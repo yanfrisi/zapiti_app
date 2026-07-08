@@ -1,0 +1,602 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
+import '../domain/bot_strategy.dart';
+import '../domain/bot_bluff_strategy.dart';
+import '../domain/bot_truco_raise_strategy.dart';
+import '../domain/bot_truco_strategy.dart';
+import '../domain/bot_memory_context.dart';
+import '../domain/character_assets.dart';
+import '../domain/debug_deals.dart';
+import '../domain/difficulty_profile.dart';
+import '../domain/difficulty_strategy.dart';
+import '../domain/limited_history.dart';
+import '../domain/played_card.dart';
+import '../domain/player.dart';
+import '../domain/round_result.dart';
+import '../domain/signal_rules.dart';
+import '../domain/spanish_card.dart';
+import '../domain/suit.dart';
+import '../domain/team_rules.dart';
+import '../domain/truco_rules.dart';
+import '../domain/zapiti_game_controller.dart';
+import '../domain/zapiti_players.dart';
+import '../domain/zapiti_rules.dart';
+import '../config/server_config.dart';
+import '../services/game_preferences_store.dart';
+import '../services/multiplayer_session_store.dart';
+import '../services/zapiti_game_socket.dart';
+import '../services/zapiti_multiplayer_protocol.dart';
+import '../services/zapiti_music_player.dart';
+import '../theme/zapiti_theme.dart';
+import '../widgets/zapiti_action_button.dart';
+import '../widgets/zapiti_card_widget.dart';
+import '../widgets/zapiti_game_table.dart';
+import '../widgets/zapiti_speech_bubble.dart';
+
+part 'game_screen_menu.dart';
+part 'game_screen_play_logic.dart';
+part 'game_screen_play_ui.dart';
+part 'game_screen_setup.dart';
+part 'game_screen_signal_logic.dart';
+part 'game_screen_state_flow.dart';
+part 'game_screen_truco_logic.dart';
+
+class GameScreen extends StatefulWidget {
+  const GameScreen({super.key});
+
+  @override
+  State<GameScreen> createState() => _GameScreenState();
+}
+
+enum _MainMenuPanel { home, tutorial, options, multiplayer }
+
+enum _BotSpeed {
+  slow('Lenta', 1.35),
+  normal('Normal', 1),
+  fast('Rapida', 0.55);
+
+  final String label;
+  final double delayFactor;
+
+  const _BotSpeed(this.label, this.delayFactor);
+}
+
+enum _ServerConnectionState {
+  idle,
+  connecting,
+  wakingServer,
+  connected,
+  reconnecting,
+  error,
+  disconnected,
+}
+
+extension on _ServerConnectionState {
+  String get label {
+    switch (this) {
+      case _ServerConnectionState.idle:
+        return 'En espera';
+      case _ServerConnectionState.connecting:
+        return 'Conectando';
+      case _ServerConnectionState.wakingServer:
+        return 'Despertando servidor';
+      case _ServerConnectionState.connected:
+        return 'Conectado';
+      case _ServerConnectionState.reconnecting:
+        return 'Reconectando';
+      case _ServerConnectionState.error:
+        return 'Error';
+      case _ServerConnectionState.disconnected:
+        return 'Desconectado';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _ServerConnectionState.idle:
+        return Icons.info_outline;
+      case _ServerConnectionState.connecting:
+        return Icons.sync_outlined;
+      case _ServerConnectionState.wakingServer:
+        return Icons.cloud_outlined;
+      case _ServerConnectionState.connected:
+        return Icons.wifi_tethering_outlined;
+      case _ServerConnectionState.reconnecting:
+        return Icons.restart_alt_outlined;
+      case _ServerConnectionState.error:
+        return Icons.error_outline;
+      case _ServerConnectionState.disconnected:
+        return Icons.wifi_off_outlined;
+    }
+  }
+}
+
+class _GameScreenState extends State<GameScreen> {
+  static const _targetScore = 30;
+  static const _defaultPlayers = ZapitiPlayers.tableOrder;
+  static const _selectedCharacterPrefsKey = 'selected_human_character_id';
+  static const _selectedDifficultyPrefsKey = 'selected_difficulty';
+  static const _audioEnabledPrefsKey = 'audio_enabled';
+  static const _audioVolumePrefsKey = 'audio_volume';
+  static const _botSpeedPrefsKey = 'bot_speed';
+  static const _showGameplayHelpPrefsKey = 'show_gameplay_help';
+  static const _confirmCardPlayPrefsKey = 'confirm_card_play';
+
+  final Map<String, String> _playerMessages = {};
+  final Map<String, Timer> _playerMessageTimers = {};
+  final Map<int, String> _knownSignalsByTeam = {};
+  final Map<int, String> _teamSignalsByTeam = {};
+  final Map<int, String> _opponentSignalsSeenByTeam = {};
+  final Set<String> _playersSignaledThisHand = {};
+  final Set<String> _forceWinRequestedPlayerIds = {};
+  String? _companionPrivateSignalStatus;
+  Random _random = Random();
+  final GamePreferencesStore _preferencesStore = const GamePreferencesStore();
+  final ZapitiMusicPlayer _musicPlayer = ZapitiMusicPlayer();
+  final Map<String, String> _characterIdsByPlayer = {
+    for (final player in _defaultPlayers) player.id: player.id,
+  };
+  late ZapitiGameController _game;
+  bool _isMultiplayerMatch = false;
+  List<Player> _multiplayerPlayers = const [];
+
+  int _handVersion = 0;
+  int? _multiplayerServerHandSequence;
+  bool _isAutoPlaying = false;
+  bool _isWaitingHumanTrucoResponse = false;
+  bool _isRequestingCompanionSignal = false;
+  bool _showGameOptions = false;
+  bool _showMainMenu = true;
+  bool _showCharacterSelection = true;
+  bool _showDifficultySelection = false;
+  bool _audioEnabled = true;
+  double _audioVolume = 0.65;
+  bool _confirmCardPlay = false;
+  _MainMenuPanel _mainMenuPanel = _MainMenuPanel.home;
+  _BotSpeed _botSpeed = _BotSpeed.normal;
+  String _selectedHumanCharacterId = 'p1';
+  int _selectedDifficulty = 3;
+  static const _debugUsePresetHands = false;
+  static const _debugPresetIndex = 0;
+  Set<String> _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
+
+  List<Player> get _players =>
+      _isMultiplayerMatch && _multiplayerPlayers.isNotEmpty
+          ? _multiplayerPlayers
+          : _defaultPlayers;
+
+  Map<int, int> get _score => _game.score;
+  Map<int, int> get _roundWins => _game.roundWins;
+  LimitedHistory get _handSummaries => _game.handSummaries;
+  List<PlayedCard> get _playedCards => _game.playedCards;
+  List<RoundResult> get _roundHistory => _game.roundHistory;
+  Map<String, List<SpanishCard>> get _hands => _game.hands;
+  Player get _currentPlayer => _game.currentPlayer;
+  Player get _humanPlayer => _game.humanPlayer;
+  List<SpanishCard> get _humanHand => _game.humanHand;
+  int get _handValue => _game.handValue;
+  set _handValue(int value) => _game.handValue = value;
+  int? get _pendingTrucoValue => _game.pendingTrucoValue;
+  set _pendingTrucoValue(int? value) => _game.pendingTrucoValue = value;
+  int? get _trucoCallerTeamId => _game.trucoCallerTeamId;
+  set _trucoCallerTeamId(int? value) => _game.trucoCallerTeamId = value;
+  int? get _winningTeamId => _game.winningTeamId;
+  set _winningTeamId(int? value) => _game.winningTeamId = value;
+  bool get _handFinished => _game.handFinished;
+  set _handFinished(bool value) => _game.handFinished = value;
+  bool get _isTrucoAccepted => _game.isTrucoAccepted;
+  set _isTrucoAccepted(bool value) => _game.isTrucoAccepted = value;
+  bool get _isRoundAwaitingContinue => _game.isRoundAwaitingContinue;
+  set _isRoundAwaitingContinue(bool value) =>
+      _game.isRoundAwaitingContinue = value;
+  String get _status => _game.status;
+  set _status(String value) => _game.status = value;
+  set _turnIndex(int value) => _game.turnIndex = value;
+  set _leadIndex(int value) => _game.leadIndex = value;
+  set _nextLeadIndex(int value) => _game.nextLeadIndex = value;
+  bool get _isHumanTurn =>
+      _currentPlayer.id == _humanPlayer.id &&
+      !_handFinished &&
+      !_isAutoPlaying &&
+      !_isRoundAwaitingContinue &&
+      !_isWaitingHumanTrucoResponse;
+  bool get _isGameFinished => _winningTeamId != null;
+  bool get _canHumanCallTruco {
+    if (_isRoundAwaitingContinue ||
+        _isWaitingHumanTrucoResponse ||
+        _isAutoPlaying) {
+      return false;
+    }
+    return _game.canCallTruco(
+      _humanPlayer,
+      value: TrucoRules.firstTrucoValue,
+      actorPlayerId: _humanPlayer.id,
+    );
+  }
+
+  List<int> get _humanRaiseOptions {
+    if (!_isWaitingHumanTrucoResponse || _pendingTrucoValue == null) {
+      return const [];
+    }
+    return _game.raiseOptions;
+  }
+
+  int get _displayedRoundNumber => _game.displayedRoundNumber;
+  Player get _companionPlayer => _players.firstWhere(
+        (player) =>
+            player.teamId == _humanPlayer.teamId &&
+            player.id != _humanPlayer.id,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _game = ZapitiGameController(
+      targetScore: _targetScore,
+      players: _players,
+      authorizedTrucoPlayerIds: _localAuthorizedTrucoPlayerIds(
+        _players,
+        ZapitiPlayers.human.id,
+      ),
+      autoStart: false,
+    );
+    _startNewHand();
+    _loadSavedCharacterSelection();
+    unawaited(_syncMusic());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_isHumanTurn && !_handFinished) {
+        _advanceBots();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _playerMessageTimers.values) {
+      timer.cancel();
+    }
+    _playerMessageTimers.clear();
+    _musicPlayer.dispose();
+    super.dispose();
+  }
+
+  void _showTemporaryPlayerMessage(
+    String playerId,
+    String message, {
+    Duration duration = const Duration(seconds: 1),
+  }) {
+    _playerMessageTimers.remove(playerId)?.cancel();
+    _playerMessages[playerId] = message;
+    _playerMessageTimers[playerId] = Timer(duration, () {
+      if (!mounted) return;
+      _updateState(() {
+        if (_playerMessages[playerId] == message) {
+          _playerMessages.remove(playerId);
+        }
+        _playerMessageTimers.remove(playerId);
+      });
+    });
+  }
+
+  void _humanVoyATi() {
+    if (_handFinished || _isGameFinished) return;
+    _updateState(() {
+      _showTemporaryPlayerMessage(_humanPlayer.id, '¡Voy a ti!');
+      if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
+          !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
+        _forceWinRequestedPlayerIds.add(_companionPlayer.id);
+      }
+    });
+    if (_isMultiplayerMatch) {
+      final socket = MultiplayerSessionStore.instance.socket;
+      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final playerId =
+          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
+      if (socket != null && socket.isConnected && roomId != null) {
+        socket.signal(
+          roomId: roomId,
+          playerId: playerId,
+          label: '¡Voy a ti!',
+          kind: 'voy_a_ti',
+        );
+      }
+    }
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+  }
+
+  void _updateState(VoidCallback action) {
+    setState(action);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cardsRemaining = {
+      for (final player in _players) player.id: _hands[player.id]?.length ?? 0,
+    };
+
+    if (_showMainMenu) {
+      return Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: _MainMenuScreen(
+            onPlay: _startFromMainMenu,
+            onTutorial: _openMainMenuTutorial,
+            onOptions: _openMainMenuOptions,
+            onMultiplayer: _openMainMenuMultiplayer,
+            onEnterGame: _enterMultiplayerMatch,
+            selectedCharacterId: _selectedHumanCharacterId,
+            onSelectedCharacterChanged: _selectHumanCharacter,
+            onBack: _closeMainMenuPanel,
+            panel: _mainMenuPanel,
+            audioEnabled: _audioEnabled,
+            onAudioChanged: _setAudioEnabled,
+            audioVolume: _audioVolume,
+            onAudioVolumeChanged: _setAudioVolume,
+            botSpeed: _botSpeed,
+            onBotSpeedChanged: _setBotSpeed,
+            confirmCardPlay: _confirmCardPlay,
+            onConfirmCardPlayChanged: _setConfirmCardPlay,
+          ),
+        ),
+      );
+    }
+
+    if (_showCharacterSelection) {
+      return Scaffold(
+        body: SafeArea(
+          child: _CharacterSelectionScreen(
+            selectedCharacterId: _selectedHumanCharacterId,
+            onSelected: _selectHumanCharacter,
+            onStart: _continueToDifficultySelection,
+          ),
+        ),
+      );
+    }
+
+    if (_showDifficultySelection) {
+      return Scaffold(
+        body: SafeArea(
+          child: _DifficultySelectionScreen(
+            selectedDifficulty: _selectedDifficulty,
+            onSelected: _selectDifficulty,
+            onStart: _startWithSelectedSettings,
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: ZapitiColors.woodDark,
+      body: SafeArea(
+        child: _WoodBackground(
+          child: Stack(
+            children: [
+              OrientationBuilder(
+                builder: (context, orientation) {
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isPortrait = orientation == Orientation.portrait;
+                      final shortest =
+                          min(constraints.maxWidth, constraints.maxHeight);
+                      final gap = shortest * (isPortrait ? 0.018 : 0.008);
+                      final padding = EdgeInsets.all(
+                          shortest * (isPortrait ? 0.018 : 0.006));
+                      final header = _CompactGameHeader(
+                        roundNumber: _displayedRoundNumber,
+                        handValue: _handValue,
+                        pendingTrucoValue: _pendingTrucoValue,
+                        trucoCallerTeamId: _trucoCallerTeamId,
+                        isTrucoAccepted: _isTrucoAccepted,
+                      );
+                      final scorePanel = _GameScorePanel(
+                        scoreTeamOne: _score[1]!,
+                        scoreTeamTwo: _score[2]!,
+                        roundWinsTeamOne: _roundWins[1]!,
+                        roundWinsTeamTwo: _roundWins[2]!,
+                        targetScore: _targetScore,
+                      );
+                      final controls = _VisibleGameControls(
+                        compact: isPortrait,
+                        signalsEnabled: !_handFinished && !_isGameFinished,
+                        isGameFinished: _isGameFinished,
+                        isHandFinished: _handFinished,
+                        isRoundAwaitingContinue: _isRoundAwaitingContinue,
+                        isWaitingHumanResponse: _isWaitingHumanTrucoResponse,
+                        canCallTruco: _canHumanCallTruco,
+                        handValue: _handValue,
+                        pendingTrucoValue: _pendingTrucoValue,
+                        trucoCallerTeamId: _trucoCallerTeamId,
+                        isTrucoAccepted: _isTrucoAccepted,
+                        raiseOptions: _humanRaiseOptions,
+                        onSignalStart: _startSignal,
+                        onSignalEnd: _endSignal,
+                        onAskCompanionSignal: _requestCompanionSignal,
+                        onVoyATi: _humanVoyATi,
+                        onCallTruco: _humanCallsTruco,
+                        onAcceptTruco: _humanAcceptsTruco,
+                        onPassTruco: _humanPassesTruco,
+                        onRaiseTruco: _humanRaisesTruco,
+                        onContinueRound: _continueAfterRound,
+                        onNewHand: _newHand,
+                        onRestart: _restartGame,
+                        onOptions: _openGameOptions,
+                        onBack: _returnToMainMenu,
+                      );
+                      Widget table() {
+                        return LayoutBuilder(
+                          builder: (context, tableConstraints) {
+                            return ZapitiGameTable(
+                              height: tableConstraints.maxHeight,
+                              players: _players,
+                              currentPlayer: _currentPlayer,
+                              humanHand: _humanHand,
+                              playedCards: _playedCards,
+                              playerMessages: _playerMessages,
+                              characterIdsByPlayer: _characterIdsByPlayer,
+                              cardsRemaining: cardsRemaining,
+                              isHumanTurn: _isHumanTurn,
+                              showHumanSeat: isPortrait,
+                              onPlayCard: _playHumanCard,
+                            );
+                          },
+                        );
+                      }
+
+                      Widget hudTile(Widget child, Alignment alignment) {
+                        return LayoutBuilder(
+                          builder: (context, tileConstraints) {
+                            final width = min(
+                                  tileConstraints.maxWidth,
+                                  tileConstraints.maxHeight *
+                                      (isPortrait ? 3.2 : 5.6),
+                                ) *
+                                0.72;
+
+                            return Align(
+                              alignment: alignment,
+                              child: SizedBox(
+                                width: width,
+                                height: tileConstraints.maxHeight,
+                                child: child,
+                              ),
+                            );
+                          },
+                        );
+                      }
+
+                      if (isPortrait) {
+                        return Padding(
+                          padding: padding,
+                          child: Column(
+                            children: [
+                              Flexible(
+                                flex: 18,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 56,
+                                      child:
+                                          hudTile(header, Alignment.centerLeft),
+                                    ),
+                                    SizedBox(width: gap),
+                                    Expanded(
+                                      flex: 44,
+                                      child: hudTile(
+                                          scorePanel, Alignment.centerRight),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: gap * 0.55),
+                              Expanded(flex: 67, child: table()),
+                              SizedBox(height: gap * 0.55),
+                              Flexible(flex: 15, child: controls),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Padding(
+                        padding: padding,
+                        child: Column(
+                          children: [
+                            Flexible(
+                              flex: 22,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 38,
+                                    child:
+                                        hudTile(header, Alignment.centerLeft),
+                                  ),
+                                  SizedBox(width: gap),
+                                  const Spacer(flex: 22),
+                                  Expanded(
+                                    flex: 40,
+                                    child: hudTile(
+                                        scorePanel, Alignment.centerRight),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: gap * 0.55),
+                            Expanded(flex: 67, child: table()),
+                            SizedBox(height: gap * 0.55),
+                            SizedBox(
+                              height: (constraints.maxHeight * 0.24)
+                                  .clamp(132.0, 180.0)
+                                  .toDouble(),
+                              child: _LandscapeBottomBoard(
+                                cards: _humanHand,
+                                enabled: _isHumanTurn,
+                                isCurrent: _humanPlayer.id == _currentPlayer.id,
+                                message: _playerMessages[_humanPlayer.id],
+                                companionMessage: _companionPrivateSignalStatus,
+                                characterId:
+                                    _characterIdsByPlayer[_humanPlayer.id] ??
+                                        _humanPlayer.id,
+                                signalsEnabled:
+                                    !_handFinished && !_isGameFinished,
+                                isGameFinished: _isGameFinished,
+                                isHandFinished: _handFinished,
+                                isRoundAwaitingContinue:
+                                    _isRoundAwaitingContinue,
+                                isWaitingHumanResponse:
+                                    _isWaitingHumanTrucoResponse,
+                                canCallTruco: _canHumanCallTruco,
+                                onPlayCard: _playHumanCard,
+                                onSignalStart: _startSignal,
+                                onSignalEnd: _endSignal,
+                                onAskCompanionSignal: _requestCompanionSignal,
+                                onVoyATi: _humanVoyATi,
+                                onCallTruco: _humanCallsTruco,
+                                onContinueRound: _continueAfterRound,
+                                onNewHand: _newHand,
+                                onRestart: _restartGame,
+                                onOptions: _openGameOptions,
+                                onBack: _returnToMainMenu,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              if (_isWaitingHumanTrucoResponse && _pendingTrucoValue != null)
+                _TrucoResponseOverlay(
+                  pendingTrucoValue: _pendingTrucoValue!,
+                  raiseOptions: _humanRaiseOptions,
+                  onAskCompanionSignal: _requestCompanionSignal,
+                  onAccept: _humanAcceptsTruco,
+                  onPass: _humanPassesTruco,
+                  onRaise: _humanRaisesTruco,
+                ),
+              if (_showGameOptions)
+                _GameOptionsOverlay(
+                  audioEnabled: _audioEnabled,
+                  onAudioChanged: _setAudioEnabled,
+                  audioVolume: _audioVolume,
+                  onAudioVolumeChanged: _setAudioVolume,
+                  botSpeed: _botSpeed,
+                  onBotSpeedChanged: _setBotSpeed,
+                  confirmCardPlay: _confirmCardPlay,
+                  onConfirmCardPlayChanged: _setConfirmCardPlay,
+                  onClose: _closeGameOptions,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
