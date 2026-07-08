@@ -6,6 +6,7 @@ class _CompactGameHeader extends StatelessWidget {
   final int? pendingTrucoValue;
   final int? trucoCallerTeamId;
   final bool isTrucoAccepted;
+  final double visualScale;
 
   const _CompactGameHeader({
     required this.roundNumber,
@@ -13,6 +14,7 @@ class _CompactGameHeader extends StatelessWidget {
     required this.pendingTrucoValue,
     required this.trucoCallerTeamId,
     required this.isTrucoAccepted,
+    this.visualScale = 1,
   });
 
   @override
@@ -20,32 +22,40 @@ class _CompactGameHeader extends StatelessWidget {
     final chinoText = handValue == 1 ? 'chino' : 'chinos';
     final trucoText = isTrucoAccepted
         ? '$handValue $chinoText'
-            : trucoCallerTeamId == null
-                ? '$handValue $chinoText'
-                : 'Equipo $trucoCallerTeamId sube a $pendingTrucoValue';
+        : trucoCallerTeamId == null
+            ? '$handValue $chinoText'
+            : 'Equipo $trucoCallerTeamId sube a $pendingTrucoValue';
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: ZapitiColors.woodDark.withValues(alpha: 0.86),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ZapitiColors.oldGold.withValues(alpha: 0.38)),
+        color: const Color(0xCC2A170F),
+        borderRadius: BorderRadius.circular(10 * visualScale),
+        border: Border.all(
+          color: const Color(0xFF9D7419),
+          width: max(1, visualScale),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 6 * visualScale,
+            offset: Offset(0, 2 * visualScale),
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final shortest = min(constraints.maxWidth, constraints.maxHeight);
-          final fontSize =
-              (constraints.maxHeight * 0.26).clamp(11.0, 22.0).toDouble();
           final padding = EdgeInsets.symmetric(
-            horizontal: shortest * 0.14,
-            vertical: shortest * 0.09,
+            horizontal: 12 * visualScale,
+            vertical: 7 * visualScale,
           );
+          final titleSize = max(9.0, 11 * visualScale);
+          final valueSize = max(13.0, 18 * visualScale);
 
           return DefaultTextStyle(
             style: Theme.of(context).textTheme.bodySmall!.copyWith(
                   color: ZapitiColors.cardCream,
                   fontWeight: FontWeight.w800,
-                  fontSize: fontSize,
                   height: 1.02,
                 ),
             child: Padding(
@@ -63,13 +73,22 @@ class _CompactGameHeader extends StatelessWidget {
                         'Ronda $roundNumber/3',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: titleSize,
+                          color: ZapitiColors.cardCream.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                      SizedBox(height: shortest * 0.035),
+                      SizedBox(height: 4 * visualScale),
                       Text(
                         trucoText,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: ZapitiColors.oldGold),
+                        style: TextStyle(
+                          color: const Color(0xFFD5A928),
+                          fontSize: valueSize,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ],
                   ),
@@ -89,6 +108,7 @@ class _GameScorePanel extends StatelessWidget {
   final int roundWinsTeamOne;
   final int roundWinsTeamTwo;
   final int targetScore;
+  final double visualScale;
 
   const _GameScorePanel({
     required this.scoreTeamOne,
@@ -96,25 +116,27 @@ class _GameScorePanel extends StatelessWidget {
     required this.roundWinsTeamOne,
     required this.roundWinsTeamTwo,
     required this.targetScore,
+    this.visualScale = 1,
   });
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final shortest = min(constraints.maxWidth, constraints.maxHeight);
-        final gap = shortest * 0.04;
-        final fontSize =
-            (constraints.maxHeight * 0.22).clamp(10.5, 20.0).toDouble();
-        final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: ZapitiColors.darkBrown,
+        final gap = 6 * visualScale;
+        final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: ZapitiColors.cardCream.withValues(alpha: 0.88),
               fontWeight: FontWeight.w900,
-              fontSize: fontSize,
+              fontSize: max(9.0, 11 * visualScale),
               height: 1.02,
             );
+        final valueStyle = labelStyle?.copyWith(
+          color: const Color(0xFFD5A928),
+          fontSize: max(10.5, 13 * visualScale),
+        );
         final padding = EdgeInsets.symmetric(
-          horizontal: gap * 0.9,
-          vertical: gap * 0.7,
+          horizontal: 12 * visualScale,
+          vertical: 8 * visualScale,
         );
         final contentWidth =
             max(0.0, constraints.maxWidth - padding.horizontal);
@@ -123,11 +145,19 @@ class _GameScorePanel extends StatelessWidget {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-            color: ZapitiColors.cardCream.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(gap * 0.75),
+            color: const Color(0xCC2A170F),
+            borderRadius: BorderRadius.circular(10 * visualScale),
             border: Border.all(
-              color: ZapitiColors.oldGold.withValues(alpha: 0.42),
+              color: const Color(0xFF9D7419),
+              width: max(1, visualScale),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.28),
+                blurRadius: 6 * visualScale,
+                offset: Offset(0, 2 * visualScale),
+              ),
+            ],
           ),
           child: FittedBox(
             fit: BoxFit.scaleDown,
@@ -140,27 +170,25 @@ class _GameScorePanel extends StatelessWidget {
                   _ScoreLine(
                     label: 'Eq1',
                     value: '$scoreTeamOne / $targetScore',
-                    style: textStyle,
+                    labelStyle: labelStyle,
+                    valueStyle: valueStyle,
                   ),
                   Divider(
-                    height: gap,
-                    color: ZapitiColors.darkBrown.withValues(alpha: 0.18),
+                    height: gap * 1.6,
+                    color: ZapitiColors.oldGold.withValues(alpha: 0.16),
                   ),
                   _ScoreLine(
                     label: 'Eq2',
                     value: '$scoreTeamTwo / $targetScore',
-                    style: textStyle,
+                    labelStyle: labelStyle,
+                    valueStyle: valueStyle,
                   ),
-                  SizedBox(height: gap * 0.45),
+                  SizedBox(height: gap * 0.7),
                   _ScoreLine(
-                    label: 'Rondas Eq1',
-                    value: '$roundWinsTeamOne / 3',
-                    style: textStyle,
-                  ),
-                  _ScoreLine(
-                    label: 'Rondas Eq2',
-                    value: '$roundWinsTeamTwo / 3',
-                    style: textStyle,
+                    label: 'Rondas',
+                    value: '$roundWinsTeamOne - $roundWinsTeamTwo',
+                    labelStyle: labelStyle,
+                    valueStyle: valueStyle,
                   ),
                 ],
               ),
@@ -175,12 +203,14 @@ class _GameScorePanel extends StatelessWidget {
 class _ScoreLine extends StatelessWidget {
   final String label;
   final String value;
-  final TextStyle? style;
+  final TextStyle? labelStyle;
+  final TextStyle? valueStyle;
 
   const _ScoreLine({
     required this.label,
     required this.value,
-    required this.style,
+    required this.labelStyle,
+    required this.valueStyle,
   });
 
   @override
@@ -193,7 +223,7 @@ class _ScoreLine extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: style,
+            style: labelStyle,
           ),
         ),
         Flexible(
@@ -204,7 +234,7 @@ class _ScoreLine extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: style,
+              style: valueStyle,
             ),
           ),
         ),
@@ -720,6 +750,7 @@ class _GameOptionsOverlay extends StatelessWidget {
 }
 
 class _LandscapeBottomBoard extends StatelessWidget {
+  final double scale;
   final List<SpanishCard> cards;
   final bool enabled;
   final bool isCurrent;
@@ -745,6 +776,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final VoidCallback onBack;
 
   const _LandscapeBottomBoard({
+    required this.scale,
     required this.cards,
     required this.enabled,
     required this.isCurrent,
@@ -774,14 +806,23 @@ class _LandscapeBottomBoard extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final shortest = min(constraints.maxWidth, constraints.maxHeight);
-        final gap = shortest * 0.055;
+        final gap = max(4.0, 5 * scale);
+        final actionWidth = min(
+          constraints.maxWidth * 0.33,
+          (270 * scale).clamp(220.0, 338.0),
+        );
+        final historyWidth = min(
+          constraints.maxWidth * 0.34,
+          (296 * scale).clamp(244.0, 370.0),
+        );
 
         return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(
-              flex: 20,
+            SizedBox(
+              width: actionWidth,
               child: _LandscapeActionPanel(
+                scale: scale,
                 gap: gap,
                 signalsEnabled: signalsEnabled,
                 isGameFinished: isGameFinished,
@@ -801,8 +842,8 @@ class _LandscapeBottomBoard extends StatelessWidget {
             ),
             SizedBox(width: gap),
             Expanded(
-              flex: 40,
               child: _LandscapeHumanPanel(
+                scale: scale,
                 cards: cards,
                 enabled: enabled,
                 isCurrent: isCurrent,
@@ -813,11 +854,13 @@ class _LandscapeBottomBoard extends StatelessWidget {
               ),
             ),
             SizedBox(width: gap),
-            Expanded(
-              flex: 40,
+            SizedBox(
+              width: historyWidth,
               child: _SignalsBar(
                 enabled: signalsEnabled,
                 compact: true,
+                twoRows: true,
+                scale: scale,
                 onSignalStart: onSignalStart,
                 onSignalEnd: onSignalEnd,
               ),
@@ -830,6 +873,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
 }
 
 class _LandscapeActionPanel extends StatelessWidget {
+  final double scale;
   final double gap;
   final bool signalsEnabled;
   final bool isGameFinished;
@@ -847,6 +891,7 @@ class _LandscapeActionPanel extends StatelessWidget {
   final VoidCallback onBack;
 
   const _LandscapeActionPanel({
+    required this.scale,
     required this.gap,
     required this.signalsEnabled,
     required this.isGameFinished,
@@ -866,45 +911,74 @@ class _LandscapeActionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(child: _primaryAction()),
-        SizedBox(height: gap),
-        Expanded(
-          child: ZapitiActionButton(
-            label: 'PEDIR SENA',
-            icon: Icons.visibility_outlined,
-            onPressed: signalsEnabled ? onAskCompanionSignal : null,
-          ),
+    final primaryHeight = (50 * scale).clamp(40.0, 62.0);
+    final secondaryHeight = (40 * scale).clamp(34.0, 52.0);
+
+    return Container(
+      padding: EdgeInsets.all(max(4.0, 5 * scale)),
+      decoration: BoxDecoration(
+        color: const Color(0x992A170F),
+        borderRadius: BorderRadius.circular(10 * scale),
+        border: Border.all(
+          color: ZapitiColors.oldGold.withValues(alpha: 0.5),
+          width: max(1, scale),
         ),
-        SizedBox(height: gap),
-        Expanded(
-          child: ZapitiActionButton(
-            label: '¡VOY A TI!',
-            icon: Icons.record_voice_over_outlined,
-            onPressed: signalsEnabled ? onVoyATi : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(height: primaryHeight, child: _primaryAction()),
+          SizedBox(height: gap),
+          SizedBox(
+            height: secondaryHeight,
+            child: Row(
+              children: [
+                Expanded(
+                  child: ZapitiActionButton(
+                    label: 'PEDIR SENA',
+                    icon: Icons.visibility_outlined,
+                    onPressed: signalsEnabled ? onAskCompanionSignal : null,
+                  ),
+                ),
+                SizedBox(width: gap),
+                Expanded(
+                  child: ZapitiActionButton(
+                    label: '¡VOY A TI!',
+                    icon: Icons.record_voice_over_outlined,
+                    onPressed: signalsEnabled ? onVoyATi : null,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: gap),
-        Expanded(
-          child: ZapitiActionButton(
-            label: 'OPCIONES',
-            icon: Icons.settings_outlined,
-            onPressed: onOptions,
-            primary: false,
+          SizedBox(height: gap),
+          SizedBox(
+            height: secondaryHeight,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _DarkUtilityButton(
+                    label: 'OPCIONES',
+                    icon: Icons.settings_outlined,
+                    onPressed: onOptions,
+                    scale: scale,
+                  ),
+                ),
+                SizedBox(width: gap),
+                Expanded(
+                  child: _DarkUtilityButton(
+                    label: 'VOLVER',
+                    icon: Icons.arrow_back,
+                    onPressed: onBack,
+                    scale: scale,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: gap),
-        Expanded(
-          child: ZapitiActionButton(
-            label: 'VOLVER',
-            icon: Icons.arrow_back,
-            onPressed: onBack,
-            primary: false,
-          ),
-        ),
-      ],
+          const Spacer(),
+        ],
+      ),
     );
   }
 
@@ -938,7 +1012,70 @@ class _LandscapeActionPanel extends StatelessWidget {
   }
 }
 
+class _DarkUtilityButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final double scale;
+
+  const _DarkUtilityButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    required this.scale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xCC2A170F),
+          foregroundColor: ZapitiColors.cardCream,
+          disabledBackgroundColor:
+              ZapitiColors.cardCream.withValues(alpha: 0.24),
+          disabledForegroundColor:
+              ZapitiColors.darkBrown.withValues(alpha: 0.46),
+          padding: EdgeInsets.symmetric(horizontal: 7 * scale),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8 * scale),
+            side: BorderSide(
+              color: ZapitiColors.oldGold.withValues(alpha: 0.72),
+              width: max(1, scale),
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: (17 * scale).clamp(14.0, 21.0)),
+            SizedBox(width: 5 * scale),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: max(9.0, 10.5 * scale),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LandscapeHumanPanel extends StatelessWidget {
+  final double scale;
   final List<SpanishCard> cards;
   final bool enabled;
   final bool isCurrent;
@@ -948,6 +1085,7 @@ class _LandscapeHumanPanel extends StatelessWidget {
   final ValueChanged<SpanishCard> onPlayCard;
 
   const _LandscapeHumanPanel({
+    required this.scale,
     required this.cards,
     required this.enabled,
     required this.isCurrent,
@@ -961,20 +1099,32 @@ class _LandscapeHumanPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const slots = 4;
-        final shortest = min(constraints.maxWidth, constraints.maxHeight);
-        final gap = shortest * 0.055;
-        final padding = EdgeInsets.symmetric(
-          horizontal: gap * 0.5,
-          vertical: gap * 0.35,
-        );
+        const slots = 3;
+        final gap = max(5.0, 7 * scale);
+        final padding = EdgeInsets.only(top: 2 * scale);
         final usableWidth = max(0.0, constraints.maxWidth - padding.horizontal);
         final usableHeight = max(0.0, constraints.maxHeight - padding.vertical);
-        final widthBound = max(0.0, (usableWidth - gap * (slots - 1)) / slots);
+        const overlapFactor = 0.66;
+        final localFactor = usableHeight < 150 ? 0.75 : 0.9;
+        final avatarWidth = (96 * scale * localFactor).clamp(68.0, 108.0);
+        final avatarHeight = min(
+          usableHeight,
+          (154 * scale * localFactor).clamp(104.0, 172.0),
+        );
         final heightBound = usableHeight * 80 / 122;
-        final slotWidth = min(widthBound, heightBound);
-        final slotHeight = slotWidth * 122 / 80;
-        final rowWidth = slotWidth * slots + gap * (slots - 1);
+        final widthBound = max(
+          0.0,
+          (usableWidth - avatarWidth - gap * 2) /
+              (1 + overlapFactor * (slots - 1)),
+        );
+        final cardWidth = min(
+          (118 * scale * localFactor).clamp(78.0, 132.0),
+          min(widthBound, heightBound),
+        );
+        final cardHeight = cardWidth * 122 / 80;
+        final cardOffset = cardWidth * overlapFactor;
+        final handWidth = cardWidth + cardOffset * (slots - 1);
+        final rowWidth = avatarWidth + gap * 1.6 + handWidth;
         final signalText = _signalStatusText(companionMessage);
 
         return Padding(
@@ -982,31 +1132,52 @@ class _LandscapeHumanPanel extends StatelessWidget {
           child: Center(
             child: SizedBox(
               width: rowWidth,
-              height: slotHeight,
+              height: max(avatarHeight, cardHeight),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      for (var index = 0; index < 3; index++) ...[
-                        _LandscapeCardSlot(
-                          card: index < cards.length ? cards[index] : null,
-                          enabled: enabled && index < cards.length,
-                          width: slotWidth,
-                          height: slotHeight,
-                          onTap: index < cards.length
-                              ? () => onPlayCard(cards[index])
-                              : null,
-                        ),
-                        SizedBox(width: gap),
-                      ],
                       _LandscapeAvatarSlot(
                         isCurrent: isCurrent,
                         message: message,
                         characterId: characterId,
-                        width: slotWidth,
-                        height: slotHeight,
+                        width: avatarWidth,
+                        height: avatarHeight,
                         gap: gap,
+                      ),
+                      SizedBox(width: gap * 1.6),
+                      SizedBox(
+                        width: handWidth,
+                        height: cardHeight + 10 * scale,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            for (var index = 0; index < slots; index++)
+                              AnimatedPositioned(
+                                key: ValueKey('landscape-card-$index'),
+                                duration: const Duration(milliseconds: 160),
+                                curve: Curves.easeOut,
+                                left: cardOffset * index,
+                                bottom: enabled && index < cards.length
+                                    ? 6 * scale
+                                    : 0,
+                                child: _LandscapeCardSlot(
+                                  card: index < cards.length
+                                      ? cards[index]
+                                      : null,
+                                  enabled: enabled && index < cards.length,
+                                  width: cardWidth,
+                                  height: cardHeight,
+                                  highlighted: enabled && index < cards.length,
+                                  onTap: index < cards.length
+                                      ? () => onPlayCard(cards[index])
+                                      : null,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -1107,6 +1278,7 @@ class _LandscapeCardSlot extends StatelessWidget {
   final bool enabled;
   final double width;
   final double height;
+  final bool highlighted;
   final VoidCallback? onTap;
 
   const _LandscapeCardSlot({
@@ -1114,6 +1286,7 @@ class _LandscapeCardSlot extends StatelessWidget {
     required this.enabled,
     required this.width,
     required this.height,
+    this.highlighted = false,
     required this.onTap,
   });
 
@@ -1122,12 +1295,26 @@ class _LandscapeCardSlot extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: ZapitiCardWidget(
-        card: card,
-        width: width,
-        height: height,
-        enabled: enabled,
-        onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: highlighted
+              ? [
+                  BoxShadow(
+                    color: ZapitiColors.oldGold.withValues(alpha: 0.32),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: ZapitiCardWidget(
+          card: card,
+          width: width,
+          height: height,
+          enabled: enabled,
+          onTap: onTap,
+        ),
       ),
     );
   }
@@ -1168,17 +1355,17 @@ class _LandscapeAvatarSlot extends StatelessWidget {
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xCC2A170F),
                 borderRadius: BorderRadius.circular(gap * 0.9),
                 border: Border.all(
                   color: isCurrent
                       ? ZapitiColors.oldGold
-                      : ZapitiColors.darkBrown.withValues(alpha: 0.2),
+                      : ZapitiColors.oldGold.withValues(alpha: 0.48),
                   width: max(1.0, gap * (isCurrent ? 0.26 : 0.16)),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
+                    color: Colors.black.withValues(alpha: 0.28),
                     blurRadius: gap * 1.8,
                     offset: Offset(0, gap * 0.55),
                   ),
@@ -1188,32 +1375,19 @@ class _LandscapeAvatarSlot extends StatelessWidget {
                 borderRadius: BorderRadius.circular(gap * 0.75),
                 child: Align(
                   alignment: Alignment.bottomCenter,
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.diagonal3Values(
-                      mirrorAvatar ? -1 : 1,
-                      1,
-                      1,
-                    ),
-                    child: Transform.translate(
-                      offset: Offset(0, avatarVerticalOffset),
-                      child: Image.asset(
-                        avatarPath,
-                        key: ValueKey(avatarPath),
-                        width: width,
-                        height: height,
-                        fit: BoxFit.contain,
-                        gaplessPlayback: true,
-                        alignment: Alignment.bottomCenter,
-                        errorBuilder: (_, __, ___) {
-                          return Icon(
-                            Icons.person,
-                            color:
-                                ZapitiColors.darkBrown.withValues(alpha: 0.7),
-                          );
-                        },
-                      ),
-                    ),
+                  child: AvatarWithSilhouette(
+                    assetPath: avatarPath,
+                    width: width,
+                    height: height,
+                    mirror: mirrorAvatar,
+                    offset: Offset(0, avatarVerticalOffset),
+                    alignment: Alignment.bottomCenter,
+                    errorBuilder: (_, __, ___) {
+                      return Icon(
+                        Icons.person,
+                        color: ZapitiColors.darkBrown.withValues(alpha: 0.7),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1260,12 +1434,16 @@ class _LandscapeAvatarSlot extends StatelessWidget {
 class _SignalsBar extends StatelessWidget {
   final bool enabled;
   final bool compact;
+  final bool twoRows;
+  final double scale;
   final ValueChanged<String> onSignalStart;
   final ValueChanged<String> onSignalEnd;
 
   const _SignalsBar({
     required this.enabled,
     required this.compact,
+    this.twoRows = false,
+    this.scale = 1,
     required this.onSignalStart,
     required this.onSignalEnd,
   });
@@ -1314,19 +1492,30 @@ class _SignalsBar extends StatelessWidget {
     if (compact) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final shortest = min(constraints.maxWidth, constraints.maxHeight);
-          final gap = shortest * 0.045;
-
-          return Container(
-            padding: EdgeInsets.all(gap),
-            decoration: BoxDecoration(
-              color: ZapitiColors.woodDark.withValues(alpha: 0.64),
-              borderRadius: BorderRadius.circular(gap),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
+          final gap = max(6.0, 7 * scale);
+          if (!twoRows) {
+            return Container(
+              padding: EdgeInsets.all(gap),
+              decoration: BoxDecoration(
+                color: const Color(0xCC2A170F),
+                borderRadius: BorderRadius.circular(10 * scale),
+                border: Border.all(
+                  color: ZapitiColors.oldGold.withValues(alpha: 0.58),
+                  width: max(1, scale),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.26),
+                    blurRadius: 6 * scale,
+                    offset: Offset(0, 2 * scale),
+                  ),
+                ],
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: SizedBox(
+                  width: max(0, constraints.maxWidth - gap * 2),
+                  height: max(0, constraints.maxHeight - gap * 2),
                   child: Row(
                     children: [
                       for (final signal in _signals)
@@ -1345,7 +1534,87 @@ class _SignalsBar extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
+            );
+          }
+
+          final horizontalGap = max(6.0, 8 * scale);
+          final verticalGap = max(4.0, 6 * scale);
+          final availableWidth = max(0.0, constraints.maxWidth - gap * 2);
+          final availableHeight = max(0.0, constraints.maxHeight - gap * 2);
+          final widthBound = (availableWidth - horizontalGap * 3) / 4;
+          final heightBound = (availableHeight - verticalGap) / 2;
+          final signalSize = min(
+            52 * scale,
+            min(widthBound, heightBound),
+          ).clamp(42.0, 66.0).toDouble();
+          final firstRow = _signals.take(4).toList();
+          final secondRow = _signals.skip(4).toList();
+
+          List<Widget> rowButtons(
+            List<
+                    ({
+                      String label,
+                      SpanishCard? card,
+                      bool hiddenCard,
+                    })>
+                signals,
+          ) {
+            return [
+              for (var index = 0; index < signals.length; index++) ...[
+                if (index > 0) SizedBox(width: horizontalGap),
+                SizedBox(
+                  width: signalSize,
+                  height: signalSize,
+                  child: _SignalHoldButton(
+                    label: signals[index].label,
+                    card: signals[index].card,
+                    hiddenCard: signals[index].hiddenCard,
+                    enabled: enabled,
+                    compact: true,
+                    dense: true,
+                    onStart: () => onSignalStart(signals[index].label),
+                    onEnd: () => onSignalEnd(signals[index].label),
+                  ),
+                ),
               ],
+            ];
+          }
+
+          return Container(
+            padding: EdgeInsets.all(gap),
+            decoration: BoxDecoration(
+              color: const Color(0xCC2A170F),
+              borderRadius: BorderRadius.circular(10 * scale),
+              border: Border.all(
+                color: ZapitiColors.oldGold.withValues(alpha: 0.58),
+                width: max(1, scale),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.26),
+                  blurRadius: 6 * scale,
+                  offset: Offset(0, 2 * scale),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: rowButtons(firstRow),
+                  ),
+                  SizedBox(height: verticalGap),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: rowButtons(secondRow),
+                  ),
+                ],
+              ),
             ),
           );
         },

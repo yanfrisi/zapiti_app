@@ -39,9 +39,11 @@ class _OpponentSeat extends StatelessWidget {
         width: width,
         gap: metrics.gap,
         compact: compact,
-        bubblePosition:
-            position == _SeatPosition.top ? _BubblePosition.right : _BubblePosition.above,
+        bubblePosition: position == _SeatPosition.top
+            ? _BubblePosition.right
+            : _BubblePosition.above,
         showBubble: showBubble,
+        teammateAccent: position == _SeatPosition.left,
       );
     }
 
@@ -49,26 +51,34 @@ class _OpponentSeat extends StatelessWidget {
       return LayoutBuilder(
         builder: (context, constraints) {
           final avatarHeight = min(
-            metrics.companionAvatarHeight,
+            metrics.remotePlayer.avatarHeight,
             constraints.maxHeight * 0.94,
           );
           final verticalLift =
-              metrics.portrait ? 0.0 : metrics.companionAvatarHeight * 0.22;
+              metrics.portrait ? 0.0 : metrics.remotePlayer.avatarHeight * 0.22;
           final companionCards = _HiddenCards(
             count: cardsRemaining,
             horizontal: true,
-            cardWidth: metrics.companionCardWidth,
-            gap: metrics.gap,
+            cardWidth: metrics.remotePlayer.cardWidth,
+            gap: metrics.remotePlayer.cardGap,
           );
           final visibleMessage = _visibleMessageFrom(message);
+          final remoteAvatarWidth = metrics.portrait
+              ? metrics.companionCardWidth
+              : min(
+                  metrics.remotePlayer.avatarWidth,
+                  constraints.maxWidth,
+                );
           final hiddenCardsWidth =
-              metrics.companionCardWidth * 3 + metrics.gap * 0.8 * 2;
-          final contentWidth = metrics.companionCardWidth +
-              metrics.gap * 1.4 +
-              hiddenCardsWidth;
+              metrics.remotePlayer.cardWidth * 3 +
+                  metrics.remotePlayer.cardGap * 0.8 * 2;
+          final contentWidth =
+              remoteAvatarWidth +
+                  metrics.remotePlayer.avatarCardGap +
+                  hiddenCardsWidth;
           final contentLeft = (constraints.maxWidth - contentWidth) / 2;
           final firstCardLeft =
-              contentLeft + metrics.companionCardWidth + metrics.gap * 1.4;
+              contentLeft + remoteAvatarWidth + metrics.remotePlayer.avatarCardGap;
           return SizedBox(
             width: constraints.maxWidth,
             height: constraints.maxHeight,
@@ -87,10 +97,10 @@ class _OpponentSeat extends StatelessWidget {
                         children: [
                           avatarFor(
                             avatarHeight,
-                            width: metrics.companionCardWidth,
+                            width: remoteAvatarWidth,
                             showBubble: false,
                           ),
-                          SizedBox(width: metrics.gap * 1.4),
+                          SizedBox(width: metrics.remotePlayer.avatarCardGap),
                           companionCards,
                         ],
                       ),
@@ -116,17 +126,22 @@ class _OpponentSeat extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final avatarHeight = min(metrics.avatarHeight, constraints.maxHeight);
-        final avatarWidth =
-            min(metrics.opponentCardWidth, constraints.maxWidth);
+        final avatarHeight =
+            min(metrics.remotePlayer.avatarHeight, constraints.maxHeight);
+        final avatarWidth = metrics.portrait
+            ? min(metrics.opponentCardWidth, constraints.maxWidth)
+            : min(
+                metrics.remotePlayer.avatarWidth,
+                constraints.maxWidth,
+              );
         final sideCards = _HiddenCards(
           count: cardsRemaining,
           horizontal: !metrics.portrait,
           cardWidth: min(
-            metrics.opponentCardWidth,
+            metrics.remotePlayer.cardWidth,
             constraints.maxWidth,
           ),
-          gap: metrics.gap,
+          gap: metrics.remotePlayer.cardGap,
         );
         final avatar = avatarFor(
           avatarHeight,
@@ -159,9 +174,9 @@ class _OpponentSeat extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox(width: metrics.gap * 1.2),
+                      SizedBox(width: metrics.remotePlayer.avatarCardGap),
                       avatar,
-                      SizedBox(width: metrics.gap * 1.2),
+                      SizedBox(width: metrics.remotePlayer.avatarCardGap),
                       sideCards,
                     ],
                   ),
@@ -170,9 +185,9 @@ class _OpponentSeat extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       sideCards,
-                      SizedBox(width: metrics.gap * 1.2),
+                      SizedBox(width: metrics.remotePlayer.avatarCardGap),
                       avatar,
-                      SizedBox(width: metrics.gap * 1.2),
+                      SizedBox(width: metrics.remotePlayer.avatarCardGap),
                     ],
                   ),
                 _ => const SizedBox.shrink(),
@@ -389,6 +404,7 @@ class _SeatAvatar extends StatelessWidget {
   final bool compact;
   final _BubblePosition bubblePosition;
   final bool showBubble;
+  final bool teammateAccent;
 
   const _SeatAvatar({
     required this.isCurrent,
@@ -400,6 +416,7 @@ class _SeatAvatar extends StatelessWidget {
     this.compact = false,
     this.bubblePosition = _BubblePosition.above,
     this.showBubble = true,
+    this.teammateAccent = false,
   });
 
   @override
@@ -428,6 +445,7 @@ class _SeatAvatar extends StatelessWidget {
                 mirror: mirrorAvatar,
                 verticalOffset: avatarVerticalOffset,
                 radius: gap * 0.9,
+                teammateAccent: teammateAccent,
               ),
             ),
             if (showBubble && visibleMessage != null)
@@ -460,6 +478,7 @@ class _SeatAvatar extends StatelessWidget {
               mirror: mirrorAvatar,
               verticalOffset: avatarVerticalOffset,
               radius: gap * 0.9,
+              teammateAccent: teammateAccent,
             ),
           ),
           if (showBubble && visibleMessage != null)
@@ -537,7 +556,6 @@ class _PositionedBubble extends StatelessWidget {
         ),
     };
   }
-
 }
 
 class _PlayerAvatar extends StatelessWidget {
@@ -548,6 +566,7 @@ class _PlayerAvatar extends StatelessWidget {
   final bool mirror;
   final double verticalOffset;
   final double radius;
+  final bool teammateAccent;
 
   const _PlayerAvatar({
     required this.assetPath,
@@ -557,6 +576,7 @@ class _PlayerAvatar extends StatelessWidget {
     required this.mirror,
     required this.verticalOffset,
     required this.radius,
+    this.teammateAccent = false,
   });
 
   @override
@@ -570,39 +590,44 @@ class _PlayerAvatar extends StatelessWidget {
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: const Color(0xCC2A170F),
             borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: teammateAccent
+                  ? Colors.lightBlueAccent.withValues(alpha: 0.78)
+                  : ZapitiColors.oldGold.withValues(alpha: 0.54),
+              width: teammateAccent
+                  ? max(1.4, radius * 0.16)
+                  : max(1.0, radius * 0.1),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.16),
+                color: Colors.black.withValues(alpha: 0.28),
                 blurRadius: radius,
                 offset: Offset(0, radius * 0.45),
               ),
+              if (teammateAccent)
+                BoxShadow(
+                  color: Colors.lightBlueAccent.withValues(alpha: 0.32),
+                  blurRadius: radius * 1.7,
+                ),
             ],
           ),
           child: Align(
             alignment: Alignment.bottomCenter,
-            child: Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.diagonal3Values(mirror ? -1 : 1, 1, 1),
-              child: Transform.translate(
-                offset: Offset(0, verticalOffset),
-                child: Image.asset(
-                  assetPath,
-                  key: ValueKey(assetPath),
-                  width: width,
-                  height: height,
-                  fit: BoxFit.contain,
-                  gaplessPlayback: true,
-                  alignment: Alignment.bottomCenter,
-                  errorBuilder: (_, __, ___) {
-                    return Icon(
-                      Icons.person,
-                      color: ZapitiColors.darkBrown.withValues(alpha: 0.7),
-                    );
-                  },
-                ),
-              ),
+            child: AvatarWithSilhouette(
+              assetPath: assetPath,
+              width: width,
+              height: height,
+              mirror: mirror,
+              offset: Offset(0, verticalOffset),
+              alignment: Alignment.bottomCenter,
+              errorBuilder: (_, __, ___) {
+                return Icon(
+                  Icons.person,
+                  color: ZapitiColors.cardCream.withValues(alpha: 0.82),
+                );
+              },
             ),
           ),
         ),

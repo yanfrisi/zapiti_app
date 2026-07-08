@@ -7,6 +7,7 @@ import '../domain/played_card.dart';
 import '../domain/player.dart';
 import '../domain/spanish_card.dart';
 import '../theme/zapiti_theme.dart';
+import 'avatar_with_silhouette.dart';
 import 'zapiti_card_widget.dart';
 import 'zapiti_speech_bubble.dart';
 

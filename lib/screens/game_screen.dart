@@ -32,6 +32,7 @@ import '../services/zapiti_game_socket.dart';
 import '../services/zapiti_multiplayer_protocol.dart';
 import '../services/zapiti_music_player.dart';
 import '../theme/zapiti_theme.dart';
+import '../widgets/avatar_with_silhouette.dart';
 import '../widgets/zapiti_action_button.dart';
 import '../widgets/zapiti_card_widget.dart';
 import '../widgets/zapiti_game_table.dart';
@@ -504,37 +505,87 @@ class _GameScreenState extends State<GameScreen> {
                         );
                       }
 
+                      final width = constraints.maxWidth;
+                      final height = constraints.maxHeight;
+                      final scale = min(
+                        1.25,
+                        min(width / 932, height / 430),
+                      );
+                      final edge = max(8.0, 12 * scale);
+                      final headerWidth = (195 * scale).clamp(150.0, 244.0);
+                      final headerHeight = (54 * scale).clamp(44.0, 68.0);
+                      final scoreWidth = (195 * scale).clamp(162.0, 244.0);
+                      final scoreHeight = (82 * scale).clamp(66.0, 102.0);
+                      final bottomHeight =
+                          (166 * scale).clamp(138.0, 206.0).toDouble();
+                      final tableTop =
+                          max(headerHeight + 4 * scale, 54 * scale);
+                      final tableBottom = bottomHeight + 4 * scale;
+                      final tableSideInset = (28 * scale).clamp(8.0, 42.0);
+
                       return Padding(
-                        padding: padding,
-                        child: Column(
+                        padding: EdgeInsets.all(edge),
+                        child: Stack(
+                          clipBehavior: Clip.none,
                           children: [
-                            Flexible(
-                              flex: 22,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 38,
-                                    child:
-                                        hudTile(header, Alignment.centerLeft),
-                                  ),
-                                  SizedBox(width: gap),
-                                  const Spacer(flex: 22),
-                                  Expanded(
-                                    flex: 40,
-                                    child: hudTile(
-                                        scorePanel, Alignment.centerRight),
-                                  ),
-                                ],
+                            Positioned(
+                              left: 0,
+                              top: 0,
+                              width: headerWidth,
+                              height: headerHeight,
+                              child: _CompactGameHeader(
+                                roundNumber: _displayedRoundNumber,
+                                handValue: _handValue,
+                                pendingTrucoValue: _pendingTrucoValue,
+                                trucoCallerTeamId: _trucoCallerTeamId,
+                                isTrucoAccepted: _isTrucoAccepted,
+                                visualScale: scale,
                               ),
                             ),
-                            SizedBox(height: gap * 0.55),
-                            Expanded(flex: 67, child: table()),
-                            SizedBox(height: gap * 0.55),
-                            SizedBox(
-                              height: (constraints.maxHeight * 0.24)
-                                  .clamp(132.0, 180.0)
-                                  .toDouble(),
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              width: scoreWidth,
+                              height: scoreHeight,
+                              child: _GameScorePanel(
+                                scoreTeamOne: _score[1]!,
+                                scoreTeamTwo: _score[2]!,
+                                roundWinsTeamOne: _roundWins[1]!,
+                                roundWinsTeamTwo: _roundWins[2]!,
+                                targetScore: _targetScore,
+                                visualScale: scale,
+                              ),
+                            ),
+                            Positioned(
+                              left: tableSideInset,
+                              right: tableSideInset,
+                              top: tableTop,
+                              bottom: tableBottom,
+                              child: LayoutBuilder(
+                                builder: (context, tableConstraints) {
+                                  return ZapitiGameTable(
+                                    height: tableConstraints.maxHeight,
+                                    players: _players,
+                                    currentPlayer: _currentPlayer,
+                                    humanHand: _humanHand,
+                                    playedCards: _playedCards,
+                                    playerMessages: _playerMessages,
+                                    characterIdsByPlayer: _characterIdsByPlayer,
+                                    cardsRemaining: cardsRemaining,
+                                    isHumanTurn: _isHumanTurn,
+                                    showHumanSeat: false,
+                                    onPlayCard: _playHumanCard,
+                                  );
+                                },
+                              ),
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: bottomHeight,
                               child: _LandscapeBottomBoard(
+                                scale: scale,
                                 cards: _humanHand,
                                 enabled: _isHumanTurn,
                                 isCurrent: _humanPlayer.id == _currentPlayer.id,

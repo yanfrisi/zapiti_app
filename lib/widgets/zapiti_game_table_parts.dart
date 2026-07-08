@@ -2,6 +2,24 @@ part of 'zapiti_game_table.dart';
 
 enum _SeatPosition { top, right, bottom, left }
 
+class RemotePlayerVisualMetrics {
+  final double avatarWidth;
+  final double avatarHeight;
+  final double cardWidth;
+  final double cardHeight;
+  final double cardGap;
+  final double avatarCardGap;
+
+  const RemotePlayerVisualMetrics({
+    required this.avatarWidth,
+    required this.avatarHeight,
+    required this.cardWidth,
+    required this.cardHeight,
+    required this.cardGap,
+    required this.avatarCardGap,
+  });
+}
+
 class _BoardMetrics {
   final Size size;
   final bool portrait;
@@ -12,6 +30,7 @@ class _BoardMetrics {
   final double opponentCardWidth;
   final double companionCardWidth;
   final double companionAvatarHeight;
+  final RemotePlayerVisualMetrics remotePlayer;
   final double humanCardWidth;
   final double humanCardHeight;
   final double playedCardWidth;
@@ -26,6 +45,7 @@ class _BoardMetrics {
     required this.opponentCardWidth,
     required this.companionCardWidth,
     required this.companionAvatarHeight,
+    required this.remotePlayer,
     required this.humanCardWidth,
     required this.humanCardHeight,
     required this.playedCardWidth,
@@ -49,14 +69,35 @@ class _BoardMetrics {
             min(size.height * 0.24, size.width * 0.108),
           );
     final humanCardHeight = humanCardWidth * 122 / 80;
-    final companionCardWidth = portrait
+    final baseRemoteCardWidth = portrait
         ? min(humanCardWidth * 0.72, shortest * 0.24)
-        : min(size.height * 0.19, size.width * 0.078);
+        : min(size.height * 0.28, size.width * 0.102)
+            .clamp(38.0, 56.0)
+            .toDouble();
+    final remotePlayerScaleFactor =
+        portrait ? 1.0 : (size.width < 760 || size.height < 170 ? 1.7 : 2.0);
+    final companionCardWidth = portrait
+        ? baseRemoteCardWidth
+        : (baseRemoteCardWidth * remotePlayerScaleFactor)
+            .clamp(64.0, 104.0)
+            .toDouble();
     final opponentCardWidth = portrait
         ? min(humanCardWidth * 0.68, shortest * 0.23)
         : companionCardWidth;
     final opponentCardHeight = opponentCardWidth * 122 / 80;
-    final companionAvatarHeight = companionCardWidth * 122 / 80;
+    final companionAvatarHeight = portrait
+        ? companionCardWidth * 122 / 80
+        : (companionCardWidth * 78 / 44).clamp(104.0, 164.0).toDouble();
+    final remotePlayer = RemotePlayerVisualMetrics(
+      avatarWidth: portrait
+          ? companionCardWidth
+          : (companionCardWidth * 52 / 44).clamp(76.0, 124.0).toDouble(),
+      avatarHeight: companionAvatarHeight,
+      cardWidth: companionCardWidth,
+      cardHeight: opponentCardHeight,
+      cardGap: portrait ? gap : max(gap * 1.45, 5.0),
+      avatarCardGap: portrait ? gap * 1.4 : max(gap * 2.2, 8.0),
+    );
     final tableSize = portrait
         ? Size.square(
             _portraitTableSide(
@@ -103,6 +144,7 @@ class _BoardMetrics {
       opponentCardWidth: opponentCardWidth,
       companionCardWidth: companionCardWidth,
       companionAvatarHeight: companionAvatarHeight,
+      remotePlayer: remotePlayer,
       humanCardWidth: humanCardWidth,
       humanCardHeight: humanCardHeight,
       playedCardWidth: playedCardWidth,
@@ -147,11 +189,11 @@ class _BoardMetrics {
     );
     final tableHeight = min(
       availableHeight,
-      shortest * 0.82,
-    ).clamp(humanCardWidth * 1.35, shortest * 0.88).toDouble();
+      shortest * 1.04,
+    ).clamp(humanCardWidth * 1.35, shortest * 1.08).toDouble();
     final tableWidth = min(
       availableWidth,
-      tableHeight * 2.12,
+      tableHeight * 2.36,
     ).clamp(tableHeight, size.width - gap * 2).toDouble();
 
     return Size(tableWidth, tableHeight);

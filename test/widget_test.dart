@@ -174,7 +174,8 @@ void main() {
     );
     expect(find.text('Muy facil'), findsOneWidget);
     expect(find.text('Experto'), findsOneWidget);
-    expect(find.text('Bots distraidos, mas errores y trucos flojos.'), findsNothing);
+    expect(find.text('Bots distraidos, mas errores y trucos flojos.'),
+        findsNothing);
     expect(find.text('Juegan aceptable, pero se precipitan.'), findsNothing);
   });
 
@@ -257,8 +258,8 @@ void main() {
     expect(find.text('Jugador rival 2'), findsNothing);
     expect(find.text('Eq1'), findsOneWidget);
     expect(find.text('Eq2'), findsOneWidget);
-    expect(find.text('Rondas Eq1'), findsOneWidget);
-    expect(find.text('Rondas Eq2'), findsOneWidget);
+    expect(find.text('Rondas'), findsOneWidget);
+    expect(find.text('0 - 0'), findsOneWidget);
     expect(find.text('Senas'), findsNothing);
     expect(find.text('PEDIR SENA'), findsOneWidget);
     expect(find.text('DEV'), findsNothing);
@@ -335,6 +336,28 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.textContaining('Ronda 1/3'), findsOneWidget);
   });
+
+  for (final size in <Size>[
+    const Size(800, 360),
+    const Size(932, 430),
+    const Size(1080, 480),
+    const Size(1280, 600),
+  ]) {
+    testWidgets('la mesa no desborda en landscape ${size.width}x${size.height}',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await startGame(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Ronda 1/3'), findsOneWidget);
+      expect(find.text('Rondas'), findsOneWidget);
+      expect(find.text('CANTAR TRUCO'), findsOneWidget);
+    });
+  }
 
   testWidgets('pedir sena muestra respuesta en landscape', (tester) async {
     tester.view.physicalSize = const Size(844, 390);
