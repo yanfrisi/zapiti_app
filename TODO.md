@@ -1,46 +1,23 @@
-# TODO del proyecto Zápiti
+# Estado del proyecto Zapiti
 
-## Fase 1 - Dominio básico
+## Implementado
 
-- [x] Crear carta española.
-- [x] Crear palos.
-- [x] Calcular fuerza de carta.
-- [x] Resolver carta ganadora.
-- [x] Modelar jugador.
-- [x] Resolver ronda.
-- [ ] Resolver mano.
-- [ ] Resolver puntuación por chinos.
-- [ ] Modelar truco.
-- [ ] Modelar chica hasta 30 chinos.
+- [x] Dominio de cartas espanolas, palos y jerarquia.
+- [x] Resolucion de chicos, incluidos empates entre equipos.
+- [x] Resolucion de repartos y puntuacion por chinos.
+- [x] Partidas hasta 30 chinos y marcador por chicas.
+- [x] Truco, aceptacion, rechazo y subidas alternas.
+- [x] Turnos, seleccion y movimiento de cartas a la mesa.
+- [x] Bots por niveles con juego de cartas y decisiones de truco.
+- [x] Mesa, cartas, avatares, señas, historial y menú inicial.
+- [x] Multijugador online mediante el protocolo documentado.
+- [x] Diseño responsive en horizontal para la pantalla de juego.
+- [x] Tests unitarios de dominio y tests principales de widgets.
 
-## Fase 2 - UI mínima
+## Pendiente / futuro
 
-- [x] Mostrar cartas como texto.
-- [x] Mostrar fuerza de cartas.
-- [x] Mostrar ganador de ronda.
-- [ ] Permitir pulsar una carta.
-- [ ] Mover carta jugada a la mesa.
-- [ ] Avanzar turno.
-- [ ] Mostrar puntos reales.
-
-## Fase 3 - Bots simples
-
-- [ ] Bot juega la carta más baja.
-- [ ] Bot juega la carta más alta si puede ganar.
-- [ ] Bot decide pasar.
-- [ ] Bot decide cantar truco de forma simple.
-
-## Fase 4 - Pulido
-
-- [ ] Mejorar visual de cartas.
-- [ ] Añadir mesa básica.
-- [ ] Añadir señas como iconos o botones.
-- [ ] Añadir menú inicial.
-
-## Fase 5 - Futuro lejano
-
-- [ ] Multijugador local en el mismo móvil.
-- [ ] Multijugador online.
-- [ ] Ranking.
-- [ ] Publicación Android.
-- [ ] Publicación iOS.
+- [x] Validacion integral con el servidor multijugador desplegado.
+- [x] Reconexión con recuperación automática de una sala anterior.
+- [x] Ranking.
+- [ ] Publicacion Android.
+- [ ] Publicacion iOS.

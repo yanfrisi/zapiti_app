@@ -74,6 +74,7 @@ class ZapitiGameTable extends StatelessWidget {
                 rect: metrics.seatRect(_SeatPosition.top),
                 child: _OpponentSeat(
                   position: _SeatPosition.top,
+                  playerName: topPlayer.name,
                   isCurrent: topPlayer.id == currentPlayer.id,
                   cardsRemaining: cardsRemaining[topPlayer.id] ?? 0,
                   message: playerMessages[topPlayer.id],
@@ -86,6 +87,7 @@ class ZapitiGameTable extends StatelessWidget {
                 rect: metrics.seatRect(_SeatPosition.left),
                 child: _OpponentSeat(
                   position: _SeatPosition.left,
+                  playerName: leftPlayer.name,
                   isCurrent: leftPlayer.id == currentPlayer.id,
                   cardsRemaining: cardsRemaining[leftPlayer.id] ?? 0,
                   message: playerMessages[leftPlayer.id],
@@ -98,6 +100,7 @@ class ZapitiGameTable extends StatelessWidget {
                 rect: metrics.seatRect(_SeatPosition.right),
                 child: _OpponentSeat(
                   position: _SeatPosition.right,
+                  playerName: rightPlayer.name,
                   isCurrent: rightPlayer.id == currentPlayer.id,
                   cardsRemaining: cardsRemaining[rightPlayer.id] ?? 0,
                   message: playerMessages[rightPlayer.id],
@@ -110,6 +113,7 @@ class ZapitiGameTable extends StatelessWidget {
                 Positioned.fromRect(
                   rect: metrics.seatRect(_SeatPosition.bottom),
                   child: _HumanSeat(
+                    playerName: bottomPlayer.name,
                     isCurrent: bottomPlayer.id == currentPlayer.id,
                     message: playerMessages[bottomPlayer.id],
                     characterId: characterIdsByPlayer[bottomPlayer.id] ??

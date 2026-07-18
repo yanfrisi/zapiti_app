@@ -410,10 +410,10 @@ class _DifficultySelectionScreen extends StatelessWidget {
   });
 
   static const _labels = {
-    1: 'Muy facil',
-    2: 'Facil',
+    1: 'Muy fácil',
+    2: 'Fácil',
     3: 'Normal',
-    4: 'Dificil',
+    4: 'Difícil',
     5: 'Experto',
   };
 
@@ -686,8 +686,8 @@ class _SelectedDifficultySummary extends StatelessWidget {
                 _DifficultySummaryLine(
                   icon: Icons.visibility_outlined,
                   text: profile.readsOpponentSignals
-                      ? 'Lee senas rivales vistas.'
-                      : 'No interpreta senas rivales.',
+                      ? 'Lee señas rivales vistas.'
+                      : 'No interpreta señas rivales.',
                 ),
               ],
             ),

@@ -10,9 +10,21 @@ enum MultiplayerMessageType {
   roomSnapshot('room_snapshot'),
   playerReady('player_ready'),
   selectCharacter('select_character'),
+  updateProfile('update_profile'),
+  recoverProfile('recover_profile'),
+  profile('profile'),
+  listTeams('list_teams'),
+  createTeam('create_team'),
+  updateTeam('update_team'),
+  archiveTeam('archive_team'),
+  selectTeam('select_team'),
+  teams('teams'),
+  getRanking('get_ranking'),
+  ranking('ranking'),
   startGame('start_game'),
   newHand('new_hand'),
   restartGame('restart_game'),
+  chooseAlVerDecision('choose_al_ver_decision'),
   playCard('play_card'),
   callTruco('call_truco'),
   acceptTruco('accept_truco'),
@@ -69,6 +81,9 @@ class MultiplayerMessage {
 class MultiplayerSeat {
   final String playerId;
   final String name;
+  final String? username;
+  final String? pairId;
+  final String? teamName;
   final int seatIndex;
   final int? teamId;
   final bool ready;
@@ -78,6 +93,9 @@ class MultiplayerSeat {
   const MultiplayerSeat({
     required this.playerId,
     required this.name,
+    this.username,
+    this.pairId,
+    this.teamName,
     required this.seatIndex,
     this.teamId,
     required this.ready,
@@ -89,6 +107,9 @@ class MultiplayerSeat {
     return MultiplayerSeat(
       playerId: json['playerId'] as String,
       name: json['name'] as String,
+      username: json['username'] as String?,
+      pairId: json['pairId'] as String?,
+      teamName: json['teamName'] as String?,
       seatIndex: json['seatIndex'] as int,
       teamId: json['teamId'] as int?,
       ready: json['ready'] as bool? ?? false,
@@ -100,6 +121,9 @@ class MultiplayerSeat {
   JsonMap toJson() => {
         'playerId': playerId,
         'name': name,
+        if (username != null) 'username': username,
+        if (pairId != null) 'pairId': pairId,
+        if (teamName != null) 'teamName': teamName,
         'seatIndex': seatIndex,
         if (teamId != null) 'teamId': teamId,
         'ready': ready,

@@ -28,10 +28,17 @@ class HandRules {
     for (var i = 0; i < rounds.length; i++) {
       final round = rounds[i];
       if (round.isTie) {
-        _applyTiedRound(roundWins, rounds, i);
+        roundWins[1] = (roundWins[1]! + 1).clamp(0, 2);
+        roundWins[2] = (roundWins[2]! + 1).clamp(0, 2);
       } else {
         final teamId = round.winningTeamId!;
-        roundWins[teamId] = roundWins[teamId]! + 1;
+        roundWins[teamId] = (roundWins[teamId]! + 1).clamp(0, 2);
+      }
+
+      if (roundWins[1] == 2 && roundWins[2] == 2) {
+        isFinished = true;
+        isNoPoints = true;
+        break;
       }
 
       winningTeamId = _winnerFrom(roundWins);
@@ -52,25 +59,6 @@ class HandRules {
       isFinished: isFinished,
       isNoPoints: isNoPoints,
     );
-  }
-
-  static void _applyTiedRound(
-    Map<int, int> roundWins,
-    List<RoundResult> rounds,
-    int roundIndex,
-  ) {
-    if (roundIndex == 0) {
-      roundWins[1] = roundWins[1]! + 1;
-      roundWins[2] = roundWins[2]! + 1;
-      return;
-    }
-
-    if (roundIndex == 1) {
-      final firstRoundWinner = rounds.first.winningTeamId;
-      if (firstRoundWinner != null) {
-        roundWins[firstRoundWinner] = roundWins[firstRoundWinner]! + 1;
-      }
-    }
   }
 
   static int? _winnerFrom(Map<int, int> roundWins) {

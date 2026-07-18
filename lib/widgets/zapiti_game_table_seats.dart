@@ -8,6 +8,7 @@ double _bubbleScaleForAvatarHeight(double avatarHeight) {
 
 class _OpponentSeat extends StatelessWidget {
   final _SeatPosition position;
+  final String playerName;
   final bool isCurrent;
   final int cardsRemaining;
   final String? message;
@@ -16,6 +17,7 @@ class _OpponentSeat extends StatelessWidget {
 
   const _OpponentSeat({
     required this.position,
+    required this.playerName,
     required this.isCurrent,
     required this.cardsRemaining,
     required this.message,
@@ -33,6 +35,7 @@ class _OpponentSeat extends StatelessWidget {
     }) {
       return _SeatAvatar(
         isCurrent: isCurrent,
+        playerName: playerName,
         message: message,
         characterId: characterId,
         height: height,
@@ -54,8 +57,6 @@ class _OpponentSeat extends StatelessWidget {
             metrics.remotePlayer.avatarHeight,
             constraints.maxHeight * 0.94,
           );
-          final verticalLift =
-              metrics.portrait ? 0.0 : metrics.remotePlayer.avatarHeight * 0.22;
           final companionCards = _HiddenCards(
             count: cardsRemaining,
             horizontal: true,
@@ -69,16 +70,15 @@ class _OpponentSeat extends StatelessWidget {
                   metrics.remotePlayer.avatarWidth,
                   constraints.maxWidth,
                 );
-          final hiddenCardsWidth =
-              metrics.remotePlayer.cardWidth * 3 +
-                  metrics.remotePlayer.cardGap * 0.8 * 2;
-          final contentWidth =
-              remoteAvatarWidth +
-                  metrics.remotePlayer.avatarCardGap +
-                  hiddenCardsWidth;
+          final hiddenCardsWidth = metrics.remotePlayer.cardWidth * 3 +
+              metrics.remotePlayer.cardGap * 2;
+          final contentWidth = remoteAvatarWidth +
+              metrics.remotePlayer.avatarCardGap +
+              hiddenCardsWidth;
           final contentLeft = (constraints.maxWidth - contentWidth) / 2;
-          final firstCardLeft =
-              contentLeft + remoteAvatarWidth + metrics.remotePlayer.avatarCardGap;
+          final firstCardLeft = contentLeft +
+              remoteAvatarWidth +
+              metrics.remotePlayer.avatarCardGap;
           return SizedBox(
             width: constraints.maxWidth,
             height: constraints.maxHeight,
@@ -87,30 +87,27 @@ class _OpponentSeat extends StatelessWidget {
               children: [
                 Align(
                   alignment: Alignment.topCenter,
-                  child: Transform.translate(
-                    offset: Offset(0, -verticalLift),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          avatarFor(
-                            avatarHeight,
-                            width: remoteAvatarWidth,
-                            showBubble: false,
-                          ),
-                          SizedBox(width: metrics.remotePlayer.avatarCardGap),
-                          companionCards,
-                        ],
-                      ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        avatarFor(
+                          avatarHeight,
+                          width: remoteAvatarWidth,
+                          showBubble: false,
+                        ),
+                        SizedBox(width: metrics.remotePlayer.avatarCardGap),
+                        companionCards,
+                      ],
                     ),
                   ),
                 ),
                 if (visibleMessage != null)
                   Positioned(
                     left: firstCardLeft,
-                    top: max(0.0, -verticalLift + avatarHeight * 0.04),
+                    top: max(0.0, avatarHeight * 0.04),
                     child: ZapitiSpeechBubble(
                       text: visibleMessage,
                       alignment: TextAlign.center,
@@ -174,7 +171,6 @@ class _OpponentSeat extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox(width: metrics.remotePlayer.avatarCardGap),
                       avatar,
                       SizedBox(width: metrics.remotePlayer.avatarCardGap),
                       sideCards,
@@ -187,7 +183,6 @@ class _OpponentSeat extends StatelessWidget {
                       sideCards,
                       SizedBox(width: metrics.remotePlayer.avatarCardGap),
                       avatar,
-                      SizedBox(width: metrics.remotePlayer.avatarCardGap),
                     ],
                   ),
                 _ => const SizedBox.shrink(),
@@ -213,12 +208,13 @@ class _OpponentSeat extends StatelessWidget {
 
   String? _visibleMessageFrom(String? value) {
     if (value == null) return null;
-    if (value.startsWith('Sena: ')) return null;
+    if (value.startsWith('Seña: ')) return null;
     return value;
   }
 }
 
 class _HumanSeat extends StatelessWidget {
+  final String playerName;
   final bool isCurrent;
   final String? message;
   final String characterId;
@@ -228,6 +224,7 @@ class _HumanSeat extends StatelessWidget {
   final ValueChanged<SpanishCard> onPlayCard;
 
   const _HumanSeat({
+    required this.playerName,
     required this.isCurrent,
     required this.message,
     required this.characterId,
@@ -249,6 +246,7 @@ class _HumanSeat extends StatelessWidget {
         final contentWidth = cardWidth * 4 + metrics.gap * 3.2;
         final avatar = _SeatAvatar(
           isCurrent: isCurrent,
+          playerName: playerName,
           message: message,
           characterId: characterId,
           height: cardHeight,
@@ -359,9 +357,36 @@ class _HiddenCards extends StatelessWidget {
     final visibleCount = count.clamp(0, 3);
     const slots = 3;
     final cardHeight = cardWidth * 122 / 80;
-    final spacing = gap * 0.8;
+    final spacing = gap;
 
     if (horizontal) {
+      if (spacing < 0) {
+        final cardStride = cardWidth + spacing;
+        final totalWidth = cardWidth + cardStride * (slots - 1);
+
+        return SizedBox(
+          width: totalWidth,
+          height: cardHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (var index = 0; index < slots; index++)
+                Positioned(
+                  left: cardStride * index,
+                  top: 0,
+                  child: index < visibleCount
+                      ? ZapitiCardWidget(
+                          card: null,
+                          hidden: true,
+                          width: cardWidth,
+                        )
+                      : ZapitiCardWidget(card: null, width: cardWidth),
+                ),
+            ],
+          ),
+        );
+      }
+
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -396,6 +421,7 @@ class _HiddenCards extends StatelessWidget {
 
 class _SeatAvatar extends StatelessWidget {
   final bool isCurrent;
+  final String playerName;
   final String? message;
   final String characterId;
   final double height;
@@ -408,6 +434,7 @@ class _SeatAvatar extends StatelessWidget {
 
   const _SeatAvatar({
     required this.isCurrent,
+    required this.playerName,
     required this.message,
     required this.characterId,
     required this.height,
@@ -456,13 +483,19 @@ class _SeatAvatar extends StatelessWidget {
                 gap: gap,
                 text: visibleMessage,
               ),
+            ZapitiPlayerNameBadge(
+              playerName: playerName,
+              avatarWidth: effectiveWidth,
+              gap: gap,
+              compact: true,
+            ),
           ],
         ),
       );
     }
 
     return SizedBox(
-      width: effectiveWidth * 1.45,
+      width: effectiveWidth,
       height: height,
       child: Stack(
         clipBehavior: Clip.none,
@@ -489,13 +522,18 @@ class _SeatAvatar extends StatelessWidget {
               gap: gap,
               text: visibleMessage,
             ),
+          ZapitiPlayerNameBadge(
+            playerName: playerName,
+            avatarWidth: effectiveWidth,
+            gap: gap,
+          ),
         ],
       ),
     );
   }
 
   String? _signalFromMessage(String? message) {
-    const prefix = 'Sena: ';
+    const prefix = 'Seña: ';
     if (message == null) return null;
     if (message.startsWith(prefix)) return message.substring(prefix.length);
 
@@ -518,6 +556,63 @@ class _SeatAvatar extends StatelessWidget {
       'Mala' => 0.13,
       _ => 0,
     };
+  }
+}
+
+class ZapitiPlayerNameBadge extends StatelessWidget {
+  final String playerName;
+  final double avatarWidth;
+  final double gap;
+  final bool compact;
+
+  const ZapitiPlayerNameBadge({
+    super.key,
+    required this.playerName,
+    required this.avatarWidth,
+    required this.gap,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = (avatarWidth * (compact ? 0.14 : 0.13))
+        .clamp(8.0, compact ? 11.0 : 12.0)
+        .toDouble();
+    return Positioned(
+      left: max(2.0, gap * 0.38),
+      right: max(2.0, gap * 0.38),
+      top: max(2.0, gap * 0.38),
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xDD2A170F),
+            borderRadius: BorderRadius.circular(max(4.0, gap * 0.7)),
+            border: Border.all(
+              color: ZapitiColors.oldGold.withValues(alpha: 0.58),
+              width: 1,
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: max(3.0, gap * 0.7),
+              vertical: max(1.5, gap * 0.24),
+            ),
+            child: Text(
+              playerName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: ZapitiColors.cardCream,
+                fontSize: fontSize,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

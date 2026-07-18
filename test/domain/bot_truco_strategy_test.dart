@@ -44,6 +44,7 @@ void main() {
         difficulty: 3,
         teamScore: 145,
         ownMaxStrength: 112,
+        handStrength: 0.82,
         cardsOnTable: 0,
         teamRoundWins: 0,
         opponentRoundWins: 0,
@@ -107,7 +108,7 @@ void main() {
       expect(shouldCall, isFalse);
     });
 
-    test('la dificultad baja permite trucar con menos respaldo', () {
+    test('ni en dificultad baja abre de salida con respaldo flojo', () {
       bool shouldCallAt(int difficulty) {
         return BotTrucoStrategy.shouldCall(
           difficulty: difficulty,
@@ -123,7 +124,7 @@ void main() {
         );
       }
 
-      expect(shouldCallAt(1), isTrue);
+      expect(shouldCallAt(1), isFalse);
       expect(shouldCallAt(5), isFalse);
     });
 
@@ -179,6 +180,40 @@ void main() {
 
       expect(shouldCallAt(1), isTrue);
       expect(shouldCallAt(5), isFalse);
+    });
+
+    test('una tirada alta deja pasar el truco aunque la mano sea fuerte', () {
+      final lowRoll = BotTrucoStrategy.shouldCallWithRoll(
+        difficulty: 3,
+        roll: 0.12,
+        teamScore: 145,
+        ownMaxStrength: 112,
+        handStrength: 0.82,
+        cardsOnTable: 2,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: false,
+        needsPoints: false,
+      );
+      final highRoll = BotTrucoStrategy.shouldCallWithRoll(
+        difficulty: 3,
+        roll: 0.48,
+        teamScore: 145,
+        ownMaxStrength: 112,
+        handStrength: 0.82,
+        cardsOnTable: 2,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: false,
+        needsPoints: false,
+      );
+
+      expect(lowRoll, isTrue);
+      expect(highRoll, isFalse);
     });
   });
 }

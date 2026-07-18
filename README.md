@@ -11,9 +11,9 @@ flutter run
 
 ## Multijugador
 
-La URL del servidor esta centralizada en `lib/config/server_config.dart`.
+La URL del servidor está centralizada en `lib/config/server_config.dart`.
 
-### Produccion
+### Producción
 
 Por defecto el cliente usa:
 
@@ -40,11 +40,11 @@ Si necesitas otra URL local, puedes pasarla con:
 flutter run -d chrome --dart-define=USE_LOCAL_SERVER=true --dart-define=LOCAL_SERVER_URL=ws://IP_LOCAL:8080
 ```
 
-## Estados de conexion
+## Estados de conexión
 
 El cliente muestra estados claros mientras conecta al servidor, lo despierta, se reconecta o falla.
 
-Si la conexion se corta en mitad de una partida, el cliente intenta volver a abrir el canal, pero no recupera automaticamente la sala anterior porque el protocolo aun no tiene reanudacion de sesion.
+Si la conexión se corta en mitad de una partida, el cliente intenta volver a abrir el canal, pero no recupera automáticamente la sala anterior porque el protocolo aún no tiene reanudación de sesión.
 
 ## Tests
 

@@ -4,11 +4,10 @@ import 'suit.dart';
 class ZapitiRules {
   const ZapitiRules._();
 
-  /// Fuerza provisional basada en la jerarquía básica del Zápiti.
+  /// Jerarquía de cartas usada por todas las modalidades de Zápiti.
   ///
   /// Importante:
-  /// - Esto es el primer ladrillo, no el juego completo.
-  /// - Si alguna regla local no coincide, se cambia aquí y no en la UI.
+  /// La UI y los bots deben consultar o reflejar esta misma jerarquía.
   static int strength(SpanishCard card) {
     if (card.value == 4 && card.suit == Suit.bastos) return 100;
     if (card.value == 7 && card.suit == Suit.copas) return 99;

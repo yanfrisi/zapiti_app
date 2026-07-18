@@ -56,6 +56,8 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (_isGameFinished) return;
 
     _handVersion += 1;
+    _alVerDecisionPromptedForHandVersion = -1;
+    _isAlVerDecisionDialogOpen = false;
     final fixedHands = _isMultiplayerMatch
         ? MultiplayerSessionStore.instance.fixedHands ?? _debugFixedHands
         : _debugFixedHands;
@@ -70,10 +72,179 @@ extension _GameScreenStateFlow on _GameScreenState {
     _opponentSignalsSeenByTeam.clear();
     _forceWinRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
+    _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
     _isAutoPlaying = false;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
+    _companionVoyATiPromptedHandVersion = -1;
+  }
+
+  void _maybeHandleAlVerDecision() {
+    if (!mounted ||
+        _showMainMenu ||
+        _showCharacterSelection ||
+        _showDifficultySelection ||
+        _handFinished ||
+        _isGameFinished ||
+        _isAlVerDecisionDialogOpen) {
+      return;
+    }
+
+    if (_game.alVerState != AlVerState.awaitingDecision) {
+      return;
+    }
+
+    if (_alVerDecisionPromptedForHandVersion == _handVersion) {
+      return;
+    }
+
+    final teamId = _game.alVerTeamId;
+    if (teamId == null) {
+      _alVerDecisionPromptedForHandVersion = _handVersion;
+      return;
+    }
+
+    final teamIsHumanControlled = _isTeamControlledByHuman(teamId);
+    _alVerDecisionPromptedForHandVersion = _handVersion;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        _processPendingAlVerDecision(
+          teamId,
+          teamIsHumanControlled: teamIsHumanControlled,
+        ),
+      );
+    });
+  }
+
+  bool _isTeamControlledByHuman(int teamId) {
+    return _players.any(
+      (player) =>
+          player.teamId == teamId &&
+          _controlledHumanPlayerIds.contains(player.id),
+    );
+  }
+
+  bool _isLocalBotPlayer(Player player) {
+    if (player.id == _humanPlayer.id) return false;
+    if (_isMultiplayerMatch) return false;
+    return true;
+  }
+
+  bool _teamHasLocalBot(int teamId) {
+    return _players.any(
+      (player) => player.teamId == teamId && _isLocalBotPlayer(player),
+    );
+  }
+
+  bool _teamNeedsLocalHumanTrucoResponse(int? teamId) {
+    return teamId != null && teamId == _humanPlayer.teamId;
+  }
+
+  bool _teamNeedsLocalBotTrucoResponse(int? teamId) {
+    return teamId != null &&
+        teamId != _humanPlayer.teamId &&
+        _teamHasLocalBot(teamId);
+  }
+
+  List<SpanishCard> _teamCardsFor(int teamId) {
+    return _players
+        .where((player) => player.teamId == teamId)
+        .expand((player) => _hands[player.id] ?? const <SpanishCard>[])
+        .toList();
+  }
+
+  Future<void> _processPendingAlVerDecision(
+    int teamId, {
+    required bool teamIsHumanControlled,
+  }) async {
+    if (!mounted ||
+        _game.alVerState != AlVerState.awaitingDecision ||
+        _game.alVerTeamId != teamId ||
+        _isAlVerDecisionDialogOpen ||
+        _showMainMenu ||
+        _showCharacterSelection ||
+        _showDifficultySelection ||
+        _handFinished ||
+        _isGameFinished) {
+      return;
+    }
+
+    if (teamIsHumanControlled) {
+      await _presentAlVerDecisionDialog(teamId);
+      return;
+    }
+
+    if (_isMultiplayerMatch) {
+      return;
+    }
+
+    final play = BotAlVerStrategy.shouldPlay(
+      cards: _teamCardsFor(teamId),
+      difficulty: _selectedDifficulty,
+      teamScore: _score[teamId]!,
+      opponentScore: _score[TeamRules.opponentOf(teamId)]!,
+      targetScore: 30,
+    );
+
+    _updateState(() {
+      _game.chooseAlVerDecision(teamId: teamId, play: play);
+    });
+    if (play &&
+        !_handFinished &&
+        !_isRoundAwaitingContinue &&
+        !_isWaitingHumanTrucoResponse &&
+        !_isAutoPlaying &&
+        !_isGameFinished &&
+        _isLocalBotPlayer(_currentPlayer)) {
+      _advanceBots();
+    }
+  }
+
+  Future<void> _presentAlVerDecisionDialog(int teamId) async {
+    if (_isAlVerDecisionDialogOpen || !mounted) {
+      return;
+    }
+
+    _updateState(() {
+      _isAlVerDecisionDialogOpen = true;
+    });
+  }
+
+  void _handleHumanAlVerDecision(int teamId, {required bool play}) {
+    if (!mounted ||
+        _game.alVerState != AlVerState.awaitingDecision ||
+        _game.alVerTeamId != teamId) {
+      return;
+    }
+    _updateState(() {
+      _isAlVerDecisionDialogOpen = false;
+      _game.chooseAlVerDecision(teamId: teamId, play: play);
+    });
+
+    if (_isMultiplayerMatch) {
+      final socket = MultiplayerSessionStore.instance.socket;
+      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final playerId = _humanPlayer.id;
+      if (socket != null && socket.isConnected && roomId != null) {
+        socket.chooseAlVerDecision(
+          roomId: roomId,
+          playerId: playerId,
+          play: play,
+        );
+      }
+    }
+
+    if (play &&
+        !_handFinished &&
+        !_isRoundAwaitingContinue &&
+        !_isWaitingHumanTrucoResponse &&
+        !_isAutoPlaying &&
+        !_isGameFinished &&
+        _isLocalBotPlayer(_currentPlayer)) {
+      _advanceBots();
+    }
   }
 
   Future<void> _syncMusic() async {
@@ -218,6 +389,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _isAutoPlaying = false;
+    _companionVoyATiPromptedHandVersion = -1;
     _pendingTrucoValue = null;
     _trucoCallerTeamId = null;
     _game.lastTrucoRaiserTeamId = null;
@@ -233,6 +405,9 @@ extension _GameScreenStateFlow on _GameScreenState {
       _game.nextLeadIndex = 0;
     }
     _game.eventLog.clear();
+    _game.alVerTeamIds.clear();
+    _game.alVerState = AlVerState.none;
+    _aiTeamsConsideredTrucoThisHand.clear();
   }
 
   void _selectHumanCharacter(String characterId) {
@@ -321,6 +496,14 @@ extension _GameScreenStateFlow on _GameScreenState {
     });
   }
 
+  void _openAboutScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AboutScreen(),
+      ),
+    );
+  }
+
   void _enterMultiplayerMatch() {
     final session = MultiplayerSessionStore.instance;
     final socket = session.socket;
@@ -329,7 +512,7 @@ extension _GameScreenStateFlow on _GameScreenState {
         session.localGamePlayerId == null ||
         session.players.isEmpty) {
       _updateState(() {
-        _status = 'La partida todavia no esta lista para entrar.';
+        _status = 'La partida todavía no está lista para entrar.';
       });
       return;
     }
@@ -342,15 +525,13 @@ extension _GameScreenStateFlow on _GameScreenState {
       _isMultiplayerMatch = true;
       _random = session.seed == null ? Random() : Random(session.seed!);
       _multiplayerPlayers = multiplayerPlayers;
+      if (session.botDifficulty != null) {
+        _selectedDifficulty = session.botDifficulty!.clamp(1, 5);
+      }
       _multiplayerServerHandSequence = null;
-      _controlledHumanPlayerIds = {
-        if (session.controlledPlayerIds.isNotEmpty)
-          ...session.controlledPlayerIds
-        else
-          localGamePlayerId,
-      };
+      _controlledHumanPlayerIds = {localGamePlayerId};
       _game = ZapitiGameController(
-        targetScore: _GameScreenState._targetScore,
+        targetScore: 30,
         players: _players,
         humanPlayerId: localGamePlayerId,
         authorizedTrucoPlayerIds: _players.map((player) => player.id),
@@ -403,7 +584,6 @@ extension _GameScreenStateFlow on _GameScreenState {
       _advanceBots();
     }
     unawaited(_syncMusic());
-    unawaited(_saveSelectedSettings());
   }
 
   void _applyMultiplayerMatchSnapshot(Map<String, dynamic> match) {
@@ -521,9 +701,46 @@ extension _GameScreenStateFlow on _GameScreenState {
         match['isRoundAwaitingContinue'] as bool? ?? _isRoundAwaitingContinue;
     _winningTeamId = match['winningTeamId'] as int?;
     _status = match['status']?.toString() ?? _status;
-    _isWaitingHumanTrucoResponse =
-        _pendingTrucoValue != null && _trucoCallerTeamId != _humanPlayer.teamId;
+    _syncAlVerFromMatch(match);
+    _isWaitingHumanTrucoResponse = _pendingTrucoValue != null &&
+        _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
     _isAutoPlaying = false;
+  }
+
+  void _syncAlVerFromMatch(Map<String, dynamic> match) {
+    final rawTeamIds = match['alVerTeamIds'];
+    final teamIds = <int>{};
+    if (rawTeamIds is List) {
+      for (final value in rawTeamIds) {
+        if (value is int) {
+          teamIds.add(value);
+        } else if (value is String) {
+          final parsed = int.tryParse(value);
+          if (parsed != null) teamIds.add(parsed);
+        }
+      }
+    }
+
+    final singleTeamId = match['alVerTeamId'];
+    if (singleTeamId is int) {
+      teamIds.add(singleTeamId);
+    } else if (singleTeamId is String) {
+      final parsed = int.tryParse(singleTeamId);
+      if (parsed != null) teamIds.add(parsed);
+    }
+
+    final rawState = match['alVerState']?.toString();
+    final state = switch (rawState) {
+      'awaitingDecision' => AlVerState.awaitingDecision,
+      'playing' => AlVerState.playing,
+      'conceded' => AlVerState.conceded,
+      _ => teamIds.isEmpty ? AlVerState.none : AlVerState.awaitingDecision,
+    };
+
+    _game.alVerTeamIds
+      ..clear()
+      ..addAll(teamIds);
+    _game.alVerState = state;
   }
 
   Map<int, int>? _parseIntMap(dynamic rawMap) {

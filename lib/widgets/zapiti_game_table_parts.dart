@@ -9,6 +9,9 @@ class RemotePlayerVisualMetrics {
   final double cardHeight;
   final double cardGap;
   final double avatarCardGap;
+  final double tablePlayerGap;
+  final double groupWidth;
+  final double groupHeight;
 
   const RemotePlayerVisualMetrics({
     required this.avatarWidth,
@@ -17,6 +20,9 @@ class RemotePlayerVisualMetrics {
     required this.cardHeight,
     required this.cardGap,
     required this.avatarCardGap,
+    required this.tablePlayerGap,
+    required this.groupWidth,
+    required this.groupHeight,
   });
 }
 
@@ -69,34 +75,63 @@ class _BoardMetrics {
             min(size.height * 0.24, size.width * 0.108),
           );
     final humanCardHeight = humanCardWidth * 122 / 80;
+    final isCompactLandscape =
+        !portrait && (size.width < 820 || size.height < 170);
+    final landscapeScale = !portrait
+        ? min(
+            1.25,
+            min(size.width / 852, size.height / 182),
+          )
+        : 1.0;
     final baseRemoteCardWidth = portrait
         ? min(humanCardWidth * 0.72, shortest * 0.24)
-        : min(size.height * 0.28, size.width * 0.102)
-            .clamp(38.0, 56.0)
-            .toDouble();
-    final remotePlayerScaleFactor =
-        portrait ? 1.0 : (size.width < 760 || size.height < 170 ? 1.7 : 2.0);
+        : isCompactLandscape
+            ? (72 * landscapeScale * 0.9).clamp(60.0, 84.0).toDouble()
+            : (78 * landscapeScale).clamp(69.0, 96.0).toDouble();
     final companionCardWidth = portrait
         ? baseRemoteCardWidth
-        : (baseRemoteCardWidth * remotePlayerScaleFactor)
-            .clamp(64.0, 104.0)
-            .toDouble();
+        : baseRemoteCardWidth;
     final opponentCardWidth = portrait
         ? min(humanCardWidth * 0.68, shortest * 0.23)
         : companionCardWidth;
     final opponentCardHeight = opponentCardWidth * 122 / 80;
     final companionAvatarHeight = portrait
         ? companionCardWidth * 122 / 80
-        : (companionCardWidth * 78 / 44).clamp(104.0, 164.0).toDouble();
+        : isCompactLandscape
+            ? (123 * landscapeScale * 0.9).clamp(102.0, 141.0).toDouble()
+            : (129 * landscapeScale).clamp(108.0, 162.0).toDouble();
+    final remoteAvatarWidth = portrait
+        ? companionCardWidth
+        : isCompactLandscape
+            ? (81 * landscapeScale * 0.9).clamp(69.0, 93.0).toDouble()
+            : (87 * landscapeScale).clamp(75.0, 108.0).toDouble();
+    final remoteCardGap = portrait
+        ? gap
+        : -companionCardWidth * (isCompactLandscape ? 0.66 : 0.68);
+    final remoteAvatarCardGap = portrait
+        ? gap * 1.4
+        : (isCompactLandscape ? 4 * landscapeScale : 6 * landscapeScale);
+    final remoteTablePlayerGap = portrait
+        ? gap * 1.4
+        : (isCompactLandscape ? 5 * landscapeScale : 6 * landscapeScale);
+    final remoteGroupWidth = remoteAvatarWidth +
+        remoteAvatarCardGap +
+        companionCardWidth * 3 +
+        remoteCardGap * 2;
+    final remoteGroupHeight = max(
+      companionAvatarHeight,
+      opponentCardHeight,
+    );
     final remotePlayer = RemotePlayerVisualMetrics(
-      avatarWidth: portrait
-          ? companionCardWidth
-          : (companionCardWidth * 52 / 44).clamp(76.0, 124.0).toDouble(),
+      avatarWidth: remoteAvatarWidth,
       avatarHeight: companionAvatarHeight,
       cardWidth: companionCardWidth,
       cardHeight: opponentCardHeight,
-      cardGap: portrait ? gap : max(gap * 1.45, 5.0),
-      avatarCardGap: portrait ? gap * 1.4 : max(gap * 2.2, 8.0),
+      cardGap: remoteCardGap,
+      avatarCardGap: remoteAvatarCardGap,
+      tablePlayerGap: remoteTablePlayerGap,
+      groupWidth: remoteGroupWidth,
+      groupHeight: remoteGroupHeight,
     );
     final tableSize = portrait
         ? Size.square(
@@ -112,14 +147,20 @@ class _BoardMetrics {
             size: size,
             humanCardWidth: humanCardWidth,
             opponentCardWidth: opponentCardWidth,
+            remoteGroupWidth: remotePlayer.groupWidth,
+            remoteGroupHeight: remotePlayer.groupHeight,
+            tablePlayerGap: remotePlayer.tablePlayerGap,
             gap: gap,
             shortest: shortest,
             reserveHumanSeat: reserveHumanSeat,
           );
+    final topSeatReserveHeight = portrait ? 0.0 : remotePlayer.groupHeight * 0.45;
     final tableCenter = _tableCenter(
       size: size,
       tableSize: tableSize,
       portrait: portrait,
+      topSeatHeight: topSeatReserveHeight,
+      tablePlayerGap: portrait ? gap : remotePlayer.tablePlayerGap,
       bottomSeatHeight: reserveHumanSeat ? humanCardHeight : 0,
       gap: gap,
     );
@@ -170,15 +211,18 @@ class _BoardMetrics {
     required Size size,
     required double humanCardWidth,
     required double opponentCardWidth,
+    required double remoteGroupWidth,
+    required double remoteGroupHeight,
+    required double tablePlayerGap,
     required double gap,
     required double shortest,
     required bool reserveHumanSeat,
   }) {
     final humanCardHeight = humanCardWidth * 122 / 80;
-    final topSeatReserve = gap * 1.2;
+    final topSeatReserve = remoteGroupHeight * 0.45 + tablePlayerGap;
     final bottomSeatReserve =
         reserveHumanSeat ? humanCardHeight + gap * 2.4 : gap * 1.2;
-    final sideSeatReserve = opponentCardWidth * 4.35 + gap * 4.2;
+    final sideSeatReserve = remoteGroupWidth * 0.72 + tablePlayerGap;
     final availableHeight = max(
       humanCardWidth * 1.35,
       size.height - topSeatReserve - bottomSeatReserve,
@@ -187,13 +231,19 @@ class _BoardMetrics {
       humanCardWidth * 1.9,
       size.width - sideSeatReserve * 2 - gap * 2,
     );
+    final tableScale = min(
+      1.25,
+      min(size.width / 852, size.height / 190),
+    );
+    final targetTableHeight =
+        (190 * tableScale).clamp(150.0, 240.0).toDouble();
     final tableHeight = min(
       availableHeight,
-      shortest * 1.04,
+      targetTableHeight,
     ).clamp(humanCardWidth * 1.35, shortest * 1.08).toDouble();
     final tableWidth = min(
       availableWidth,
-      tableHeight * 2.36,
+      tableHeight * 3.45,
     ).clamp(tableHeight, size.width - gap * 2).toDouble();
 
     return Size(tableWidth, tableHeight);
@@ -203,14 +253,16 @@ class _BoardMetrics {
     required Size size,
     required Size tableSize,
     required bool portrait,
+    required double topSeatHeight,
+    required double tablePlayerGap,
     required double bottomSeatHeight,
     required double gap,
   }) {
     if (portrait) return size.center(Offset.zero);
 
-    final minY = tableSize.height / 2 + gap * 0.8;
+    final minY = topSeatHeight + tablePlayerGap + tableSize.height / 2;
     final maxY = size.height - tableSize.height / 2 - bottomSeatHeight - gap;
-    final desiredY = minY + (maxY - minY) * 0.68;
+    final desiredY = minY + (maxY - minY) * 0.18;
     final y = minY <= maxY
         ? desiredY.clamp(minY, maxY).toDouble()
         : (minY + maxY) / 2;
@@ -222,8 +274,12 @@ class _BoardMetrics {
   }
 
   Rect seatRect(_SeatPosition position) {
-    final topSeatHeight = companionAvatarHeight + gap * 4.2;
-    final topSeatContentWidth = companionCardWidth * 4.55 + gap * 4.2;
+    final topSeatHeight = portrait
+        ? companionAvatarHeight + gap * 4.2
+        : remotePlayer.groupHeight;
+    final topSeatContentWidth = portrait
+        ? companionCardWidth * 4.55 + gap * 4.2
+        : remotePlayer.groupWidth;
     final topSeatWidth = min(
       size.width - gap * 2,
       max(topSeatContentWidth, tableRect.width + gap * 1.6),
@@ -232,20 +288,24 @@ class _BoardMetrics {
         .clamp(gap, size.width - topSeatWidth - gap);
     final topSeatTop = portrait
         ? max(0.0, tableRect.top - topSeatHeight - gap)
-        : -topSeatHeight * 0.33;
+        : (tableRect.top - topSeatHeight - remotePlayer.tablePlayerGap)
+            .clamp(-topSeatHeight * 0.56, size.height - topSeatHeight);
     final sideWidth = portrait
         ? max(
             opponentCardWidth * 1.95 + gap * 2.4,
             size.width * 0.2,
           )
-        : max(
-            opponentCardWidth * 4.2 + gap * 3,
-            tableRect.left - gap,
-          );
+        : remotePlayer.groupWidth;
     final opponentCardHeight = opponentCardWidth * 122 / 80;
     final sideHeight = portrait
         ? max(tableSide * 1.04, opponentCardHeight * 3 + gap * 4.2)
-        : avatarHeight + gap * 2;
+        : remotePlayer.groupHeight;
+    final leftTablePlayerGap = portrait
+        ? remotePlayer.tablePlayerGap
+        : max(3.0, remotePlayer.tablePlayerGap * 0.52);
+    final leftSeatLeft = portrait
+        ? 0.0
+        : max(0.0, tableRect.left - sideWidth - leftTablePlayerGap);
     final bottomHeight = size.height - tableRect.bottom - gap;
     final bottomContentWidth = humanCardWidth * 4.35 + gap * 3.6;
     final bottomWidth = portrait
@@ -273,15 +333,15 @@ class _BoardMetrics {
           bottomHeight,
         ),
       _SeatPosition.left => Rect.fromLTWH(
-          0,
+          leftSeatLeft,
           tableRect.center.dy - sideHeight / 2,
-          max(0.0, min(sideWidth, tableRect.left - gap)).toDouble(),
+          max(0.0, min(sideWidth, tableRect.left - leftTablePlayerGap)),
           sideHeight,
         ),
       _SeatPosition.right => Rect.fromLTWH(
-          tableRect.right + gap,
+          tableRect.right + remotePlayer.tablePlayerGap,
           tableRect.center.dy - sideHeight / 2,
-          max(0.0, size.width - tableRect.right - gap),
+          max(0.0, size.width - tableRect.right - remotePlayer.tablePlayerGap),
           sideHeight,
         ),
     };

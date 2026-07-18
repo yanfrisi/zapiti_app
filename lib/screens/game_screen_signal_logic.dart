@@ -9,8 +9,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
       return;
     }
 
-    if (_isMultiplayerMatch &&
-        MultiplayerSessionStore.instance.controlledPlayerIds.length >= 2) {
+    if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -46,13 +45,13 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     if (signal == null) {
       _updateState(() {
-        _companionPrivateSignalStatus = 'Compa: sin sena';
+        _companionPrivateSignalStatus = 'Compa: sin seña';
         _isRequestingCompanionSignal = false;
       });
       await Future<void>.delayed(_companionNoSignalStatusDuration);
       if (!mounted || version != _handVersion) return;
       _updateState(() {
-        if (_companionPrivateSignalStatus == 'Compa: sin sena') {
+        if (_companionPrivateSignalStatus == 'Compa: sin seña') {
           _companionPrivateSignalStatus = null;
         }
       });
@@ -61,7 +60,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     _updateState(() {
       _playersSignaledThisHand.add(companion.id);
-      _playerMessages[companion.id] = 'Sena: $signal';
+      _playerMessages[companion.id] = 'Seña: $signal';
       _companionPrivateSignalStatus = 'Compa: $signal';
       _teamSignalsByTeam[companion.teamId] = signal;
       _knownSignalsByTeam[companion.teamId] = signal;
@@ -72,7 +71,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     await Future<void>.delayed(_companionSignalGestureDuration);
     if (!mounted || version != _handVersion) return;
     _updateState(() {
-      if (_playerMessages[companion.id] == 'Sena: $signal') {
+      if (_playerMessages[companion.id] == 'Seña: $signal') {
         _playerMessages.remove(companion.id);
       }
       if (_companionPrivateSignalStatus == 'Compa: $signal') {
@@ -87,7 +86,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     }
 
     _updateState(() {
-      _playerMessages[_humanPlayer.id] = 'Sena: $label';
+      _playerMessages[_humanPlayer.id] = 'Seña: $label';
       _knownSignalsByTeam[_humanPlayer.teamId] = label;
       _teamSignalsByTeam[_humanPlayer.teamId] = label;
       _maybeLetRivalsSeeHumanSignal(label);
@@ -119,7 +118,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
   }
 
   void _endSignal(String label) {
-    if (_playerMessages[_humanPlayer.id] != 'Sena: $label') return;
+    if (_playerMessages[_humanPlayer.id] != 'Seña: $label') return;
 
     _updateState(() {
       _playerMessages.remove(_humanPlayer.id);

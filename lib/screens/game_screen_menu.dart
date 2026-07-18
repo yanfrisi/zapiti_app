@@ -66,6 +66,7 @@ class _MainMenuScreen extends StatelessWidget {
   final VoidCallback onTutorial;
   final VoidCallback onOptions;
   final VoidCallback onMultiplayer;
+  final VoidCallback onAbout;
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
@@ -85,6 +86,7 @@ class _MainMenuScreen extends StatelessWidget {
     required this.onTutorial,
     required this.onOptions,
     required this.onMultiplayer,
+    required this.onAbout,
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
@@ -124,6 +126,7 @@ class _MainMenuScreen extends StatelessWidget {
                       onBotSpeedChanged: onBotSpeedChanged,
                       confirmCardPlay: confirmCardPlay,
                       onConfirmCardPlayChanged: onConfirmCardPlayChanged,
+                      onAbout: onAbout,
                       onEnterGame: onEnterGame,
                       selectedCharacterId: selectedCharacterId,
                       onSelectedCharacterChanged: onSelectedCharacterChanged,
@@ -292,6 +295,7 @@ class _MainMenuInfoPanel extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
+  final VoidCallback onAbout;
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
@@ -308,6 +312,7 @@ class _MainMenuInfoPanel extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
+    required this.onAbout,
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
@@ -418,6 +423,7 @@ class _MainMenuInfoPanel extends StatelessWidget {
                                 confirmCardPlay: confirmCardPlay,
                                 onConfirmCardPlayChanged:
                                     onConfirmCardPlayChanged,
+                                onAbout: onAbout,
                               ),
                             ),
                           ),
@@ -446,36 +452,94 @@ class _MainMenuTutorialContent extends StatefulWidget {
 
 class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
   int _stepIndex = 0;
+  final Map<int, int> _selectedAnswers = {};
 
   static const _steps = [
     _TutorialStep(
       title: 'Mesa por parejas',
       body: '1. Juegas en pareja contra dos rivales.',
       icon: Icons.groups_outlined,
+      prompt:
+          'Tu aliado se sienta enfrente. Si gana tu equipo, no gastes carta.',
+      options: ['Guardar fuerte', 'Tirar alta'],
+      correctIndex: 0,
+      answer:
+          'Bien: cuando tu pareja ya domina, conservar cartas fuertes vale media partida.',
     ),
     _TutorialStep(
       title: 'Tres rondas',
       body:
           'Cada reparto tiene hasta tres rondas. Gana quien domina las cartas jugadas.',
       icon: Icons.style_outlined,
+      prompt: 'Si el rival ya ganó una ronda, la siguiente pesa más.',
+      options: ['Salvar ronda', 'Regalar carta'],
+      correctIndex: 0,
+      answer:
+          'Exacto: con una ronda rival, la IA intenta salvar con la mínima carta útil.',
     ),
     _TutorialStep(
       title: 'Valor de cartas',
-      body:
-          '4 de bastos -> 7 de copas -> 7 de oros -> as de espadas -> tres -> dos -> as.',
+      body: '4 de bastos -> 7 de copas -> 7 de oros -> as de espadas -> '
+          '3 -> 2 -> as -> 12 -> 11 -> 10 -> 7 -> 6 -> 5 -> 4.',
       icon: Icons.workspace_premium_outlined,
+      prompt: 'El 4 de bastos es la carta máxima.',
+      options: ['Verdadero', 'Falso'],
+      correctIndex: 0,
+      answer: 'Sí: el 4 de bastos manda sobre toda la baraja.',
     ),
     _TutorialStep(
       title: 'Truco y puntos',
       body:
           'Puedes cantar truco, aceptar, pasar o subir para aumentar el valor del reparto.',
       icon: Icons.campaign_outlined,
+      prompt: 'Si ya no puedes ganar la ronda visible, lo prudente es...',
+      options: ['Pasar', 'Aceptar'],
+      correctIndex: 0,
+      answer:
+          'Eso es: aceptar sin opciones reales solo regala chinos al rival.',
     ),
     _TutorialStep(
-      title: 'Senas',
+      title: 'Señas',
       body:
-          'Pide sena a tu pareja o usa las tuyas para comunicar cartas fuertes.',
+          'Pide seña a tu pareja o usa las tuyas para comunicar cartas fuertes.',
       icon: Icons.visibility_outlined,
+      prompt: 'Una seña fuerte ayuda a decidir carta y truco.',
+      options: ['Pedir seña', 'Ignorar'],
+      correctIndex: 0,
+      answer: 'Buena lectura: la seña cambia cuánto arriesga tu equipo.',
+    ),
+    _TutorialStep(
+      title: 'Voy a ti',
+      body:
+          'Sirve para pedir a tu pareja que intente ganar, pero sin quemar carta inútil.',
+      icon: Icons.record_voice_over_outlined,
+      prompt: 'Si tu pareja no puede ganar la mesa, debería...',
+      options: ['Tirar menor', 'Tirar mayor'],
+      correctIndex: 0,
+      answer:
+          'Correcto: si no puede ganar, guarda fuerza para la siguiente ronda.',
+    ),
+    _TutorialStep(
+      title: 'Faroles',
+      body:
+          'La IA puede cantar o subir con historia de mesa, presión o cartas rivales gastadas.',
+      icon: Icons.theater_comedy_outlined,
+      prompt: 'Un farol funciona mejor cuando...',
+      options: ['Hay contexto', 'No hay nada'],
+      correctIndex: 0,
+      answer:
+          'Sí: una carta fuerte ya gastada o marcador en contra hace creíble el farol.',
+    ),
+    _TutorialStep(
+      title: 'Dificultad',
+      body:
+          'Cada nivel cambia errores, lectura de señas, paciencia y agresividad con el truco.',
+      icon: Icons.psychology_alt_outlined,
+      prompt: 'En experto la IA...',
+      options: ['Lee mejor', 'Acepta todo'],
+      correctIndex: 0,
+      answer:
+          'Exacto: en niveles altos lee mesa y señales antes de comprometer chinos.',
     ),
   ];
 
@@ -511,15 +575,18 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
             ? constraints.maxHeight
             : shortest * 0.62;
         final compact = maxHeight < 300;
+        final showPrompt = maxHeight >= 430 && step.prompt != null;
         final visualHeight = max(
           compact ? 110.0 : 150.0,
-          min(maxHeight * (compact ? 0.55 : 0.72), 280.0),
+          min(maxHeight * (showPrompt ? 0.42 : 0.62),
+              showPrompt ? 210.0 : 260.0),
         );
         final cardWidth = min(
           shortest * 0.22,
           min(visualHeight * 0.74, 110.0),
         );
-        final bodyMaxLines = compact ? 1 : 3;
+        final bodyMaxLines = compact ? 1 : 2;
+        final selectedAnswer = _selectedAnswers[_stepIndex];
 
         return Column(
           mainAxisSize: MainAxisSize.max,
@@ -573,6 +640,18 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
                 style: bodyStyle,
               ),
             ),
+            if (showPrompt) ...[
+              SizedBox(height: compact ? 2 : 6),
+              _TutorialDecisionPrompt(
+                step: step,
+                selectedIndex: selectedAnswer,
+                onSelected: (index) {
+                  setState(() {
+                    _selectedAnswers[_stepIndex] = index;
+                  });
+                },
+              ),
+            ],
             SizedBox(height: compact ? 6 : 10),
             Row(
               children: [
@@ -636,12 +715,107 @@ class _TutorialStep {
   final String title;
   final String body;
   final IconData icon;
+  final String? prompt;
+  final List<String> options;
+  final int correctIndex;
+  final String? answer;
 
   const _TutorialStep({
     required this.title,
     required this.body,
     required this.icon,
+    this.prompt,
+    this.options = const [],
+    this.correctIndex = 0,
+    this.answer,
   });
+}
+
+class _TutorialDecisionPrompt extends StatelessWidget {
+  final _TutorialStep step;
+  final int? selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _TutorialDecisionPrompt({
+    required this.step,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final answerIsCorrect = selectedIndex == step.correctIndex;
+    final bodyStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              step.prompt!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: bodyStyle,
+            ),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (var index = 0; index < step.options.length; index++)
+                  ChoiceChip(
+                    label: Text(step.options[index]),
+                    selected: selectedIndex == index,
+                    onSelected: (_) => onSelected(index),
+                    selectedColor:
+                        answerIsCorrect ? ZapitiColors.oldGold : Colors.white,
+                    backgroundColor: ZapitiColors.cardCream,
+                    labelStyle: TextStyle(
+                      color: selectedIndex == index
+                          ? ZapitiColors.darkBrown
+                          : ZapitiColors.darkBrown.withValues(alpha: 0.72),
+                      fontWeight: FontWeight.w900,
+                    ),
+                    side: BorderSide(
+                      color: selectedIndex == index
+                          ? ZapitiColors.wineRed
+                          : ZapitiColors.darkBrown.withValues(alpha: 0.12),
+                    ),
+                  ),
+              ],
+            ),
+            if (selectedIndex != null && step.answer != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                answerIsCorrect ? step.answer! : 'Casi: ${step.answer!}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: bodyStyle?.copyWith(
+                  color: answerIsCorrect
+                      ? ZapitiColors.tableGreenDark
+                      : ZapitiColors.wineRed,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _TutorialVisual extends StatelessWidget {
@@ -934,13 +1108,21 @@ class _MainMenuMultiplayerContent extends StatefulWidget {
 
 class _MainMenuMultiplayerContentState
     extends State<_MainMenuMultiplayerContent> {
+  static const _maxPlayerNameLength = 18;
+  static const _maxUsernameLength = 24;
+  static const _maxTeamNameLength = 22;
+
   final TextEditingController _serverController =
       TextEditingController(text: ServerConfig.websocketUrl);
   final TextEditingController _nameController =
       TextEditingController(text: 'Jugador');
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _teamNameController = TextEditingController();
   final TextEditingController _roomController = TextEditingController();
   GameSocket? _socket;
   String? _playerId;
+  String? _sessionToken;
   String? _connectedRoomId;
   MultiplayerRoomSnapshot? _roomSnapshot;
   bool _keepSocketAliveOnDispose = false;
@@ -952,8 +1134,21 @@ class _MainMenuMultiplayerContentState
   _ServerConnectionState _connectionState = _ServerConnectionState.idle;
   String _status = 'Prepara una sala para conectar a amigos.';
   bool _ready = false;
+  bool _profileReady = false;
+  bool _showCreateAccount = false;
+  bool _teamModalShownForCurrentRoom = false;
+  bool _teamDialogAutoClosed = false;
+  BuildContext? _teamDialogContext;
+  String _profileStatus = 'Configura tu perfil multijugador.';
   late String _selectedCharacterId;
   String? _confirmedCharacterId;
+  Map<String, dynamic> _playerStats = const {};
+  List<Map<String, dynamic>> _rankingPairs = const [];
+  List<Map<String, dynamic>> _rankingMatches = const [];
+  List<Map<String, dynamic>> _playerTeams = const [];
+  String? _selectedPairId;
+  bool _teamsLoaded = false;
+  bool _rankingRequested = false;
 
   @override
   void initState() {
@@ -986,15 +1181,18 @@ class _MainMenuMultiplayerContentState
       );
       if (mySeat != null && mySeat.playerId.isNotEmpty) {
         _ready = mySeat.ready;
+        _setPlayerNameField(mySeat.name);
       }
 
       _socket!.onMessage = _handleSocketMessage;
       _socket!.onError = (error) {
-        _clearSessionAfterConnectionLoss('Error de conexion: $error');
+        _clearSessionAfterConnectionLoss('Error de conexión: $error');
       };
       _socket!.onDone = () {
         _clearSessionAfterConnectionLoss('Servidor desconectado.');
       };
+    } else {
+      unawaited(_loadSavedPlayerProfile());
     }
   }
 
@@ -1015,11 +1213,181 @@ class _MainMenuMultiplayerContentState
     }
     _serverController.dispose();
     _nameController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _teamNameController.dispose();
     _roomController.dispose();
     super.dispose();
   }
 
-  String get _playerName => _nameController.text.trim();
+  String get _playerName => _cleanPlayerName(_nameController.text);
+  String get _username => _cleanUsername(_usernameController.text);
+  String get _profilePassword => _passwordController.text.trim();
+  String get _teamName => _cleanTeamName(_teamNameController.text);
+  String get _selectedTeamName {
+    final selected = _selectedTeam;
+    if (selected != null) {
+      final name = selected['teamName']?.toString().trim() ?? '';
+      if (name.isNotEmpty) return _cleanTeamName(name);
+    }
+    return _teamName;
+  }
+
+  Map<String, dynamic>? get _selectedTeam {
+    final pairId = _selectedPairId;
+    if (pairId == null) return null;
+    for (final team in _playerTeams) {
+      if (team['pairId']?.toString() == pairId) return team;
+    }
+    return null;
+  }
+
+  String _cleanPlayerName(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.length <= _maxPlayerNameLength) return normalized;
+    return normalized.substring(0, _maxPlayerNameLength).trimRight();
+  }
+
+  void _setPlayerNameField(String value) {
+    final cleaned = _cleanPlayerName(value);
+    if (cleaned.isEmpty || _nameController.text == cleaned) return;
+    _nameController.text = cleaned;
+    _nameController.selection = TextSelection.collapsed(
+      offset: _nameController.text.length,
+    );
+  }
+
+  String _cleanUsername(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.length <= _maxUsernameLength) return normalized;
+    return normalized.substring(0, _maxUsernameLength);
+  }
+
+  void _setUsernameField(String value) {
+    final cleaned = _cleanUsername(value);
+    if (_usernameController.text == cleaned) return;
+    _usernameController.text = cleaned;
+    _usernameController.selection = TextSelection.collapsed(
+      offset: _usernameController.text.length,
+    );
+  }
+
+  String _cleanTeamName(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.length <= _maxTeamNameLength) return normalized;
+    return normalized.substring(0, _maxTeamNameLength).trimRight();
+  }
+
+  void _setTeamNameField(String value) {
+    final cleaned = _cleanTeamName(value);
+    if (_teamNameController.text == cleaned) return;
+    _teamNameController.text = cleaned;
+    _teamNameController.selection = TextSelection.collapsed(
+      offset: _teamNameController.text.length,
+    );
+  }
+
+  Future<void> _loadSavedPlayerProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted || _roomSnapshot != null) return;
+    _setPlayerNameField(
+      prefs.getString(_GameScreenState._multiplayerPlayerNamePrefsKey) ??
+          _nameController.text,
+    );
+    _setUsernameField(
+      prefs.getString(_GameScreenState._multiplayerUsernamePrefsKey) ??
+          _defaultUsernameFromName(_nameController.text),
+    );
+    _playerId = prefs.getString(_GameScreenState._multiplayerPlayerIdPrefsKey);
+    _sessionToken = prefs.getString(
+      _GameScreenState._multiplayerSessionTokenPrefsKey,
+    );
+    if (_playerId == null || _playerId!.isEmpty) {
+      _playerId = _createPersistentPlayerId();
+      await prefs.setString(
+        _GameScreenState._multiplayerPlayerIdPrefsKey,
+        _playerId!,
+      );
+    }
+    final savedPin = prefs.getString(
+      _GameScreenState._multiplayerPlayerPinPrefsKey,
+    );
+    _passwordController.text =
+        prefs.getString(_GameScreenState._multiplayerPasswordPrefsKey) ??
+            savedPin ??
+            '';
+    _setTeamNameField(
+      prefs.getString(_GameScreenState._multiplayerTeamNamePrefsKey) ?? '',
+    );
+    if (mounted) {
+      setState(() {
+        _profileReady = _sessionToken != null && _sessionToken!.isNotEmpty;
+        _profileStatus = _profileReady
+            ? 'Sesion activa. Puedes entrar a salas.'
+            : 'Inicia sesion para recuperar tus datos.';
+      });
+    }
+  }
+
+  String _defaultUsernameFromName(String name) {
+    final normalized = name
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '.')
+        .replaceAll(RegExp(r'[^a-z0-9_.-]'), '');
+    if (normalized.length >= 3) return _cleanUsername(normalized);
+    return '';
+  }
+
+  Future<void> _savePlayerName(String playerName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _GameScreenState._multiplayerPlayerNamePrefsKey,
+      playerName,
+    );
+  }
+
+  Future<void> _savePlayerId(String playerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _GameScreenState._multiplayerPlayerIdPrefsKey,
+      playerId,
+    );
+  }
+
+  Future<void> _saveUsername(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _GameScreenState._multiplayerUsernamePrefsKey,
+      username,
+    );
+  }
+
+  Future<void> _saveSessionToken(String sessionToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _GameScreenState._multiplayerSessionTokenPrefsKey,
+      sessionToken,
+    );
+  }
+
+  Future<void> _clearSavedSessionToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_GameScreenState._multiplayerSessionTokenPrefsKey);
+  }
+
+  Future<void> _saveTeamName(String teamName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _GameScreenState._multiplayerTeamNamePrefsKey,
+      teamName,
+    );
+  }
+
+  String _createPersistentPlayerId() {
+    final randomValue = Random().nextInt(0x7fffffff);
+    return 'player_${DateTime.now().microsecondsSinceEpoch}_$randomValue';
+  }
 
   bool get _serverUrlIsEditable => ServerConfig.useLocalServer;
 
@@ -1031,7 +1399,7 @@ class _MainMenuMultiplayerContentState
   }
 
   String get _localPlayerId =>
-      _playerId ??= 'player_${DateTime.now().millisecondsSinceEpoch}';
+      _playerId ??= _createPersistentPlayerId();
 
   void _setConnectionState(
     _ServerConnectionState state, {
@@ -1061,7 +1429,6 @@ class _MainMenuMultiplayerContentState
       _sessionStarted = false;
       _roomSnapshot = null;
       _connectedRoomId = null;
-      _playerId = null;
       _ready = false;
       _autoEnterQueued = false;
       _connectionState = connectionState;
@@ -1182,7 +1549,7 @@ class _MainMenuMultiplayerContentState
     if (serverUrl.isEmpty) {
       _setConnectionState(
         _ServerConnectionState.error,
-        status: 'Escribe la direccion del servidor.',
+        status: 'Escribe la dirección del servidor.',
       );
       return false;
     }
@@ -1201,7 +1568,7 @@ class _MainMenuMultiplayerContentState
       if (ServerConfig.useLocalServer)
         'Reconectando...'
       else
-        'El servidor gratuito esta arrancando. Esto puede tardar unos segundos...',
+        'El servidor gratuito está arrancando. Esto puede tardar unos segundos...',
       'Reconectando...',
       'Reconectando...',
     ];
@@ -1241,11 +1608,11 @@ class _MainMenuMultiplayerContentState
       nextSocket.onMessage = _handleSocketMessage;
       nextSocket.onError = (error) {
         if (!mounted || generation != _connectionGeneration) return;
-        _handleSocketDropped('Error de conexion: $error');
+        _handleSocketDropped('Error de conexión: $error');
       };
       nextSocket.onDone = () {
         if (!mounted || generation != _connectionGeneration) return;
-        _handleSocketDropped('Conexion cerrada.');
+        _handleSocketDropped('Conexión cerrada.');
       };
 
       try {
@@ -1290,7 +1657,7 @@ class _MainMenuMultiplayerContentState
     if (hadSession) {
       _setConnectionState(
         _ServerConnectionState.reconnecting,
-        status: 'La conexion se ha cerrado. Reintentando...',
+        status: 'La conexión se ha cerrado. Reintentando...',
       );
       unawaited(_recoverAfterConnectionLoss());
       return;
@@ -1311,7 +1678,7 @@ class _MainMenuMultiplayerContentState
     }
 
     _clearSessionAfterConnectionLoss(
-      'Conexion restablecida. La partida anterior no se puede recuperar. Vuelve a crear o unirte de nuevo.',
+      'Conexión restablecida. La partida anterior no se puede recuperar. Vuelve a crear o unirte de nuevo.',
       preserveSocket: true,
       connectionState: _ServerConnectionState.connected,
     );
@@ -1330,16 +1697,28 @@ class _MainMenuMultiplayerContentState
           if (message.playerId != null && message.playerId!.isNotEmpty) {
             _playerId = message.playerId;
           }
+          final localSeat = _localSeatFor(snapshot);
+          if (localSeat != null) {
+            _ready = localSeat.ready;
+            if ((localSeat.pairId ?? '').isNotEmpty) {
+              _selectedPairId = localSeat.pairId;
+            }
+            final localTeamName = localSeat.teamName?.trim() ?? '';
+            if (localTeamName.isNotEmpty) {
+              _setTeamNameField(localTeamName);
+            }
+          }
           _sessionStarted = snapshot.phase != 'lobby';
           _connectionState = _ServerConnectionState.connected;
           _status = switch (snapshot.phase) {
-            'starting' => 'Todos listos. La partida esta arrancando.',
+            'starting' => 'Todos listos. La partida está arrancando.',
             'playing' => 'Partida en curso.',
             _ => 'Sala ${snapshot.roomId} sincronizada.',
           };
         });
         MultiplayerSessionStore.instance.roomSnapshot = snapshot;
         _syncSelectedCharacterFromRoom();
+        _resolveTeamForRoomSnapshot(snapshot);
         _maybeAutoEnterGame();
         break;
       case MultiplayerMessageType.error:
@@ -1347,9 +1726,27 @@ class _MainMenuMultiplayerContentState
           final code = message.payload['code']?.toString() ?? 'error';
           final text =
               message.payload['message']?.toString() ?? 'Error del servidor';
+          if (code == 'profile_not_found') {
+            _profileStatus = 'No hay cuenta con ese usuario y contrasena.';
+            _showCreateAccount = true;
+          } else if (code == 'auth_failed') {
+            _sessionToken = null;
+            unawaited(_clearSavedSessionToken());
+            _profileReady = false;
+            _showCreateAccount = true;
+            _teamsLoaded = false;
+            _playerTeams = const [];
+            _selectedPairId = null;
+            _profileStatus =
+                'Sesion caducada. Inicia sesion con tu contrasena.';
+          } else if (code == 'invalid_payload' && !_profileReady) {
+            _profileStatus = 'Revisa usuario, nombre y contrasena.';
+          }
           _status = switch (code) {
             'room_not_found' =>
               'La sala ya no existe. El servidor pudo haberse reiniciado.',
+            'team_required' =>
+              'Crea o selecciona el equipo antes de marcar listo.',
             _ => 'Servidor: $code - $text',
           };
         });
@@ -1365,9 +1762,11 @@ class _MainMenuMultiplayerContentState
             _parsePlayers(message.payload['players']);
         MultiplayerSessionStore.instance.characterIdsByPlayer =
             _parseCharacterIdsByPlayer(message.payload['players']);
+        MultiplayerSessionStore.instance.botDifficulty =
+            _parseBotDifficulty(message.payload['players']);
         MultiplayerSessionStore.instance.seed = message.payload['seed'] as int?;
         MultiplayerSessionStore.instance.controlledPlayerIds =
-            _parseControlledPlayerIds(message.payload['controlledPlayerIds']);
+            message.playerId == null ? const [] : [message.playerId!];
         MultiplayerSessionStore.instance.fixedHands =
             _parseFixedHands(message.payload['fixedHands']);
         setState(() {
@@ -1376,6 +1775,111 @@ class _MainMenuMultiplayerContentState
           _status = 'La partida va a empezar. Abriendo la mesa...';
         });
         _maybeAutoEnterGame();
+        break;
+      case MultiplayerMessageType.ranking:
+        setState(() {
+          _rankingPairs = [
+            for (final entry
+                in (message.payload['pairs'] as List<dynamic>? ?? const []))
+              if (entry is Map) Map<String, dynamic>.from(entry),
+          ];
+          _rankingMatches = [
+            for (final entry
+                in (message.payload['matches'] as List<dynamic>? ?? const []))
+              if (entry is Map) Map<String, dynamic>.from(entry),
+          ];
+          final rankingPlayers = [
+            for (final entry
+                in (message.payload['players'] as List<dynamic>? ?? const []))
+              if (entry is Map) Map<String, dynamic>.from(entry),
+          ];
+          final localPlayerId = _playerId;
+          if (localPlayerId != null) {
+            final playerStats = rankingPlayers.cast<Map<String, dynamic>?>()
+                .firstWhere(
+                  (entry) => entry?['playerId']?.toString() == localPlayerId,
+                  orElse: () => null,
+                );
+            if (playerStats != null) {
+              _playerStats = playerStats;
+            }
+          }
+          _rankingRequested = true;
+          _status = _rankingPairs.isEmpty && _rankingMatches.isEmpty
+              ? 'Aun no hay partidas registradas.'
+              : 'Ranking actualizado.';
+        });
+        break;
+      case MultiplayerMessageType.teams:
+        final teams = [
+          for (final entry
+              in (message.payload['teams'] as List<dynamic>? ?? const []))
+            if (entry is Map) Map<String, dynamic>.from(entry),
+        ];
+        setState(() {
+          _playerTeams = teams;
+          _teamsLoaded = true;
+          if (_selectedPairId == null ||
+              !teams.any(
+                (team) => team['pairId']?.toString() == _selectedPairId,
+              )) {
+            _selectedPairId =
+                teams.isEmpty ? null : teams.first['pairId']?.toString();
+          }
+          final selectedName = _selectedTeamName;
+          if (selectedName.isNotEmpty) {
+            _setTeamNameField(selectedName);
+            unawaited(_saveTeamName(selectedName));
+          }
+          _status = teams.isEmpty
+              ? 'Aun no tienes equipos. Crea uno con el usuario de tu pareja.'
+              : 'Equipos actualizados.';
+        });
+        final snapshot = _roomSnapshot;
+        if (snapshot != null) {
+          _resolveTeamForRoomSnapshot(snapshot);
+        }
+        break;
+      case MultiplayerMessageType.profile:
+        final profilePlayerId =
+            message.payload['playerId']?.toString() ?? message.playerId;
+        final profileUsername = message.payload['username']?.toString();
+        final profileName = message.payload['name']?.toString();
+        final profileTeamName = message.payload['teamName']?.toString() ?? '';
+        final profileSessionToken =
+            message.payload['sessionToken']?.toString();
+        if (profilePlayerId == null || profileName == null) {
+          setState(() {
+            _profileStatus = 'El servidor devolvio un perfil incompleto.';
+          });
+          break;
+        }
+        _playerId = profilePlayerId;
+        _teamsLoaded = false;
+        _playerTeams = const [];
+        _selectedPairId = null;
+        if (profileUsername != null && profileUsername.isNotEmpty) {
+          _setUsernameField(profileUsername);
+          unawaited(_saveUsername(profileUsername));
+        }
+        _setPlayerNameField(profileName);
+        _setTeamNameField(profileTeamName);
+        unawaited(_savePlayerName(profileName));
+        unawaited(_savePlayerId(profilePlayerId));
+        unawaited(_saveTeamName(profileTeamName));
+        if (profileSessionToken != null && profileSessionToken.isNotEmpty) {
+          _sessionToken = profileSessionToken;
+          unawaited(_saveSessionToken(profileSessionToken));
+        }
+        _passwordController.clear();
+        setState(() {
+          _playerStats = Map<String, dynamic>.from(message.payload);
+          _profileReady = true;
+          _showCreateAccount = false;
+          _profileStatus = 'Sesion iniciada.';
+          _status = 'Perfil ${_cleanPlayerName(profileName)} sincronizado.';
+        });
+        _requestTeamsIfReady();
         break;
       default:
         setState(() {
@@ -1387,14 +1891,33 @@ class _MainMenuMultiplayerContentState
 
   Future<void> _createRoom() async {
     final playerName = _playerName;
+    final username = _username;
     if (playerName.isEmpty) {
       setState(() {
         _status = 'Escribe tu nombre antes de crear la sala.';
       });
       return;
     }
+    if (!_hasUsableSessionOrCredentials()) {
+      setState(() {
+        _profileReady = false;
+        _profileStatus = 'Inicia sesion antes de crear una sala.';
+      });
+      return;
+    }
+    _setPlayerNameField(playerName);
+    _setUsernameField(username);
+    _setTeamNameField(_selectedTeamName);
+    unawaited(_savePlayerName(playerName));
+    unawaited(_saveUsername(username));
+    unawaited(_saveTeamName(_selectedTeamName));
 
     if (!await _ensureConnected()) {
+      setState(() {
+        _showCreateAccount = true;
+        _profileStatus =
+            'Servidor sin respuesta. Prepara una cuenta nueva para intentarlo.';
+      });
       return;
     }
 
@@ -1404,13 +1927,20 @@ class _MainMenuMultiplayerContentState
     setState(() {
       _connectedRoomId = null;
       _ready = false;
+      _teamModalShownForCurrentRoom = false;
       _status = 'Solicitando creacion de sala...';
     });
 
     try {
+      final localPlayerId = _localPlayerId;
+      unawaited(_savePlayerId(localPlayerId));
       socket.createRoom(
-        playerId: _localPlayerId,
+        playerId: localPlayerId,
+        username: username,
         playerName: playerName,
+        password: _sessionToken == null ? _profilePassword : null,
+        teamName: _selectedTeamName,
+        sessionToken: _sessionToken,
         characterId: _selectedCharacterId,
       );
       setState(() {
@@ -1426,10 +1956,11 @@ class _MainMenuMultiplayerContentState
   Future<void> _joinRoom() async {
     final roomCode = _roomController.text.trim();
     final playerName = _playerName;
+    final username = _username;
 
     if (roomCode.isEmpty) {
       setState(() {
-        _status = 'Escribe un codigo de sala para unirte.';
+        _status = 'Escribe un código de sala para unirte.';
       });
       return;
     }
@@ -1440,6 +1971,19 @@ class _MainMenuMultiplayerContentState
       });
       return;
     }
+    if (!_hasUsableSessionOrCredentials()) {
+      setState(() {
+        _profileReady = false;
+        _profileStatus = 'Inicia sesion antes de unirte a una sala.';
+      });
+      return;
+    }
+    _setPlayerNameField(playerName);
+    _setUsernameField(username);
+    _setTeamNameField(_selectedTeamName);
+    unawaited(_savePlayerName(playerName));
+    unawaited(_saveUsername(username));
+    unawaited(_saveTeamName(_selectedTeamName));
 
     if (!await _ensureConnected()) {
       return;
@@ -1451,14 +1995,21 @@ class _MainMenuMultiplayerContentState
     setState(() {
       _connectedRoomId = roomCode;
       _ready = false;
+      _teamModalShownForCurrentRoom = false;
       _status = 'Intentando unirme a $roomCode...';
     });
 
     try {
+      final localPlayerId = _localPlayerId;
+      unawaited(_savePlayerId(localPlayerId));
       socket.joinRoom(
         roomId: roomCode,
-        playerId: _localPlayerId,
+        playerId: localPlayerId,
+        username: username,
         playerName: playerName,
+        password: _sessionToken == null ? _profilePassword : null,
+        teamName: _selectedTeamName,
+        sessionToken: _sessionToken,
         characterId: _selectedCharacterId,
       );
       setState(() {
@@ -1480,6 +2031,17 @@ class _MainMenuMultiplayerContentState
       });
       return;
     }
+    final snapshot = _roomSnapshot;
+    if (snapshot != null &&
+        _teammateSeatFor(snapshot)?.playerId.isNotEmpty == true &&
+        (_selectedPairId == null || _selectedPairId!.isEmpty)) {
+      setState(() {
+        _status = 'Crea o selecciona el equipo antes de marcar listo.';
+      });
+      _resolveTeamForRoomSnapshot(snapshot);
+      return;
+    }
+    _sendTeamSelectionIfReady(roomId: roomId);
 
     final nextReady = !_ready;
     setState(() {
@@ -1502,6 +2064,406 @@ class _MainMenuMultiplayerContentState
     }
   }
 
+  Future<void> _requestRanking() async {
+    if (!await _ensureConnected()) {
+      return;
+    }
+    final socket = _socket;
+    if (socket == null) return;
+    setState(() {
+      _rankingRequested = true;
+      _status = 'Pidiendo ranking al servidor...';
+    });
+    try {
+      socket.requestRanking();
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudo pedir el ranking: $error';
+      });
+    }
+  }
+
+  void _requestTeamsIfReady() {
+    final socket = _socket;
+    final playerId = _playerId;
+    final sessionToken = _sessionToken;
+    if (socket == null ||
+        !socket.isConnected ||
+        playerId == null ||
+        sessionToken == null ||
+        sessionToken.isEmpty) {
+      return;
+    }
+    try {
+      socket.requestTeams(playerId: playerId, sessionToken: sessionToken);
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudieron pedir los equipos: $error';
+      });
+    }
+  }
+
+  void _resolveTeamForRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
+    if (snapshot.phase != 'lobby') return;
+    final localSeat = _localSeatFor(snapshot);
+    final teammate = _teammateSeatFor(snapshot);
+    final teammateUsername = teammate?.username?.trim() ?? '';
+    if (teammate == null || teammateUsername.isEmpty) return;
+    final teammatePairId = teammate.pairId?.trim() ?? '';
+    if (teammatePairId.isNotEmpty) {
+      final teammateTeamName = teammate.teamName?.trim() ?? '';
+      final alreadySelected = _selectedPairId == teammatePairId;
+      final alreadySynced = localSeat?.pairId == teammatePairId;
+      if (!alreadySelected || !alreadySynced) {
+        setState(() {
+          _selectedPairId = teammatePairId;
+          if (teammateTeamName.isNotEmpty) {
+            _setTeamNameField(teammateTeamName);
+            unawaited(_saveTeamName(teammateTeamName));
+          }
+          _status = teammateTeamName.isEmpty
+              ? 'Equipo sincronizado con tu companero.'
+              : 'Equipo $teammateTeamName sincronizado.';
+        });
+        _closeCreateTeamDialog();
+        _requestTeamsIfReady();
+        _sendTeamSelectionIfReady(roomId: snapshot.roomId);
+      }
+      return;
+    }
+    if (!_teamsLoaded) {
+      _requestTeamsIfReady();
+      return;
+    }
+
+    final existingTeam = _teamForTeammate(teammate.playerId);
+    if (existingTeam != null) {
+      final pairId = existingTeam['pairId']?.toString();
+      final teamName = existingTeam['teamName']?.toString().trim() ?? '';
+      if (pairId != null && pairId.isNotEmpty) {
+        setState(() {
+          _selectedPairId = pairId;
+          if (teamName.isNotEmpty) {
+            _setTeamNameField(teamName);
+            unawaited(_saveTeamName(teamName));
+          }
+        });
+        _sendTeamSelectionIfReady(roomId: snapshot.roomId);
+        _closeCreateTeamDialog();
+      }
+      return;
+    }
+
+    if (_teamModalShownForCurrentRoom) return;
+    _teamModalShownForCurrentRoom = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
+      _showCreateTeamDialog(teammate);
+    });
+  }
+
+  MultiplayerSeat? _localSeatFor(MultiplayerRoomSnapshot snapshot) {
+    final localPlayerId = _playerId;
+    if (localPlayerId == null) return null;
+    final seat = snapshot.seats.firstWhere(
+      (seat) => seat.playerId == localPlayerId,
+      orElse: () => const MultiplayerSeat(
+        playerId: '',
+        name: '',
+        seatIndex: -1,
+        ready: false,
+        connected: false,
+      ),
+    );
+    return seat.playerId.isEmpty ? null : seat;
+  }
+
+  MultiplayerSeat? _teammateSeatFor(MultiplayerRoomSnapshot snapshot) {
+    final localPlayerId = _playerId;
+    if (localPlayerId == null) return null;
+    final localSeat = _localSeatFor(snapshot);
+    if (localSeat == null) return null;
+    if (snapshot.seats.length == 2) {
+      return snapshot.seats.firstWhere(
+        (seat) => seat.playerId != localPlayerId,
+        orElse: () => const MultiplayerSeat(
+          playerId: '',
+          name: '',
+          seatIndex: -1,
+          ready: false,
+          connected: false,
+        ),
+      );
+    }
+    return snapshot.seats.firstWhere(
+      (seat) =>
+          seat.playerId != localPlayerId && seat.teamId == localSeat.teamId,
+      orElse: () => const MultiplayerSeat(
+        playerId: '',
+        name: '',
+        seatIndex: -1,
+        ready: false,
+        connected: false,
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _teamForTeammate(String teammatePlayerId) {
+    if (teammatePlayerId.isEmpty) return null;
+    for (final team in _playerTeams) {
+      final playerIds = team['playerIds'];
+      if (playerIds is List &&
+          playerIds.map((entry) => entry.toString()).contains(teammatePlayerId)) {
+        return team;
+      }
+    }
+    return null;
+  }
+
+  void _sendTeamSelectionIfReady({String? roomId}) {
+    final socket = _socket;
+    final playerId = _playerId;
+    final sessionToken = _sessionToken;
+    final pairId = _selectedPairId;
+    final targetRoomId =
+        roomId ?? _connectedRoomId ?? _roomController.text.trim();
+    if (socket == null ||
+        !socket.isConnected ||
+        playerId == null ||
+        sessionToken == null ||
+        pairId == null ||
+        targetRoomId.isEmpty) {
+      return;
+    }
+
+    try {
+      socket.selectTeam(
+        roomId: targetRoomId,
+        playerId: playerId,
+        sessionToken: sessionToken,
+        pairId: pairId,
+      );
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudo seleccionar el equipo: $error';
+      });
+    }
+  }
+
+  void _closeCreateTeamDialog() {
+    final dialogContext = _teamDialogContext;
+    if (dialogContext == null) return;
+    _teamDialogAutoClosed = true;
+    _teamDialogContext = null;
+    _teamModalShownForCurrentRoom = true;
+    Navigator.of(dialogContext).pop(false);
+  }
+
+  Future<void> _showCreateTeamDialog(MultiplayerSeat teammate) async {
+    final teamNameController = TextEditingController(
+      text: '$_playerName / ${teammate.name}',
+    );
+    _teamDialogAutoClosed = false;
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        _teamDialogContext = context;
+        return AlertDialog(
+          title: const Text('Crear equipo'),
+          content: TextField(
+            controller: teamNameController,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(_maxTeamNameLength),
+            ],
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              labelText: 'Nombre del equipo',
+              helperText: 'Companero: ${teammate.name}',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Ahora no'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Crear'),
+            ),
+          ],
+        );
+      },
+    );
+    final autoClosed = _teamDialogAutoClosed;
+    _teamDialogAutoClosed = false;
+    _teamDialogContext = null;
+    if (created != true || !mounted) {
+      if (!autoClosed) {
+        _teamModalShownForCurrentRoom = false;
+      }
+      return;
+    }
+    await _createTeamForTeammate(
+      teammateUsername: teammate.username!,
+      teamName: _cleanTeamName(teamNameController.text),
+    );
+  }
+
+  Future<void> _createTeamForTeammate({
+    required String teammateUsername,
+    required String teamName,
+  }) async {
+    final socket = _socket;
+    final playerId = _playerId;
+    final sessionToken = _sessionToken;
+    if (socket == null || playerId == null || sessionToken == null) return;
+    if (teamName.isEmpty) {
+      setState(() {
+        _status = 'Escribe un nombre para el equipo.';
+      });
+      return;
+    }
+
+    try {
+      socket.createTeam(
+        playerId: playerId,
+        sessionToken: sessionToken,
+        teammateUsername: teammateUsername,
+        teamName: teamName,
+      );
+      setState(() {
+        _setTeamNameField(teamName);
+        _status = 'Creando equipo con $teammateUsername...';
+      });
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudo crear el equipo: $error';
+      });
+    }
+  }
+
+  Future<void> _saveProfileAndContinue() async {
+    final playerName = _playerName;
+    final username = _username;
+    final password = _profilePassword;
+    if (playerName.isEmpty) {
+      setState(() {
+        _profileStatus = 'Escribe tu nombre para continuar.';
+      });
+      return;
+    }
+    if (!RegExp(r'^[a-z0-9_.-]{3,24}$').hasMatch(username)) {
+      setState(() {
+        _profileStatus =
+            'El usuario debe tener 3-24 letras, numeros, punto o guion.';
+      });
+      return;
+    }
+    if (password.length < 6 || password.length > 72) {
+      setState(() {
+        _profileStatus = 'La contrasena debe tener entre 6 y 72 caracteres.';
+      });
+      return;
+    }
+
+    final localPlayerId = _localPlayerId;
+    await Future.wait([
+      _savePlayerName(playerName),
+      _savePlayerId(localPlayerId),
+      _saveUsername(username),
+    ]);
+
+    setState(() {
+      _profileStatus = 'Creando usuario...';
+      _status = 'Sincronizando usuario con el servidor...';
+    });
+
+    if (!await _ensureConnected()) {
+      setState(() {
+        _profileStatus = 'No se pudo conectar para crear el usuario.';
+      });
+      return;
+    }
+
+    final socket = _socket;
+    if (socket == null) return;
+    try {
+      socket.updateProfile(
+        playerId: localPlayerId,
+        username: username,
+        playerName: playerName,
+        password: password,
+        teamName: '',
+        sessionToken: _sessionToken,
+      );
+    } catch (error) {
+      setState(() {
+        _profileStatus = 'No se pudo crear el usuario: $error';
+      });
+    }
+  }
+
+  Future<void> _recoverProfile() async {
+    final username = _username;
+    final password = _profilePassword;
+    if (!RegExp(r'^[a-z0-9_.-]{3,24}$').hasMatch(username) ||
+        password.length < 6 ||
+        password.length > 72) {
+      setState(() {
+        _profileStatus = 'Escribe usuario y contrasena validos.';
+      });
+      return;
+    }
+    if (!await _ensureConnected()) {
+      setState(() {
+        _showCreateAccount = true;
+        _profileStatus =
+            'Servidor sin respuesta. Prepara una cuenta nueva para intentarlo.';
+      });
+      return;
+    }
+    final socket = _socket;
+    if (socket == null) return;
+    setState(() {
+      _profileStatus = 'Iniciando sesion...';
+    });
+    try {
+      socket.recoverProfile(
+        username: username,
+        password: password,
+      );
+    } catch (error) {
+      setState(() {
+        _profileStatus = 'No se pudo iniciar sesion: $error';
+      });
+    }
+  }
+
+  bool _hasUsableSessionOrCredentials() {
+    if (_sessionToken != null && _sessionToken!.isNotEmpty) return true;
+    return RegExp(r'^[a-z0-9_.-]{3,24}$').hasMatch(_username) &&
+        _profilePassword.length >= 6 &&
+        _profilePassword.length <= 72;
+  }
+
+  Future<void> _copyRoomInvitation() async {
+    final roomId = _connectedRoomId ?? _roomController.text.trim();
+    if (roomId.isEmpty) {
+      setState(() {
+        _status = 'Crea o escribe una sala antes de copiar invitacion.';
+      });
+      return;
+    }
+
+    await Clipboard.setData(
+      ClipboardData(text: 'Unete a mi sala de Zapiti: $roomId'),
+    );
+    if (!mounted) return;
+    setState(() {
+      _status = 'Invitacion copiada: $roomId.';
+    });
+  }
+
   Future<void> _leaveRoom() async {
     final socket = _socket;
     final roomId = _connectedRoomId ?? _roomController.text.trim();
@@ -1516,7 +2478,7 @@ class _MainMenuMultiplayerContentState
         socket.leaveRoom(roomId: roomId, playerId: playerId);
       }
     } catch (_) {
-      // Si el leave falla, cerramos igualmente la conexion local.
+      // Si el leave falla, cerramos igualmente la conexión local.
     }
 
     _closeSocketIntentionally();
@@ -1524,11 +2486,11 @@ class _MainMenuMultiplayerContentState
     if (!mounted) return;
     setState(() {
       _socket = null;
-      _playerId = null;
       _connectedRoomId = null;
       _roomSnapshot = null;
       _sessionStarted = false;
       _ready = false;
+      _teamModalShownForCurrentRoom = false;
       _connectionState = _ServerConnectionState.disconnected;
       _connecting = false;
       _status = 'Has salido de la sala.';
@@ -1605,14 +2567,6 @@ class _MainMenuMultiplayerContentState
     };
   }
 
-  List<String> _parseControlledPlayerIds(dynamic rawIds) {
-    if (rawIds is! List) return const [];
-    return [
-      for (final rawId in rawIds)
-        if (rawId != null) rawId.toString(),
-    ];
-  }
-
   List<Player> _parsePlayers(dynamic rawPlayers) {
     if (rawPlayers is! List) return const [];
     return [
@@ -1644,6 +2598,21 @@ class _MainMenuMultiplayerContentState
     return parsed;
   }
 
+  int? _parseBotDifficulty(dynamic rawPlayers) {
+    if (rawPlayers is! List) return null;
+    for (final rawPlayer in rawPlayers) {
+      if (rawPlayer is! Map) continue;
+      final rawDifficulty = rawPlayer['aiDifficulty'];
+      final difficulty = rawDifficulty is int
+          ? rawDifficulty
+          : int.tryParse(rawDifficulty?.toString() ?? '');
+      if (difficulty != null) {
+        return difficulty.clamp(1, 5);
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -1657,6 +2626,35 @@ class _MainMenuMultiplayerContentState
         );
 
     final showSession = _sessionStarted && _roomSnapshot != null;
+    if (!_profileReady && !showSession) {
+      if (_showCreateAccount) {
+        return _MultiplayerCreateAccountView(
+          usernameController: _usernameController,
+          nameController: _nameController,
+          passwordController: _passwordController,
+          status: _profileStatus,
+          onCreate: _saveProfileAndContinue,
+          onBackToLogin: () {
+            setState(() {
+              _showCreateAccount = false;
+              _profileStatus = 'Inicia sesion para recuperar tus datos.';
+            });
+          },
+        );
+      }
+      return _MultiplayerLoginView(
+        usernameController: _usernameController,
+        passwordController: _passwordController,
+        status: _profileStatus,
+        onLogin: _recoverProfile,
+        onCreateAccount: () {
+          setState(() {
+            _showCreateAccount = true;
+            _profileStatus = 'Crea tu usuario para guardar estadisticas.';
+          });
+        },
+      );
+    }
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
@@ -1666,9 +2664,16 @@ class _MainMenuMultiplayerContentState
               snapshot: _roomSnapshot!,
               playerId: _playerId,
               status: _status,
+              playerStats: _playerStats,
+              fallbackPlayerName: _playerName,
+              fallbackTeamName: _teamName,
+              rankingPairs: _rankingPairs,
+              rankingMatches: _rankingMatches,
               canEnterGame: _multiplayerSessionReadyForGame(),
               onEnterGame: _enterGame,
               onLeaveRoom: _leaveRoom,
+              onCopyInvitation: _copyRoomInvitation,
+              onRequestRanking: _requestRanking,
             )
           : Column(
               key: const ValueKey('multiplayer-lobby'),
@@ -1677,7 +2682,7 @@ class _MainMenuMultiplayerContentState
                 Text('Lobby multijugador', style: titleStyle),
                 const SizedBox(height: 8),
                 Text(
-                  'Primer paso: preparar sala, codigo e intercambio de acciones por WebSocket.',
+                  'Crea una sala, comparte el código y jugad en la misma mesa por WebSocket.',
                   style: bodyStyle,
                 ),
                 const SizedBox(height: 10),
@@ -1750,7 +2755,8 @@ class _MainMenuMultiplayerContentState
                           color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+                            color:
+                                ZapitiColors.darkBrown.withValues(alpha: 0.12),
                           ),
                         ),
                         child: Padding(
@@ -1778,14 +2784,74 @@ class _MainMenuMultiplayerContentState
                       ),
                     ],
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    labelText: 'Nombre',
-                    prefixIcon: Icon(Icons.person_outline),
-                    border: OutlineInputBorder(),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.account_circle_outlined,
+                          color: ZapitiColors.wineRed,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                _username.isEmpty
+                                    ? _playerName
+                                    : '$_playerName (@$_username)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: bodyStyle.copyWith(
+                                  color: ZapitiColors.darkBrown,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              if (_selectedTeamName.isNotEmpty)
+                                Text(
+                                  'Equipo: $_selectedTeamName',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: bodyStyle.copyWith(
+                                    fontSize:
+                                        ((bodyStyle.fontSize ?? 12) * 0.88),
+                                    color: ZapitiColors.darkBrown.withValues(
+                                      alpha: 0.66,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Editar usuario',
+                          onPressed: () {
+                            setState(() {
+                              _profileReady = false;
+                              _showCreateAccount = true;
+                              _profileStatus =
+                                  'Actualiza nombre o contrasena.';
+                            });
+                          },
+                          icon: const Icon(Icons.manage_accounts_outlined),
+                          color: ZapitiColors.darkBrown,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 36,
+                            height: 36,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1794,7 +2860,7 @@ class _MainMenuMultiplayerContentState
                   textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
                     isDense: true,
-                    labelText: 'Codigo de sala',
+                    labelText: 'Código de sala',
                     prefixIcon: Icon(Icons.tag_outlined),
                     border: OutlineInputBorder(),
                   ),
@@ -1848,6 +2914,45 @@ class _MainMenuMultiplayerContentState
                   ],
                 ),
                 const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: ZapitiActionButton(
+                          label: 'RANKING',
+                          icon: Icons.leaderboard_outlined,
+                          onPressed: _connecting ? null : _requestRanking,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: ZapitiActionButton(
+                          label: 'COPIAR INV.',
+                          icon: Icons.ios_share_outlined,
+                          onPressed: _copyRoomInvitation,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _PlayerStatsCard(
+                  stats: _playerStats,
+                  fallbackPlayerName: _playerName,
+                  fallbackTeamName: _teamName,
+                ),
+                if (_rankingRequested) ...[
+                  const SizedBox(height: 8),
+                  _RankingPanel(
+                    pairs: _rankingPairs,
+                    matches: _rankingMatches,
+                  ),
+                ],
+                const SizedBox(height: 8),
                 SizedBox(
                   height: 42,
                   child: ZapitiActionButton(
@@ -1879,22 +2984,276 @@ class _MainMenuMultiplayerContentState
   }
 }
 
+class _MultiplayerLoginView extends StatelessWidget {
+  final TextEditingController usernameController;
+  final TextEditingController passwordController;
+  final String status;
+  final VoidCallback onLogin;
+  final VoidCallback onCreateAccount;
+
+  const _MultiplayerLoginView({
+    required this.usernameController,
+    required this.passwordController,
+    required this.status,
+    required this.onLogin,
+    required this.onCreateAccount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w900,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium!.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.82),
+          height: 1.25,
+          fontWeight: FontWeight.w700,
+        );
+
+    return Column(
+      key: const ValueKey('multiplayer-login'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Iniciar sesion', style: titleStyle),
+        const SizedBox(height: 8),
+        Text(
+          'Entra con tu usuario para recuperar tu ficha, equipos y ranking.',
+          style: bodyStyle,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: usernameController,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_.-]')),
+            LengthLimitingTextInputFormatter(
+              _MainMenuMultiplayerContentState._maxUsernameLength,
+            ),
+          ],
+          textCapitalization: TextCapitalization.none,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: 'Usuario',
+            prefixIcon: Icon(Icons.alternate_email),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: passwordController,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          inputFormatters: [LengthLimitingTextInputFormatter(72)],
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: 'Contrasena',
+            prefixIcon: Icon(Icons.lock_outline),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 42,
+          child: ZapitiActionButton(
+            label: 'ENTRAR',
+            icon: Icons.login,
+            onPressed: onLogin,
+            primary: true,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 42,
+          child: ZapitiActionButton(
+            label: 'CREAR USUARIO',
+            icon: Icons.person_add_alt_1_outlined,
+            onPressed: onCreateAccount,
+          ),
+        ),
+        const SizedBox(height: 10),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: ZapitiColors.darkBrown.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(status, style: bodyStyle),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MultiplayerCreateAccountView extends StatelessWidget {
+  final TextEditingController usernameController;
+  final TextEditingController nameController;
+  final TextEditingController passwordController;
+  final String status;
+  final VoidCallback onCreate;
+  final VoidCallback onBackToLogin;
+
+  const _MultiplayerCreateAccountView({
+    required this.usernameController,
+    required this.nameController,
+    required this.passwordController,
+    required this.status,
+    required this.onCreate,
+    required this.onBackToLogin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w900,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium!.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.82),
+          height: 1.25,
+          fontWeight: FontWeight.w700,
+        );
+
+    return Column(
+      key: const ValueKey('multiplayer-create-account'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Crear usuario', style: titleStyle),
+        const SizedBox(height: 8),
+        Text(
+          'Crea tu ficha para guardar partidas y formar equipos.',
+          style: bodyStyle,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: usernameController,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_.-]')),
+            LengthLimitingTextInputFormatter(
+              _MainMenuMultiplayerContentState._maxUsernameLength,
+            ),
+          ],
+          textCapitalization: TextCapitalization.none,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: 'Usuario',
+            prefixIcon: Icon(Icons.alternate_email),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: nameController,
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(
+              _MainMenuMultiplayerContentState._maxPlayerNameLength,
+            ),
+          ],
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: 'Nombre de jugador',
+            prefixIcon: Icon(Icons.person_outline),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: passwordController,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          inputFormatters: [LengthLimitingTextInputFormatter(72)],
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: 'Contrasena',
+            prefixIcon: Icon(Icons.lock_outline),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: ZapitiActionButton(
+                  label: 'CREAR',
+                  icon: Icons.check,
+                  onPressed: onCreate,
+                  primary: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: ZapitiActionButton(
+                  label: 'VOLVER',
+                  icon: Icons.arrow_back,
+                  onPressed: onBackToLogin,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: ZapitiColors.darkBrown.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(status, style: bodyStyle),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MultiplayerSessionView extends StatelessWidget {
   final MultiplayerRoomSnapshot snapshot;
   final String? playerId;
   final String status;
+  final Map<String, dynamic> playerStats;
+  final String fallbackPlayerName;
+  final String fallbackTeamName;
+  final List<Map<String, dynamic>> rankingPairs;
+  final List<Map<String, dynamic>> rankingMatches;
   final bool canEnterGame;
   final VoidCallback onEnterGame;
   final VoidCallback onLeaveRoom;
+  final VoidCallback onCopyInvitation;
+  final VoidCallback onRequestRanking;
 
   const _MultiplayerSessionView({
     super.key,
     required this.snapshot,
     required this.playerId,
     required this.status,
+    required this.playerStats,
+    required this.fallbackPlayerName,
+    required this.fallbackTeamName,
+    required this.rankingPairs,
+    required this.rankingMatches,
     required this.canEnterGame,
     required this.onEnterGame,
     required this.onLeaveRoom,
+    required this.onCopyInvitation,
+    required this.onRequestRanking,
   });
 
   @override
@@ -1935,6 +3294,32 @@ class _MultiplayerSessionView extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text('Sala ${snapshot.roomId} - $phaseLabel', style: bodyStyle),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: ZapitiActionButton(
+                  label: 'COPIAR INV.',
+                  icon: Icons.ios_share_outlined,
+                  onPressed: onCopyInvitation,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: ZapitiActionButton(
+                  label: 'RANKING',
+                  icon: Icons.leaderboard_outlined,
+                  onPressed: onRequestRanking,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 4),
         Text('Creada: $createdAt', style: bodyStyle),
         const SizedBox(height: 4),
@@ -2062,6 +3447,19 @@ class _MultiplayerSessionView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
+        _PlayerStatsCard(
+          stats: playerStats,
+          fallbackPlayerName: fallbackPlayerName,
+          fallbackTeamName: fallbackTeamName,
+        ),
+        const SizedBox(height: 8),
+        if (rankingPairs.isNotEmpty || rankingMatches.isNotEmpty) ...[
+          _RankingPanel(
+            pairs: rankingPairs,
+            matches: rankingMatches,
+          ),
+          const SizedBox(height: 8),
+        ],
         Text(status, style: bodyStyle),
         const SizedBox(height: 8),
         if (canEnterGame)
@@ -2089,6 +3487,457 @@ class _MultiplayerSessionView extends StatelessWidget {
   }
 }
 
+class _PlayerStatsCard extends StatelessWidget {
+  final Map<String, dynamic> stats;
+  final String fallbackPlayerName;
+  final String fallbackTeamName;
+
+  const _PlayerStatsCard({
+    required this.stats,
+    required this.fallbackPlayerName,
+    required this.fallbackTeamName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (stats['name']?.toString().trim().isNotEmpty ?? false)
+        ? stats['name'].toString()
+        : fallbackPlayerName;
+    final teamName = (stats['teamName']?.toString().trim().isNotEmpty ?? false)
+        ? stats['teamName'].toString()
+        : fallbackTeamName;
+    final played = _readInt(stats['played']);
+    final wins = _readInt(stats['wins']);
+    final losses = _readInt(stats['losses']);
+    final pointsFor = _readInt(stats['pointsFor']);
+    final pointsAgainst = _readInt(stats['pointsAgainst']);
+    final winRate = played == 0 ? 0 : ((wins / played) * 100).round();
+    final diff = pointsFor - pointsAgainst;
+    final favoritePair = stats['favoritePair']?.toString().trim() ?? '';
+    final lastPlayedAt = _readInt(stats['lastPlayedAt']);
+    final bodyStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w800,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.account_circle_outlined,
+                  size: 16,
+                  color: ZapitiColors.wineRed,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Ficha del jugador',
+                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              teamName.isEmpty ? name : '$name - $teamName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: bodyStyle.copyWith(
+                color: ZapitiColors.darkBrown,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _PlayerStatPill(label: 'Partidas', value: '$played'),
+                _PlayerStatPill(label: 'V/D', value: '$wins/$losses'),
+                _PlayerStatPill(label: 'Victorias', value: '$winRate%'),
+                _PlayerStatPill(
+                  label: 'Chinos',
+                  value: diff >= 0 ? '+$diff' : '$diff',
+                ),
+              ],
+            ),
+            if (favoritePair.isNotEmpty || lastPlayedAt > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                [
+                  if (favoritePair.isNotEmpty) 'Pareja habitual: $favoritePair',
+                  if (lastPlayedAt > 0)
+                    'Ultima partida: ${_formatMatchDate(lastPlayedAt)}',
+                ].join(' - '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: bodyStyle.copyWith(
+                  fontSize: ((bodyStyle.fontSize ?? 12) * 0.9),
+                  color: ZapitiColors.darkBrown.withValues(alpha: 0.66),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerStatPill extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _PlayerStatPill({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.62),
+          fontWeight: FontWeight.w900,
+          fontSize: 10,
+        );
+    final valueStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+          color: ZapitiColors.wineRed,
+          fontWeight: FontWeight.w900,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.46),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: labelStyle),
+            Text(value, style: valueStyle),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RankingPanel extends StatelessWidget {
+  final List<Map<String, dynamic>> pairs;
+  final List<Map<String, dynamic>> matches;
+
+  const _RankingPanel({
+    required this.pairs,
+    required this.matches,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w800,
+        );
+    final visiblePairs = pairs.take(8).toList();
+    final visibleMatches = matches.take(5).toList();
+    final panelHeight = (MediaQuery.sizeOf(context).height * 0.34)
+        .clamp(190.0, 340.0)
+        .toDouble();
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: SizedBox(
+          height: panelHeight,
+          child: ListView(
+            children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.leaderboard_outlined,
+                  size: 16,
+                  color: ZapitiColors.wineRed,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Ranking de parejas',
+                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (visiblePairs.isEmpty)
+              Text('Aun no hay partidas registradas.', style: bodyStyle)
+            else ...[
+              _RankingHeader(style: bodyStyle),
+              const SizedBox(height: 4),
+              for (var index = 0; index < visiblePairs.length; index++)
+                Padding(
+                  padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+                  child: _RankingRow(
+                    position: index + 1,
+                    pair: visiblePairs[index],
+                  ),
+                ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(
+                  Icons.history_outlined,
+                  size: 16,
+                  color: ZapitiColors.wineRed,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Ultimas partidas',
+                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (visibleMatches.isEmpty)
+              Text('Todavia no hay historial.', style: bodyStyle)
+            else
+              for (var index = 0; index < visibleMatches.length; index++)
+                Padding(
+                  padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+                  child: _MatchHistoryRow(match: visibleMatches[index]),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RankingHeader extends StatelessWidget {
+  final TextStyle style;
+
+  const _RankingHeader({required this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final headerStyle = style.copyWith(
+      color: ZapitiColors.darkBrown.withValues(alpha: 0.62),
+      fontSize: ((style.fontSize ?? 12) * 0.86),
+      fontWeight: FontWeight.w900,
+    );
+
+    return Row(
+      children: [
+        const SizedBox(width: 24),
+        Expanded(child: Text('Pareja', style: headerStyle)),
+        SizedBox(
+          width: 48,
+          child: Text('V/P', textAlign: TextAlign.right, style: headerStyle),
+        ),
+        SizedBox(
+          width: 48,
+          child: Text('%', textAlign: TextAlign.right, style: headerStyle),
+        ),
+        SizedBox(
+          width: 62,
+          child: Text('Chinos', textAlign: TextAlign.right, style: headerStyle),
+        ),
+      ],
+    );
+  }
+}
+
+class _RankingRow extends StatelessWidget {
+  final int position;
+  final Map<String, dynamic> pair;
+
+  const _RankingRow({
+    required this.position,
+    required this.pair,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = pair['teamName']?.toString() ?? 'Pareja';
+    final played = _readInt(pair['played']);
+    final wins = _readInt(pair['wins']);
+    final losses = _readInt(pair['losses']);
+    final pointsFor = _readInt(pair['pointsFor']);
+    final pointsAgainst = _readInt(pair['pointsAgainst']);
+    final winRate = played == 0 ? 0 : ((wins / played) * 100).round();
+    final diff = pointsFor - pointsAgainst;
+    final textStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w800,
+        );
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 24,
+          child: Text('$position.', style: textStyle),
+        ),
+        Expanded(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textStyle.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ),
+        SizedBox(
+          width: 48,
+          child: Text(
+            '$wins/$losses',
+            textAlign: TextAlign.right,
+            style: textStyle.copyWith(color: ZapitiColors.wineRed),
+          ),
+        ),
+        SizedBox(
+          width: 48,
+          child: Text(
+            '$winRate%',
+            textAlign: TextAlign.right,
+            style: textStyle,
+          ),
+        ),
+        SizedBox(
+          width: 62,
+          child: Text(
+            diff >= 0 ? '+$diff' : '$diff',
+            textAlign: TextAlign.right,
+            style: textStyle.copyWith(
+              color: diff >= 0
+                  ? Colors.green.shade700
+                  : ZapitiColors.darkBrown.withValues(alpha: 0.72),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MatchHistoryRow extends StatelessWidget {
+  final Map<String, dynamic> match;
+
+  const _MatchHistoryRow({required this.match});
+
+  @override
+  Widget build(BuildContext context) {
+    final score = match['score'] is Map ? match['score'] as Map : const {};
+    final scoreOne = _readInt(score['1']);
+    final scoreTwo = _readInt(score['2']);
+    final winnerTeamId = _readInt(match['winnerTeamId']);
+    final teamOne = _matchTeamName(match, '1');
+    final teamTwo = _matchTeamName(match, '2');
+    final date = _formatMatchDate(_readInt(match['finishedAt']));
+    final textStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w800,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.46),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$teamOne vs $teamTwo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$scoreOne-$scoreTwo',
+                  style: textStyle.copyWith(color: ZapitiColors.wineRed),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Gana equipo $winnerTeamId - $date',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textStyle.copyWith(
+                fontSize: ((textStyle.fontSize ?? 12) * 0.9),
+                color: ZapitiColors.darkBrown.withValues(alpha: 0.66),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+int _readInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+String _matchTeamName(Map<String, dynamic> match, String teamId) {
+  final teams = match['teams'];
+  final rawPlayers = teams is Map ? teams[teamId] : null;
+  if (rawPlayers is! List) return 'Equipo $teamId';
+  final names = [
+    for (final rawPlayer in rawPlayers)
+      if (rawPlayer is Map &&
+          rawPlayer['isBot'] != true &&
+          (rawPlayer['name']?.toString().trim().isNotEmpty ?? false))
+        rawPlayer['name'].toString().trim(),
+  ];
+  if (names.isEmpty) return 'Equipo $teamId';
+  return names.join(' / ');
+}
+
+String _formatMatchDate(int millis) {
+  if (millis <= 0) return 'sin fecha';
+  final date = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(date.day)}/${two(date.month)} ${two(date.hour)}:${two(date.minute)}';
+}
+
 class _MainMenuOptionsContent extends StatelessWidget {
   final bool audioEnabled;
   final ValueChanged<bool> onAudioChanged;
@@ -2098,6 +3947,7 @@ class _MainMenuOptionsContent extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
+  final VoidCallback onAbout;
 
   const _MainMenuOptionsContent({
     required this.audioEnabled,
@@ -2108,6 +3958,7 @@ class _MainMenuOptionsContent extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
+    required this.onAbout,
   });
 
   @override
@@ -2165,6 +4016,23 @@ class _MainMenuOptionsContent extends StatelessWidget {
             icon: Icons.touch_app_outlined,
             value: confirmCardPlay,
             onChanged: onConfirmCardPlayChanged,
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Más',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: ZapitiColors.darkBrown,
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ZapitiActionButton(
+            label: 'ACERCA DE',
+            icon: Icons.badge_outlined,
+            onPressed: onAbout,
           ),
           const SizedBox(height: 8),
           Align(

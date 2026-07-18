@@ -19,7 +19,7 @@ void main() {
       expect(progress.isFinished, isFalse);
     });
 
-    test('la segunda ronda empatada da la mano al ganador de la primera', () {
+    test('cada ronda empatada da un chico a cada equipo', () {
       final progress = HandRules.resolve([
         _wonRoundByTeam(1),
         _tiedRound(),
@@ -31,15 +31,17 @@ void main() {
       expect(progress.isNoPoints, isFalse);
     });
 
-    test('primera y segunda empatadas dejan decidir a la tercera', () {
+    test('dos rondas empatadas producen 2-2 y terminan sin puntos', () {
       final progress = HandRules.resolve([
         _tiedRound(),
         _tiedRound(),
       ]);
 
-      expect(progress.roundWinsFor(1), 1);
-      expect(progress.roundWinsFor(2), 1);
-      expect(progress.isFinished, isFalse);
+      expect(progress.roundWinsFor(1), 2);
+      expect(progress.roundWinsFor(2), 2);
+      expect(progress.winningTeamId, isNull);
+      expect(progress.isFinished, isTrue);
+      expect(progress.isNoPoints, isTrue);
     });
 
     test('primera empatada y segunda ganada decide el reparto', () {
@@ -83,29 +85,29 @@ void main() {
       expect(progress.isNoPoints, isFalse);
     });
 
-    test('tercera ronda empatada con 1-1 termina sin puntos', () {
+    test('tercera ronda empatada suma a ambos y termina 2-2 sin puntos', () {
       final progress = HandRules.resolve([
         _wonRoundByTeam(1),
         _wonRoundByTeam(2),
         _tiedRound(),
       ]);
 
-      expect(progress.roundWinsFor(1), 1);
-      expect(progress.roundWinsFor(2), 1);
+      expect(progress.roundWinsFor(1), 2);
+      expect(progress.roundWinsFor(2), 2);
       expect(progress.winningTeamId, isNull);
       expect(progress.isFinished, isTrue);
       expect(progress.isNoPoints, isTrue);
     });
 
-    test('tres rondas empatadas terminan sin puntos', () {
+    test('no procesa mas chicos despues de alcanzar un 2-2', () {
       final progress = HandRules.resolve([
         _tiedRound(),
         _tiedRound(),
         _tiedRound(),
       ]);
 
-      expect(progress.roundWinsFor(1), 1);
-      expect(progress.roundWinsFor(2), 1);
+      expect(progress.roundWinsFor(1), 2);
+      expect(progress.roundWinsFor(2), 2);
       expect(progress.winningTeamId, isNull);
       expect(progress.isFinished, isTrue);
       expect(progress.isNoPoints, isTrue);

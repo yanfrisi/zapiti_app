@@ -42,6 +42,9 @@ void main() {
           MultiplayerSeat(
             playerId: 'p1',
             name: 'Host',
+            username: 'host',
+            pairId: 'p1+p2',
+            teamName: 'Los Bravos',
             seatIndex: 0,
             teamId: 1,
             ready: true,
@@ -54,12 +57,80 @@ void main() {
 
       expect(parsed.roomId, 'ZP777');
       expect(parsed.seats.single.name, 'Host');
+      expect(parsed.seats.single.username, 'host');
+      expect(parsed.seats.single.pairId, 'p1+p2');
+      expect(parsed.seats.single.teamName, 'Los Bravos');
       expect(parsed.seats.single.ready, isTrue);
       expect(parsed.seats.single.seatIndex, 0);
       expect(parsed.seats.single.teamId, 1);
       expect(parsed.seats.single.connected, isTrue);
       expect(parsed.phase, 'lobby');
       expect(parsed.createdAt, 1710000000000);
+    });
+
+    test('serializa ranking multijugador', () {
+      const message = MultiplayerMessage(
+        type: MultiplayerMessageType.ranking,
+        payload: {
+          'pairs': [
+            {'teamName': 'Juan / Ana', 'played': 2, 'wins': 1},
+          ],
+          'matches': [
+            {
+              'winnerTeamId': 1,
+              'score': {'1': 30, '2': 18},
+            },
+          ],
+        },
+      );
+
+      final parsed = MultiplayerMessage.fromJson(message.toJson());
+
+      expect(parsed.type, MultiplayerMessageType.ranking);
+      expect(parsed.payload['pairs'], isA<List<dynamic>>());
+      expect(parsed.payload['matches'], isA<List<dynamic>>());
+    });
+
+    test('serializa equipos del jugador', () {
+      const message = MultiplayerMessage(
+        type: MultiplayerMessageType.teams,
+        playerId: 'player_1',
+        payload: {
+          'teams': [
+            {
+              'pairId': 'player_1+player_2',
+              'teamName': 'Los Bravos',
+              'teammateNames': ['Ana'],
+            },
+          ],
+        },
+      );
+
+      final parsed = MultiplayerMessage.fromJson(message.toJson());
+
+      expect(parsed.type, MultiplayerMessageType.teams);
+      expect(parsed.payload['teams'], isA<List<dynamic>>());
+    });
+
+    test('serializa perfil multijugador', () {
+      const message = MultiplayerMessage(
+        type: MultiplayerMessageType.profile,
+        playerId: 'player_1',
+        payload: {
+          'playerId': 'player_1',
+          'username': 'juan',
+          'name': 'Juan',
+          'sessionToken': 'session_123',
+          'teamName': 'Los Bravos',
+        },
+      );
+
+      final parsed = MultiplayerMessage.fromJson(message.toJson());
+
+      expect(parsed.type, MultiplayerMessageType.profile);
+      expect(parsed.payload['username'], 'juan');
+      expect(parsed.payload['sessionToken'], 'session_123');
+      expect(parsed.payload['teamName'], 'Los Bravos');
     });
   });
 }

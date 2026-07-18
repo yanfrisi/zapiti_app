@@ -2,122 +2,60 @@
 
 ## Contexto
 
-Este repositorio es un prototipo inicial de un juego de cartas llamado Zápiti.
+Zapiti es un juego de cartas Flutter funcional, con partida local contra bots y
+modo multijugador. Ya no es un prototipo inicial.
 
-El usuario sabe programar, principalmente en Java/backend, pero está empezando con Flutter y desarrollo mobile.
+## Arquitectura
 
-El proyecto debe mantenerse simple, claro y progresivo.
+- `lib/domain`: modelos y reglas puras del juego.
+- `lib/screens`: pantallas, coordinacion visual y entrada del usuario.
+- `lib/widgets`: componentes visuales reutilizables.
+- `lib/multiplayer`: protocolo y cliente multijugador.
+- `test/domain`: pruebas unitarias de reglas.
 
-## Prioridad técnica
+No dupliques reglas en widgets. Local y multijugador deben usar el mismo
+dominio siempre que el servidor no sea la autoridad de una accion.
 
-La prioridad absoluta es construir primero el dominio del juego, no una UI bonita.
+## Reglas consolidadas
 
-El código debe ser fácil de leer, con clases pequeñas y tests.
+- Juegan dos equipos de dos jugadores.
+- Cada reparto contiene hasta tres chicos.
+- Cada jugador juega una carta por chico.
+- La carta de fuerza maxima decide el chico.
+- Si la fuerza maxima aparece en ambos equipos, el chico queda empatado.
+- Cada chico empatado concede un chico a cada equipo.
+- Un empate no inicia otro reparto: se continua con las cartas disponibles.
+- Gana el reparto el primer equipo que alcanza dos chicos.
+- Si ambos alcanzan dos chicos simultaneamente, el reparto termina empatado y
+  no se suman chinos.
+- El ganador suma el valor vigente del reparto y entonces se reparten cartas.
+- Una fuerza maxima empatada nunca se desempata con la segunda carta.
+- La jerarquia canonica vive en `ZapitiRules.strength`; tutoriales y bots deben
+  coincidir con ella.
 
-## Arquitectura obligatoria
+## Truco
 
-Mantener esta separación:
+- Solo existe una negociacion de truco por reparto.
+- Mientras esta pendiente se puede aceptar, rechazar o subir alternativamente.
+- Tras aceptar o rechazar no se puede volver a cantar en ese reparto.
+- En local, el humano decide por su equipo: el companero bot no canta ni sube.
+- Los rivales bot si pueden cantar o subir.
+- Las restricciones de puntuacion se calculan por equipo segun `TrucoRules`.
 
-- `lib/domain`: reglas, modelos y lógica pura.
-- `lib/screens`: pantallas Flutter.
-- `test/domain`: tests unitarios de reglas.
+## Criterios de implementacion
 
-No meter lógica de reglas dentro de widgets.
+- Mantener clases pequenas, nombres claros y estados explicitos.
+- Preferir modelos inmutables cuando sea razonable.
+- Anadir tests al cambiar una regla.
+- No modificar callbacks, sincronizacion o reglas al hacer cambios visuales.
+- No introducir gestores de estado o dependencias sin una necesidad concreta.
+- Conservar la orientacion horizontal y el responsive de la partida.
 
-## Estilo de implementación
+## Validacion
 
-Preferir:
-
-- Código simple.
-- Nombres claros.
-- Pocas abstracciones.
-- Tests antes de ampliar reglas.
-- Modelos inmutables cuando sea razonable.
-- Errores explícitos si el estado no tiene sentido.
-
-Evitar:
-
-- Arquitecturas grandes.
-- Riverpod, Bloc, Provider o Redux por ahora.
-- Firebase.
-- Backend.
-- Online.
-- Animaciones.
-- Assets gráficos.
-- Refactors innecesarios.
-
-## Estado actual del dominio
-
-Ya existen:
-
-- `SpanishCard`
-- `Suit`
-- `ZapitiRules`
-- `Player`
-- `PlayedCard`
-- `RoundRules`
-- `RoundResult`
-
-`ZapitiRules.strength` define una jerarquía inicial de cartas.
-
-`RoundRules.resolveRound` decide qué jugador gana una ronda según la carta más fuerte.
-
-## Próxima tarea recomendada
-
-Implementar `HandRules`.
-
-### Objetivo
-
-Dadas varias rondas jugadas, determinar qué equipo gana una mano.
-
-### Restricción
-
-No implementar todavía todas las reglas especiales de empate si no están claras.
-
-Primero crear una versión explícita y testeada con estas reglas provisionales:
-
-1. Una mano puede tener hasta 3 rondas.
-2. Gana la mano el primer equipo que gane 2 rondas.
-3. Si no hay ganador claro, lanzar error o devolver resultado pendiente.
-
-### Archivos sugeridos
-
-Crear:
+Antes de cerrar cambios funcionales o visuales, ejecutar:
 
 ```text
-lib/domain/hand_result.dart
-lib/domain/hand_rules.dart
-test/domain/hand_rules_test.dart
+flutter analyze
+flutter test
 ```
-
-### Modelo sugerido
-
-```dart
-class HandResult {
-  final int winningTeamId;
-  final int roundsWon;
-}
-```
-
-### Tests mínimos
-
-Crear tests para:
-
-1. Equipo 1 gana dos rondas y gana la mano.
-2. Equipo 2 gana dos rondas y gana la mano.
-3. Una sola ronda no debería cerrar la mano.
-4. Lista vacía de rondas debería fallar explícitamente.
-
-## Importante
-
-No cambiar el proyecto a una arquitectura compleja.
-
-No añadir dependencias salvo que sean estrictamente necesarias.
-
-No trabajar todavía en diseño visual.
-
-No crear assets.
-
-No añadir online.
-
-El objetivo es que el usuario aprenda construyendo el juego paso a paso.

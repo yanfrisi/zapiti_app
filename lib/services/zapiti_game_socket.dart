@@ -52,21 +52,31 @@ class GameSocket {
 
   void send(MultiplayerMessage message) {
     if (_channel == null) {
-      throw StateError('WebSocket no esta conectado.');
+      throw StateError('WebSocket no está conectado.');
     }
     _channel!.sink.add(jsonEncode(message.toJson()));
   }
 
   void createRoom({
     required String playerId,
+    required String username,
     required String playerName,
+    required String teamName,
+    String? password,
+    String? sessionToken,
+    String? pairId,
     String? characterId,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.createRoom,
       playerId: playerId,
       payload: {
+        'username': username,
         'name': playerName,
+        'teamName': teamName,
+        if (sessionToken != null) 'sessionToken': sessionToken,
+        if (sessionToken == null && password != null) 'password': password,
+        if (pairId != null) 'pairId': pairId,
         if (characterId != null) 'characterId': characterId,
       },
     ));
@@ -75,7 +85,12 @@ class GameSocket {
   void joinRoom({
     required String roomId,
     required String playerId,
+    required String username,
     required String playerName,
+    required String teamName,
+    String? password,
+    String? sessionToken,
+    String? pairId,
     String? characterId,
   }) {
     send(MultiplayerMessage(
@@ -83,7 +98,12 @@ class GameSocket {
       roomId: roomId,
       playerId: playerId,
       payload: {
+        'username': username,
         'name': playerName,
+        'teamName': teamName,
+        if (sessionToken != null) 'sessionToken': sessionToken,
+        if (sessionToken == null && password != null) 'password': password,
+        if (pairId != null) 'pairId': pairId,
         if (characterId != null) 'characterId': characterId,
       },
     ));
@@ -126,6 +146,124 @@ class GameSocket {
     ));
   }
 
+  void requestRanking() {
+    send(const MultiplayerMessage(
+      type: MultiplayerMessageType.getRanking,
+    ));
+  }
+
+  void requestTeams({
+    required String playerId,
+    required String sessionToken,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.listTeams,
+      playerId: playerId,
+      payload: {'sessionToken': sessionToken},
+    ));
+  }
+
+  void createTeam({
+    required String playerId,
+    required String sessionToken,
+    required String teammateUsername,
+    required String teamName,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.createTeam,
+      playerId: playerId,
+      payload: {
+        'sessionToken': sessionToken,
+        'teammateUsername': teammateUsername,
+        'teamName': teamName,
+      },
+    ));
+  }
+
+  void selectTeam({
+    required String roomId,
+    required String playerId,
+    required String sessionToken,
+    required String pairId,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.selectTeam,
+      roomId: roomId,
+      playerId: playerId,
+      payload: {
+        'sessionToken': sessionToken,
+        'pairId': pairId,
+      },
+    ));
+  }
+
+  void updateTeam({
+    required String playerId,
+    required String sessionToken,
+    required String pairId,
+    required String teamName,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.updateTeam,
+      playerId: playerId,
+      payload: {
+        'sessionToken': sessionToken,
+        'pairId': pairId,
+        'teamName': teamName,
+      },
+    ));
+  }
+
+  void archiveTeam({
+    required String playerId,
+    required String sessionToken,
+    required String pairId,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.archiveTeam,
+      playerId: playerId,
+      payload: {
+        'sessionToken': sessionToken,
+        'pairId': pairId,
+      },
+    ));
+  }
+
+  void updateProfile({
+    required String playerId,
+    required String username,
+    required String playerName,
+    required String teamName,
+    String? password,
+    String? sessionToken,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.updateProfile,
+      playerId: playerId,
+      payload: {
+        'username': username,
+        'name': playerName,
+        'teamName': teamName,
+        if (password != null) 'password': password,
+        if (password == null && sessionToken != null)
+          'sessionToken': sessionToken,
+      },
+    ));
+  }
+
+  void recoverProfile({
+    required String username,
+    required String password,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.recoverProfile,
+      payload: {
+        'username': username,
+        'password': password,
+      },
+    ));
+  }
+
   void newHand({required String roomId, required String playerId}) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.newHand,
@@ -139,6 +277,19 @@ class GameSocket {
       type: MultiplayerMessageType.restartGame,
       roomId: roomId,
       playerId: playerId,
+    ));
+  }
+
+  void chooseAlVerDecision({
+    required String roomId,
+    required String playerId,
+    required bool play,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.chooseAlVerDecision,
+      roomId: roomId,
+      playerId: playerId,
+      payload: {'play': play},
     ));
   }
 

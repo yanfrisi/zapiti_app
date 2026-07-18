@@ -30,6 +30,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       if (socket != null && socket.isConnected && roomId != null) {
         socket.callTruco(roomId: roomId, playerId: playerId, value: value);
       }
+      if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
+        _resolveBotResponseToTruco();
+      }
       return;
     }
     _resolveBotResponseToTruco();
@@ -138,6 +141,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       if (socket != null && socket.isConnected && roomId != null) {
         socket.raiseTruco(roomId: roomId, playerId: playerId, value: value);
       }
+      if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
+        _resolveBotResponseToTruco();
+      }
       return;
     }
     _resolveBotResponseToTruco();
@@ -214,8 +220,17 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     return _players.firstWhere((player) => player.teamId == teamId);
   }
 
+  Player _teamBotResponderPlayer(int teamId) {
+    if (_isMultiplayerMatch) {
+      final localBots = _players.where(
+        (player) => player.teamId == teamId && _isLocalBotPlayer(player),
+      );
+      if (localBots.isNotEmpty) return localBots.first;
+    }
+    return _teamLeadPlayer(teamId);
+  }
+
   Future<void> _resolveBotResponseToTruco() async {
-    if (_isMultiplayerMatch) return;
     final version = _handVersion;
 
     await _botDelay(900);
@@ -230,6 +245,10 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final callerTeamId = _trucoCallerTeamId!;
     final pendingValue = _pendingTrucoValue!;
     final respondingTeamId = TeamRules.opponentOf(callerTeamId);
+    if (_isMultiplayerMatch &&
+        !_teamNeedsLocalBotTrucoResponse(respondingTeamId)) {
+      return;
+    }
     if (respondingTeamId == _humanPlayer.teamId) {
       _updateState(() {
         _isAutoPlaying = false;
@@ -239,7 +258,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       return;
     }
 
-    final respondingPlayer = _teamLeadPlayer(respondingTeamId);
+    final respondingPlayer = _teamBotResponderPlayer(respondingTeamId);
     final accepts = _shouldTeamAcceptTruco(
       respondingTeamId,
       pendingValue: pendingValue,
@@ -255,12 +274,17 @@ extension _GameScreenTrucoLogic on _GameScreenState {
             value: raiseValue,
             actorPlayerId: respondingPlayer.id,
           )) {
+        _sendMultiplayerTrucoRaiseIfNeeded(respondingPlayer, raiseValue);
         _isAutoPlaying = false;
-        _isWaitingHumanTrucoResponse = true;
-        _status =
-            'Equipo $respondingTeamId sube a $raiseValue. Responde tu equipo.';
+        _isWaitingHumanTrucoResponse =
+            _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
+        _status = _isWaitingHumanTrucoResponse
+            ? 'Equipo $respondingTeamId sube a $raiseValue. Responde tu equipo.'
+            : 'Equipo $respondingTeamId sube a $raiseValue.';
       } else if (accepts) {
-        _acceptTruco(teamId: respondingTeamId, actorPlayerId: respondingPlayer.id);
+        _acceptTruco(
+            teamId: respondingTeamId, actorPlayerId: respondingPlayer.id);
+        _sendMultiplayerTrucoAcceptIfNeeded(respondingPlayer);
         _showTemporaryPlayerMessage(respondingPlayer.id, 'Aceptamos.');
       } else {
         _showTemporaryPlayerMessage(respondingPlayer.id, 'Pasamos.');
@@ -268,6 +292,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
           passingTeamId: respondingTeamId,
           actorPlayerId: respondingPlayer.id,
         );
+        _sendMultiplayerTrucoPassIfNeeded(respondingPlayer);
       }
     });
 
@@ -281,7 +306,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
   }
 
   bool _shouldBotCallTruco(Player bot) {
-    if (_isMultiplayerMatch || bot.teamId == _humanPlayer.teamId) return false;
+    if (!_isLocalBotPlayer(bot) || bot.teamId == _humanPlayer.teamId) {
+      return false;
+    }
     if (_pendingTrucoValue != null ||
         _handFinished ||
         _roundHistory.length >= 2 ||
@@ -296,6 +323,10 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
     final hand = _hands[bot.id] ?? [];
     if (hand.isEmpty) return false;
+    final alreadyConsidered =
+        _aiTeamsConsideredTrucoThisHand.contains(bot.teamId);
+    if (alreadyConsidered) return false;
+    _aiTeamsConsideredTrucoThisHand.add(bot.teamId);
 
     final teamSignal = _teamSignalsByTeam[bot.teamId];
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
@@ -305,30 +336,58 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final ownMaxStrength = hand
         .map(ZapitiRules.strength)
         .reduce((best, current) => current > best ? current : best);
-    final difficultyProfile = DifficultyProfiles.byLevel(_selectedDifficulty);
-    final impulsiveBonus = difficultyProfile.impulsiveTrucoChance > 0 &&
-        _playedCards.isNotEmpty &&
-        _random.nextDouble() < difficultyProfile.impulsiveTrucoChance;
-    if (impulsiveBonus && teamScore >= 80) return true;
-
-    if (BotTrucoStrategy.shouldCall(
-      difficulty: _selectedDifficulty,
+    final memory = BotMemoryContext.from(
+      bot: bot,
+      playedCards: _playedCards,
+      roundHistory: _roundHistory,
+    );
+    final pressuredByScoreOrRounds =
+        needsPoints || memory.teamIsUnderRoundPressure;
+    final teamCards = _teamCardsFor(bot.teamId);
+    final handStrength = BotTrucoStrategy.evaluateHandStrength(teamCards);
+    final profile = DifficultyProfiles.byLevel(_selectedDifficulty);
+    final callChance = BotTrucoStrategy.callChance(
+      profile,
+      handStrength: handStrength,
       teamScore: teamScore,
       ownMaxStrength: ownMaxStrength,
+      cardsOnTable: _playedCards.length,
+      teamRoundWins: _roundWins[bot.teamId]!,
+      needsPoints: pressuredByScoreOrRounds,
+      teamHasStrongSignal: _isStrongSignal(teamSignal),
+      isCompanion: false,
+    );
+    final callRoll = _random.nextDouble();
+    final shouldCall = BotTrucoStrategy.shouldCallWithRoll(
+      difficulty: _selectedDifficulty,
+      roll: callRoll,
+      teamScore: teamScore,
+      ownMaxStrength: ownMaxStrength,
+      handStrength: handStrength,
       cardsOnTable: _playedCards.length,
       teamRoundWins: _roundWins[bot.teamId]!,
       opponentRoundWins: _roundWins[otherTeam]!,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
       opponentHasStrongSignal: _isStrongSignal(opponentSignal),
       isCompanion: false,
-      needsPoints: needsPoints,
-    )) {
+      needsPoints: pressuredByScoreOrRounds,
+    );
+    debugPrint(
+      '[AI TRUCO] team=${bot.teamId} difficulty=$_selectedDifficulty '
+      'handStrength=${handStrength.toStringAsFixed(2)} '
+      'chance=${callChance.toStringAsFixed(3)} '
+      'roll=${callRoll.toStringAsFixed(3)} result=$shouldCall '
+      'pending=${_game.trucoState == TrucoNegotiationState.awaitingResponse} '
+      'alreadyConsidered=$alreadyConsidered',
+    );
+    if (shouldCall) {
       return true;
     }
 
-    return BotBluffStrategy.shouldBluffCall(
+    final bluffRoll = _random.nextDouble();
+    final shouldBluff = BotBluffStrategy.shouldBluffCall(
       difficulty: _selectedDifficulty,
-      roll: _random.nextDouble(),
+      roll: bluffRoll,
       teamScore: teamScore,
       ownMaxStrength: ownMaxStrength,
       cardsOnTable: _playedCards.length,
@@ -336,11 +395,25 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       opponentRoundWins: _roundWins[otherTeam]!,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
       opponentHasStrongSignal: _isStrongSignal(opponentSignal),
-      needsPoints: needsPoints,
+      needsPoints: pressuredByScoreOrRounds,
+      opponentsSpentPower: memory.opponentsSpentPower,
+      teamSpentPower: memory.teamSpentPower,
+      teamIsUnderRoundPressure: memory.teamIsUnderRoundPressure,
     );
+    debugPrint(
+      '[AI TRUCO] team=${bot.teamId} bluffRoll=${bluffRoll.toStringAsFixed(3)} '
+      'bluff=$shouldBluff alreadyConsidered=true',
+    );
+    return shouldBluff;
   }
 
   int? _botRaiseValue(int teamId, {required int pendingValue}) {
+    final responder = _teamBotResponderPlayer(teamId);
+    final memory = BotMemoryContext.from(
+      bot: responder,
+      playedCards: _playedCards,
+      roundHistory: _roundHistory,
+    );
     final teamCards = _players
         .where((player) => player.teamId == teamId)
         .expand((player) => _hands[player.id] ?? <SpanishCard>[])
@@ -357,8 +430,26 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       hasStrongSignal: _isStrongSignal(_teamSignalsByTeam[teamId]),
       isWinningReparto: isWinningReparto,
       sawOpponentStrongSignal: _opponentSignalsSeenByTeam.containsKey(teamId),
+      roll: _random.nextDouble(),
     );
-    return _game.raiseOptions.contains(raiseValue) ? raiseValue : null;
+    if (_game.raiseOptions.contains(raiseValue)) return raiseValue;
+
+    final otherTeam = TeamRules.opponentOf(teamId);
+    final bluffValue = BotBluffStrategy.bluffRaiseValue(
+      difficulty: _selectedDifficulty,
+      roll: _random.nextDouble(),
+      pendingValue: pendingValue,
+      maxAllowedValue: _game.maxAllowedTrucoValueForTeam(teamId),
+      teamScore: _teamHandScore(teamId),
+      hasStrongSignal: _isStrongSignal(_teamSignalsByTeam[teamId]),
+      sawOpponentStrongSignal: _opponentSignalsSeenByTeam.containsKey(teamId),
+      needsPoints: _score[teamId]! < _score[otherTeam]! ||
+          memory.teamIsUnderRoundPressure,
+      isWinningReparto: isWinningReparto,
+      opponentsSpentPower: memory.opponentsSpentPower,
+      teamSpentPower: memory.teamSpentPower,
+    );
+    return _game.raiseOptions.contains(bluffValue) ? bluffValue : null;
   }
 
   bool _shouldTeamAcceptTruco(int teamId, {required int pendingValue}) {
@@ -366,6 +457,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final otherTeam = TeamRules.opponentOf(teamId);
     final opponentSignal = _opponentSignalsSeenByTeam[teamId];
     final difficultyProfile = DifficultyProfiles.byLevel(_selectedDifficulty);
+    if (_currentRoundIsUnsavableForTeam(teamId)) {
+      return false;
+    }
     if (difficultyProfile.readsOpponentSignals &&
         _isStrongSignal(opponentSignal) &&
         _roundWins[teamId] == 0 &&
@@ -385,7 +479,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _random.nextDouble() < difficultyProfile.impulsiveTrucoChance) {
       return pendingValue <= 5;
     }
-    if (canCloseHand && pendingValue <= 6) return true;
+    if (canCloseHand && teamScore >= _callThreshold(86) && pendingValue <= 6) {
+      return true;
+    }
     if (mustSaveHand && teamScore >= _callThreshold(85) && pendingValue <= 5) {
       return true;
     }
@@ -397,12 +493,48 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         pendingValue <= 6) {
       return true;
     }
-    if (teamScore >= _callThreshold(125)) return pendingValue <= 8;
-    if (teamScore >= _callThreshold(95)) return pendingValue <= 5;
-    return teamScore >= _callThreshold(75) && pendingValue <= 3;
+    if (teamScore >= _callThreshold(148)) return pendingValue <= 8;
+    if (teamScore >= _callThreshold(122)) return pendingValue <= 5;
+    return teamScore >= _callThreshold(100) && pendingValue <= 3;
   }
 
   int get _tableInformationDiscount => _playedCards.length >= 2 ? 14 : 6;
+
+  bool _currentRoundIsUnsavableForTeam(int teamId) {
+    return BotTableRead.currentRoundIsUnsavableForTeam(
+      teamId: teamId,
+      players: _players,
+      hands: _hands,
+      playedCards: _playedCards,
+    );
+  }
+
+  void _sendMultiplayerTrucoAcceptIfNeeded(Player player) {
+    if (!_isMultiplayerMatch) return;
+    final socket = MultiplayerSessionStore.instance.socket;
+    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    if (socket != null && socket.isConnected && roomId != null) {
+      socket.acceptTruco(roomId: roomId, playerId: player.id);
+    }
+  }
+
+  void _sendMultiplayerTrucoPassIfNeeded(Player player) {
+    if (!_isMultiplayerMatch) return;
+    final socket = MultiplayerSessionStore.instance.socket;
+    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    if (socket != null && socket.isConnected && roomId != null) {
+      socket.passTruco(roomId: roomId, playerId: player.id);
+    }
+  }
+
+  void _sendMultiplayerTrucoRaiseIfNeeded(Player player, int value) {
+    if (!_isMultiplayerMatch) return;
+    final socket = MultiplayerSessionStore.instance.socket;
+    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    if (socket != null && socket.isConnected && roomId != null) {
+      socket.raiseTruco(roomId: roomId, playerId: player.id, value: value);
+    }
+  }
 
   int _callThreshold(int base) {
     return base +

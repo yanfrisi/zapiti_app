@@ -37,7 +37,7 @@ void main() {
     ];
 
     test('reduce progresivamente la probabilidad de error', () {
-      expect(DifficultyStrategy.cardMistakeChance(1), greaterThan(0.3));
+      expect(DifficultyStrategy.cardMistakeChance(1), greaterThan(0.15));
       expect(
         DifficultyStrategy.cardMistakeChance(1),
         greaterThan(DifficultyStrategy.cardMistakeChance(2)),

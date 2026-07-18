@@ -226,6 +226,25 @@ void main() {
       expect(controller.handFinished, isTrue);
     });
 
+    test('dos empates seguidos terminan 2-2 sin sumar chinos', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      )..startNewHand(fixedHands: _twoTiedRoundsHands());
+
+      _playFullRound(controller);
+      controller.resolveRound();
+      controller.continueRound();
+      _playFullRound(controller);
+      controller.resolveRound();
+
+      expect(controller.roundWins[TeamRules.teamOne], 2);
+      expect(controller.roundWins[TeamRules.teamTwo], 2);
+      expect(controller.score[TeamRules.teamOne], 0);
+      expect(controller.score[TeamRules.teamTwo], 0);
+      expect(controller.handFinished, isTrue);
+      expect(controller.isRoundAwaitingContinue, isFalse);
+    });
+
     test('mano sin truco vale un chino', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
@@ -606,6 +625,179 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('detecta al ver cuando equipo 1 empieza con 29 chinos', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+
+      controller.startNewHand(fixedHands: DebugDeals.presets.first);
+
+      expect(controller.alVerState, AlVerState.awaitingDecision);
+      expect(controller.alVerTeamId, TeamRules.teamOne);
+      expect(controller.alVerTeamIds, contains(TeamRules.teamOne));
+    });
+
+    test('detecta al ver cuando equipo 2 empieza con 29 chinos', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamTwo] = 29;
+
+      controller.startNewHand(fixedHands: DebugDeals.presets.first);
+
+      expect(controller.alVerState, AlVerState.awaitingDecision);
+      expect(controller.alVerTeamId, TeamRules.teamTwo);
+      expect(controller.alVerTeamIds, contains(TeamRules.teamTwo));
+    });
+
+    test('no activa al ver cuando nadie tiene 29 chinos', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      expect(controller.alVerState, AlVerState.none);
+      expect(controller.alVerTeamId, isNull);
+      expect(controller.alVerTeamIds, isEmpty);
+    });
+
+    test('al ver debe decidir antes de poder jugar una carta', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.startNewHand(fixedHands: DebugDeals.presets.first);
+
+      expect(
+        () => controller.playCard(
+          ZapitiPlayers.human,
+          controller.hands[ZapitiPlayers.human.id]!.first,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('si el equipo al ver decide jugar, la mano continua y vale 1 chino',
+        () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      controller.chooseAlVerDecision(
+        teamId: TeamRules.teamOne,
+        play: true,
+      );
+
+      expect(controller.alVerState, AlVerState.playing);
+      expect(controller.handValue, 1);
+      expect(
+        () => controller.playCard(
+          controller.currentPlayer,
+          controller.hands[controller.currentPlayer.id]!.first,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('si el equipo al ver se va a casa, el rival suma 2 chinos', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.startNewHand(fixedHands: DebugDeals.presets.first);
+
+      controller.chooseAlVerDecision(
+        teamId: TeamRules.teamOne,
+        play: false,
+      );
+
+      expect(controller.alVerState, AlVerState.conceded);
+      expect(controller.score[TeamRules.teamTwo], 2);
+      expect(controller.handFinished, isTrue);
+      expect(controller.isRoundAwaitingContinue, isFalse);
+      expect(controller.roundHistory, isEmpty);
+      expect(controller.playedCards, isEmpty);
+    });
+
+    test('al ver bloquea truco y subida para ese equipo, pero no para el rival',
+        () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+      controller.chooseAlVerDecision(teamId: TeamRules.teamOne, play: true);
+
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.human,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.human.id,
+        ),
+        isFalse,
+      );
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.rightRival,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.rightRival.id,
+        ),
+        isTrue,
+      );
+
+      controller.callTruco(
+        ZapitiPlayers.rightRival,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.rightRival.id,
+      );
+
+      expect(controller.raiseOptionsForTeam(TeamRules.teamOne), isEmpty);
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.human,
+          value: 6,
+          actorPlayerId: ZapitiPlayers.human.id,
+        ),
+        isFalse,
+      );
+    });
+
+    test('si el equipo al ver juega y gana sin truco, suma 1 chino', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+      controller.chooseAlVerDecision(
+        teamId: TeamRules.teamOne,
+        play: true,
+      );
+
+      _finishTwoRounds(controller);
+
+      expect(controller.score[TeamRules.teamOne], 30);
+      expect(controller.handFinished, isTrue);
+    });
+
+    test('una mano nueva sin 29 limpia el estado al ver', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.startNewHand(fixedHands: DebugDeals.presets.first);
+      expect(controller.alVerState, AlVerState.awaitingDecision);
+
+      controller.score[TeamRules.teamOne] = 0;
+      controller.score[TeamRules.teamTwo] = 0;
+      controller.startNewHand(fixedHands: DebugDeals.presets.first);
+
+      expect(controller.alVerState, AlVerState.none);
+      expect(controller.alVerTeamId, isNull);
+      expect(controller.alVerTeamIds, isEmpty);
+    });
   });
 }
 
@@ -644,6 +836,31 @@ Map<String, List<SpanishCard>> _tieThenTeamTwoWinsHands() {
     ZapitiPlayers.leftRival.id: [
       const SpanishCard(value: 2, suit: Suit.copas),
       const SpanishCard(value: 6, suit: Suit.oros),
+      const SpanishCard(value: 6, suit: Suit.espadas),
+    ],
+  };
+}
+
+Map<String, List<SpanishCard>> _twoTiedRoundsHands() {
+  return {
+    ZapitiPlayers.human.id: [
+      const SpanishCard(value: 3, suit: Suit.oros),
+      const SpanishCard(value: 2, suit: Suit.oros),
+      const SpanishCard(value: 5, suit: Suit.copas),
+    ],
+    ZapitiPlayers.rightRival.id: [
+      const SpanishCard(value: 3, suit: Suit.bastos),
+      const SpanishCard(value: 2, suit: Suit.bastos),
+      const SpanishCard(value: 5, suit: Suit.oros),
+    ],
+    ZapitiPlayers.companion.id: [
+      const SpanishCard(value: 12, suit: Suit.copas),
+      const SpanishCard(value: 11, suit: Suit.bastos),
+      const SpanishCard(value: 6, suit: Suit.bastos),
+    ],
+    ZapitiPlayers.leftRival.id: [
+      const SpanishCard(value: 10, suit: Suit.copas),
+      const SpanishCard(value: 7, suit: Suit.espadas),
       const SpanishCard(value: 6, suit: Suit.espadas),
     ],
   };

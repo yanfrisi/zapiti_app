@@ -3,11 +3,16 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/bot_strategy.dart';
+import '../domain/bot_al_ver_strategy.dart';
 import '../domain/bot_bluff_strategy.dart';
+import '../domain/bot_table_read.dart';
 import '../domain/bot_truco_raise_strategy.dart';
 import '../domain/bot_truco_strategy.dart';
+import '../domain/bot_voy_a_ti_strategy.dart';
 import '../domain/bot_memory_context.dart';
 import '../domain/character_assets.dart';
 import '../domain/debug_deals.dart';
@@ -32,6 +37,7 @@ import '../services/zapiti_game_socket.dart';
 import '../services/zapiti_multiplayer_protocol.dart';
 import '../services/zapiti_music_player.dart';
 import '../theme/zapiti_theme.dart';
+import 'about_screen.dart';
 import '../widgets/avatar_with_silhouette.dart';
 import '../widgets/zapiti_action_button.dart';
 import '../widgets/zapiti_card_widget.dart';
@@ -58,7 +64,7 @@ enum _MainMenuPanel { home, tutorial, options, multiplayer }
 enum _BotSpeed {
   slow('Lenta', 1.35),
   normal('Normal', 1),
-  fast('Rapida', 0.55);
+  fast('Rápida', 0.55);
 
   final String label;
   final double delayFactor;
@@ -116,7 +122,7 @@ extension on _ServerConnectionState {
   }
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static const _targetScore = 30;
   static const _defaultPlayers = ZapitiPlayers.tableOrder;
   static const _selectedCharacterPrefsKey = 'selected_human_character_id';
@@ -126,6 +132,14 @@ class _GameScreenState extends State<GameScreen> {
   static const _botSpeedPrefsKey = 'bot_speed';
   static const _showGameplayHelpPrefsKey = 'show_gameplay_help';
   static const _confirmCardPlayPrefsKey = 'confirm_card_play';
+  static const _multiplayerPlayerNamePrefsKey = 'multiplayer_player_name';
+  static const _multiplayerPlayerIdPrefsKey = 'multiplayer_player_id';
+  static const _multiplayerUsernamePrefsKey = 'multiplayer_username';
+  static const _multiplayerPasswordPrefsKey = 'multiplayer_password';
+  static const _multiplayerPlayerPinPrefsKey = 'multiplayer_player_pin';
+  static const _multiplayerSessionTokenPrefsKey =
+      'multiplayer_session_token';
+  static const _multiplayerTeamNamePrefsKey = 'multiplayer_team_name';
 
   final Map<String, String> _playerMessages = {};
   final Map<String, Timer> _playerMessageTimers = {};
@@ -134,6 +148,7 @@ class _GameScreenState extends State<GameScreen> {
   final Map<int, String> _opponentSignalsSeenByTeam = {};
   final Set<String> _playersSignaledThisHand = {};
   final Set<String> _forceWinRequestedPlayerIds = {};
+  final Set<int> _aiTeamsConsideredTrucoThisHand = {};
   String? _companionPrivateSignalStatus;
   Random _random = Random();
   final GamePreferencesStore _preferencesStore = const GamePreferencesStore();
@@ -157,10 +172,13 @@ class _GameScreenState extends State<GameScreen> {
   bool _audioEnabled = true;
   double _audioVolume = 0.65;
   bool _confirmCardPlay = false;
+  bool _isAlVerDecisionDialogOpen = false;
+  int _alVerDecisionPromptedForHandVersion = -1;
   _MainMenuPanel _mainMenuPanel = _MainMenuPanel.home;
   _BotSpeed _botSpeed = _BotSpeed.normal;
   String _selectedHumanCharacterId = 'p1';
   int _selectedDifficulty = 3;
+  int _companionVoyATiPromptedHandVersion = -1;
   static const _debugUsePresetHands = false;
   static const _debugPresetIndex = 0;
   Set<String> _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
@@ -204,8 +222,28 @@ class _GameScreenState extends State<GameScreen> {
       !_handFinished &&
       !_isAutoPlaying &&
       !_isRoundAwaitingContinue &&
-      !_isWaitingHumanTrucoResponse;
+      !_isWaitingHumanTrucoResponse &&
+      _game.alVerState != AlVerState.awaitingDecision;
   bool get _isGameFinished => _winningTeamId != null;
+  @visibleForTesting
+  ZapitiGameController get gameController => _game;
+  @visibleForTesting
+  Future<void> showAlVerDecisionDialogForTesting() async {
+    final teamId = _game.alVerTeamId;
+    if (teamId == null) return;
+    await _presentAlVerDecisionDialog(teamId);
+  }
+
+  @visibleForTesting
+  Future<void> resolveAlVerDecisionForTesting() async {
+    final teamId = _game.alVerTeamId;
+    if (teamId == null) return;
+    await _processPendingAlVerDecision(
+      teamId,
+      teamIsHumanControlled: _isTeamControlledByHuman(teamId),
+    );
+  }
+
   bool get _canHumanCallTruco {
     if (_isRoundAwaitingContinue ||
         _isWaitingHumanTrucoResponse ||
@@ -236,6 +274,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _game = ZapitiGameController(
       targetScore: _targetScore,
       players: _players,
@@ -256,7 +295,23 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        unawaited(_syncMusic());
+        return;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        unawaited(_musicPlayer.stop());
+        return;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final timer in _playerMessageTimers.values) {
       timer.cancel();
     }
@@ -322,6 +377,7 @@ class _GameScreenState extends State<GameScreen> {
     final cardsRemaining = {
       for (final player in _players) player.id: _hands[player.id]?.length ?? 0,
     };
+    _maybeHandleAlVerDecision();
 
     if (_showMainMenu) {
       return Scaffold(
@@ -332,6 +388,7 @@ class _GameScreenState extends State<GameScreen> {
             onTutorial: _openMainMenuTutorial,
             onOptions: _openMainMenuOptions,
             onMultiplayer: _openMainMenuMultiplayer,
+            onAbout: _openAboutScreen,
             onEnterGame: _enterMultiplayerMatch,
             selectedCharacterId: _selectedHumanCharacterId,
             onSelectedCharacterChanged: _selectHumanCharacter,
@@ -396,6 +453,8 @@ class _GameScreenState extends State<GameScreen> {
                         pendingTrucoValue: _pendingTrucoValue,
                         trucoCallerTeamId: _trucoCallerTeamId,
                         isTrucoAccepted: _isTrucoAccepted,
+                        difficultyProfile:
+                            DifficultyProfiles.byLevel(_selectedDifficulty),
                       );
                       final scorePanel = _GameScorePanel(
                         scoreTeamOne: _score[1]!,
@@ -517,11 +576,10 @@ class _GameScreenState extends State<GameScreen> {
                       final scoreWidth = (195 * scale).clamp(162.0, 244.0);
                       final scoreHeight = (82 * scale).clamp(66.0, 102.0);
                       final bottomHeight =
-                          (166 * scale).clamp(138.0, 206.0).toDouble();
-                      final tableTop =
-                          max(headerHeight + 4 * scale, 54 * scale);
+                          (140 * scale).clamp(120.0, 170.0).toDouble();
+                      final tableTop = max(headerHeight * 0.58, 30 * scale);
                       final tableBottom = bottomHeight + 4 * scale;
-                      final tableSideInset = (28 * scale).clamp(8.0, 42.0);
+                      final tableSideInset = (12 * scale).clamp(4.0, 24.0);
 
                       return Padding(
                         padding: EdgeInsets.all(edge),
@@ -539,6 +597,9 @@ class _GameScreenState extends State<GameScreen> {
                                 pendingTrucoValue: _pendingTrucoValue,
                                 trucoCallerTeamId: _trucoCallerTeamId,
                                 isTrucoAccepted: _isTrucoAccepted,
+                                difficultyProfile: DifficultyProfiles.byLevel(
+                                  _selectedDifficulty,
+                                ),
                                 visualScale: scale,
                               ),
                             ),
@@ -586,6 +647,7 @@ class _GameScreenState extends State<GameScreen> {
                               height: bottomHeight,
                               child: _LandscapeBottomBoard(
                                 scale: scale,
+                                playerName: _humanPlayer.name,
                                 cards: _humanHand,
                                 enabled: _isHumanTurn,
                                 isCurrent: _humanPlayer.id == _currentPlayer.id,
@@ -632,6 +694,29 @@ class _GameScreenState extends State<GameScreen> {
                   onPass: _humanPassesTruco,
                   onRaise: _humanRaisesTruco,
                 ),
+              if (_isAlVerDecisionDialogOpen &&
+                  _game.alVerState == AlVerState.awaitingDecision &&
+                  _game.alVerTeamId == _humanPlayer.teamId)
+                _AlVerDecisionOverlay(
+                  teamId: _humanPlayer.teamId,
+                  onAskCompanionSignal: _requestCompanionSignal,
+                  onSignalStart: _startSignal,
+                  onSignalEnd: _endSignal,
+                  onPlay: (teamId) =>
+                      _handleHumanAlVerDecision(teamId, play: true),
+                  onGoHome: (teamId) =>
+                      _handleHumanAlVerDecision(teamId, play: false),
+                ),
+              if (_isGameFinished && _winningTeamId != null)
+                _GameFinishedOverlay(
+                  winningTeamId: _winningTeamId!,
+                  winningPlayers: _players
+                      .where((player) => player.teamId == _winningTeamId)
+                      .toList(),
+                  scoreTeamOne: _score[TeamRules.teamOne]!,
+                  scoreTeamTwo: _score[TeamRules.teamTwo]!,
+                  onRestart: _restartGame,
+                ),
               if (_showGameOptions)
                 _GameOptionsOverlay(
                   audioEnabled: _audioEnabled,
@@ -642,6 +727,7 @@ class _GameScreenState extends State<GameScreen> {
                   onBotSpeedChanged: _setBotSpeed,
                   confirmCardPlay: _confirmCardPlay,
                   onConfirmCardPlayChanged: _setConfirmCardPlay,
+                  onAbout: _openAboutScreen,
                   onClose: _closeGameOptions,
                 ),
             ],

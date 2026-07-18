@@ -16,6 +16,7 @@ class MultiplayerSessionStore {
   Map<String, String> characterIdsByPlayer = const {};
   Map<String, List<SpanishCard>>? fixedHands;
   int? seed;
+  int? botDifficulty;
   bool matchStarted = false;
 
   void clearMatchData() {
@@ -25,6 +26,7 @@ class MultiplayerSessionStore {
     characterIdsByPlayer = const {};
     fixedHands = null;
     seed = null;
+    botDifficulty = null;
     matchStarted = false;
   }
 
