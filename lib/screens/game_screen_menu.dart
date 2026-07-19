@@ -1138,7 +1138,10 @@ class _MainMenuMultiplayerContentState
   bool _showCreateAccount = false;
   bool _teamModalShownForCurrentRoom = false;
   bool _teamDialogAutoClosed = false;
+  String? _teamDialogTeammatePlayerId;
   BuildContext? _teamDialogContext;
+  String? _pendingRoomAction;
+  bool _roomActionRetriedWithoutCharacter = false;
   String _profileStatus = 'Configura tu perfil multijugador.';
   late String _selectedCharacterId;
   String? _confirmedCharacterId;
@@ -1421,6 +1424,7 @@ class _MainMenuMultiplayerContentState
     _ServerConnectionState connectionState =
         _ServerConnectionState.disconnected,
   }) {
+    _closeCreateTeamDialog();
     setState(() {
       if (!preserveSocket) {
         _socket = null;
@@ -1433,6 +1437,8 @@ class _MainMenuMultiplayerContentState
       _autoEnterQueued = false;
       _connectionState = connectionState;
       _connecting = false;
+      _teamModalShownForCurrentRoom = false;
+      _teamDialogTeammatePlayerId = null;
       _status = status;
     });
   }
@@ -1691,6 +1697,8 @@ class _MainMenuMultiplayerContentState
       case MultiplayerMessageType.roomSnapshot:
         final snapshot = MultiplayerRoomSnapshot.fromJson(message.payload);
         setState(() {
+          _pendingRoomAction = null;
+          _roomActionRetriedWithoutCharacter = false;
           _roomSnapshot = snapshot;
           _connectedRoomId = snapshot.roomId;
           _roomController.text = snapshot.roomId;
@@ -1733,7 +1741,7 @@ class _MainMenuMultiplayerContentState
             _sessionToken = null;
             unawaited(_clearSavedSessionToken());
             _profileReady = false;
-            _showCreateAccount = true;
+            _showCreateAccount = false;
             _teamsLoaded = false;
             _playerTeams = const [];
             _selectedPairId = null;
@@ -1747,12 +1755,27 @@ class _MainMenuMultiplayerContentState
               'La sala ya no existe. El servidor pudo haberse reiniciado.',
             'team_required' =>
               'Crea o selecciona el equipo antes de marcar listo.',
+            'invalid_team_for_room' =>
+              'Ese equipo no corresponde con tu companero en esta sala.',
+            'auth_failed' =>
+              'Sesion caducada. Vuelve a iniciar sesion con tu contrasena.',
+            'character_taken' =>
+              'Ese personaje ya esta ocupado en esta sala. Elige otro.',
             _ => 'Servidor: $code - $text',
           };
         });
-        if (message.payload['code']?.toString() == 'character_taken' ||
-            message.payload['code']?.toString() == 'room_in_progress') {
+        final errorCode = message.payload['code']?.toString();
+        if (errorCode == 'character_taken') {
+          if (_retryPendingRoomActionWithoutCharacter()) {
+            break;
+          }
           _revertSelectedCharacter();
+        } else if (errorCode == 'room_in_progress') {
+          _revertSelectedCharacter();
+        } else if (errorCode == 'invalid_team_for_room') {
+          setState(() {
+            _selectedPairId = null;
+          });
         }
         break;
       case MultiplayerMessageType.startGame:
@@ -1823,8 +1846,13 @@ class _MainMenuMultiplayerContentState
               !teams.any(
                 (team) => team['pairId']?.toString() == _selectedPairId,
               )) {
-            _selectedPairId =
-                teams.isEmpty ? null : teams.first['pairId']?.toString();
+            final snapshot = _roomSnapshot;
+            final teammate = snapshot == null ? null : _teammateSeatFor(snapshot);
+            _selectedPairId = teammate == null
+                ? teams.isEmpty
+                    ? null
+                    : teams.first['pairId']?.toString()
+                : _teamForTeammate(teammate.playerId)?['pairId']?.toString();
           }
           final selectedName = _selectedTeamName;
           if (selectedName.isNotEmpty) {
@@ -1914,9 +1942,9 @@ class _MainMenuMultiplayerContentState
 
     if (!await _ensureConnected()) {
       setState(() {
-        _showCreateAccount = true;
         _profileStatus =
-            'Servidor sin respuesta. Prepara una cuenta nueva para intentarlo.';
+            'Servidor sin respuesta. Intenta crear la sala de nuevo.';
+        _status = 'Servidor sin respuesta. No se ha creado la sala.';
       });
       return;
     }
@@ -1928,12 +1956,15 @@ class _MainMenuMultiplayerContentState
       _connectedRoomId = null;
       _ready = false;
       _teamModalShownForCurrentRoom = false;
+      _teamDialogTeammatePlayerId = null;
       _status = 'Solicitando creacion de sala...';
     });
 
     try {
       final localPlayerId = _localPlayerId;
       unawaited(_savePlayerId(localPlayerId));
+      _pendingRoomAction = 'create';
+      _roomActionRetriedWithoutCharacter = false;
       socket.createRoom(
         playerId: localPlayerId,
         username: username,
@@ -1986,6 +2017,11 @@ class _MainMenuMultiplayerContentState
     unawaited(_saveTeamName(_selectedTeamName));
 
     if (!await _ensureConnected()) {
+      setState(() {
+        _profileStatus =
+            'Servidor sin respuesta. Intenta unirte de nuevo.';
+        _status = 'Servidor sin respuesta. No se ha unido a la sala.';
+      });
       return;
     }
 
@@ -1996,12 +2032,15 @@ class _MainMenuMultiplayerContentState
       _connectedRoomId = roomCode;
       _ready = false;
       _teamModalShownForCurrentRoom = false;
+      _teamDialogTeammatePlayerId = null;
       _status = 'Intentando unirme a $roomCode...';
     });
 
     try {
       final localPlayerId = _localPlayerId;
       unawaited(_savePlayerId(localPlayerId));
+      _pendingRoomAction = 'join';
+      _roomActionRetriedWithoutCharacter = false;
       socket.joinRoom(
         roomId: roomCode,
         playerId: localPlayerId,
@@ -2022,6 +2061,60 @@ class _MainMenuMultiplayerContentState
     }
   }
 
+  bool _retryPendingRoomActionWithoutCharacter() {
+    if (_roomActionRetriedWithoutCharacter) return false;
+    final action = _pendingRoomAction;
+    final socket = _socket;
+    if (action == null || socket == null || !socket.isConnected) return false;
+
+    final playerName = _playerName;
+    final username = _username;
+    final localPlayerId = _localPlayerId;
+    _roomActionRetriedWithoutCharacter = true;
+
+    try {
+      if (action == 'create') {
+        socket.createRoom(
+          playerId: localPlayerId,
+          username: username,
+          playerName: playerName,
+          password: _sessionToken == null ? _profilePassword : null,
+          teamName: _selectedTeamName,
+          sessionToken: _sessionToken,
+        );
+        setState(() {
+          _status =
+              'Personaje ocupado. Reintentando sala con personaje libre...';
+        });
+        return true;
+      }
+
+      if (action == 'join') {
+        final roomId = _connectedRoomId ?? _roomController.text.trim();
+        if (roomId.isEmpty) return false;
+        socket.joinRoom(
+          roomId: roomId,
+          playerId: localPlayerId,
+          username: username,
+          playerName: playerName,
+          password: _sessionToken == null ? _profilePassword : null,
+          teamName: _selectedTeamName,
+          sessionToken: _sessionToken,
+        );
+        setState(() {
+          _status =
+              'Personaje ocupado. Reintentando union con personaje libre...';
+        });
+        return true;
+      }
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudo reintentar sin personaje: $error';
+      });
+    }
+    return false;
+  }
+
   Future<void> _toggleReady() async {
     final socket = _socket;
     final roomId = _connectedRoomId ?? _roomController.text.trim();
@@ -2033,6 +2126,7 @@ class _MainMenuMultiplayerContentState
     }
     final snapshot = _roomSnapshot;
     if (snapshot != null &&
+        snapshot.seats.length >= 4 &&
         _teammateSeatFor(snapshot)?.playerId.isNotEmpty == true &&
         (_selectedPairId == null || _selectedPairId!.isEmpty)) {
       setState(() {
@@ -2105,10 +2199,25 @@ class _MainMenuMultiplayerContentState
 
   void _resolveTeamForRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
     if (snapshot.phase != 'lobby') return;
+    if (snapshot.seats.length < 4) return;
     final localSeat = _localSeatFor(snapshot);
     final teammate = _teammateSeatFor(snapshot);
     final teammateUsername = teammate?.username?.trim() ?? '';
     if (teammate == null || teammateUsername.isEmpty) return;
+    if (_teamDialogContext != null &&
+        _teamDialogTeammatePlayerId != null &&
+        _teamDialogTeammatePlayerId != teammate.playerId) {
+      _closeCreateTeamDialog();
+      _teamModalShownForCurrentRoom = false;
+    }
+    final selectedTeam = _selectedTeam;
+    if (selectedTeam != null &&
+        _teamForTeammate(teammate.playerId)?['pairId']?.toString() !=
+            selectedTeam['pairId']?.toString()) {
+      setState(() {
+        _selectedPairId = null;
+      });
+    }
     final teammatePairId = teammate.pairId?.trim() ?? '';
     if (teammatePairId.isNotEmpty) {
       final teammateTeamName = teammate.teamName?.trim() ?? '';
@@ -2156,6 +2265,7 @@ class _MainMenuMultiplayerContentState
 
     if (_teamModalShownForCurrentRoom) return;
     _teamModalShownForCurrentRoom = true;
+    _teamDialogTeammatePlayerId = teammate.playerId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
       _showCreateTeamDialog(teammate);
@@ -2255,6 +2365,7 @@ class _MainMenuMultiplayerContentState
     if (dialogContext == null) return;
     _teamDialogAutoClosed = true;
     _teamDialogContext = null;
+    _teamDialogTeammatePlayerId = null;
     _teamModalShownForCurrentRoom = true;
     Navigator.of(dialogContext).pop(false);
   }
@@ -2297,6 +2408,7 @@ class _MainMenuMultiplayerContentState
     final autoClosed = _teamDialogAutoClosed;
     _teamDialogAutoClosed = false;
     _teamDialogContext = null;
+    _teamDialogTeammatePlayerId = null;
     if (created != true || !mounted) {
       if (!autoClosed) {
         _teamModalShownForCurrentRoom = false;
@@ -2416,9 +2528,8 @@ class _MainMenuMultiplayerContentState
     }
     if (!await _ensureConnected()) {
       setState(() {
-        _showCreateAccount = true;
         _profileStatus =
-            'Servidor sin respuesta. Prepara una cuenta nueva para intentarlo.';
+            'Servidor sin respuesta. Intenta iniciar sesion de nuevo.';
       });
       return;
     }
