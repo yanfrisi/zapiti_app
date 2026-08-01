@@ -24,6 +24,7 @@ class ZapitiGameTable extends StatelessWidget {
   final Map<String, String> playerMessages;
   final Map<String, String> characterIdsByPlayer;
   final Map<String, int> cardsRemaining;
+  final int? turnSecondsRemaining;
   final bool isHumanTurn;
   final bool showHumanSeat;
   final ValueChanged<SpanishCard> onPlayCard;
@@ -38,6 +39,7 @@ class ZapitiGameTable extends StatelessWidget {
     required this.playerMessages,
     required this.characterIdsByPlayer,
     required this.cardsRemaining,
+    required this.turnSecondsRemaining,
     required this.isHumanTurn,
     this.showHumanSeat = true,
     required this.onPlayCard,
@@ -76,6 +78,9 @@ class ZapitiGameTable extends StatelessWidget {
                   position: _SeatPosition.top,
                   playerName: topPlayer.name,
                   isCurrent: topPlayer.id == currentPlayer.id,
+                  turnSecondsRemaining: topPlayer.id == currentPlayer.id
+                      ? turnSecondsRemaining
+                      : null,
                   cardsRemaining: cardsRemaining[topPlayer.id] ?? 0,
                   message: playerMessages[topPlayer.id],
                   characterId:
@@ -89,6 +94,9 @@ class ZapitiGameTable extends StatelessWidget {
                   position: _SeatPosition.left,
                   playerName: leftPlayer.name,
                   isCurrent: leftPlayer.id == currentPlayer.id,
+                  turnSecondsRemaining: leftPlayer.id == currentPlayer.id
+                      ? turnSecondsRemaining
+                      : null,
                   cardsRemaining: cardsRemaining[leftPlayer.id] ?? 0,
                   message: playerMessages[leftPlayer.id],
                   characterId:
@@ -102,6 +110,9 @@ class ZapitiGameTable extends StatelessWidget {
                   position: _SeatPosition.right,
                   playerName: rightPlayer.name,
                   isCurrent: rightPlayer.id == currentPlayer.id,
+                  turnSecondsRemaining: rightPlayer.id == currentPlayer.id
+                      ? turnSecondsRemaining
+                      : null,
                   cardsRemaining: cardsRemaining[rightPlayer.id] ?? 0,
                   message: playerMessages[rightPlayer.id],
                   characterId:
@@ -115,6 +126,9 @@ class ZapitiGameTable extends StatelessWidget {
                   child: _HumanSeat(
                     playerName: bottomPlayer.name,
                     isCurrent: bottomPlayer.id == currentPlayer.id,
+                    turnSecondsRemaining: bottomPlayer.id == currentPlayer.id
+                        ? turnSecondsRemaining
+                        : null,
                     message: playerMessages[bottomPlayer.id],
                     characterId: characterIdsByPlayer[bottomPlayer.id] ??
                         bottomPlayer.id,

@@ -132,5 +132,36 @@ void main() {
       expect(parsed.payload['sessionToken'], 'session_123');
       expect(parsed.payload['teamName'], 'Los Bravos');
     });
+
+    test('serializa liberacion de personaje', () {
+      const message = MultiplayerMessage(
+        type: MultiplayerMessageType.selectCharacter,
+        roomId: 'ZP777',
+        playerId: 'player_1',
+        payload: {'characterId': null},
+      );
+
+      final parsed = MultiplayerMessage.fromJson(message.toJson());
+
+      expect(parsed.type, MultiplayerMessageType.selectCharacter);
+      expect(parsed.payload.containsKey('characterId'), isTrue);
+      expect(parsed.payload['characterId'], isNull);
+    });
+
+    test('serializa pasar mano', () {
+      const message = MultiplayerMessage(
+        type: MultiplayerMessageType.passHand,
+        roomId: 'ZP777',
+        playerId: 'p1',
+        payload: {'toPlayerId': 'p3'},
+      );
+
+      final json = message.toJson();
+      final parsed = MultiplayerMessage.fromJson(json);
+
+      expect(json['type'], 'pass_hand');
+      expect(parsed.type, MultiplayerMessageType.passHand);
+      expect(parsed.payload['toPlayerId'], 'p3');
+    });
   });
 }

@@ -75,15 +75,13 @@ void main() {
     expect(find.text('Opciones'), findsOneWidget);
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Mostrar ayuda'), findsNothing);
+    expect(find.text('Permitir pasar mano'), findsNothing);
   });
 
-  testWidgets('menu principal abre la seccion acerca de desde opciones',
+  testWidgets('menu principal abre la seccion acerca de desde portada',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
-
-    await tester.tap(find.text('OPCIONES'));
-    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('ACERCA DE'));
     await tester.tap(find.text('ACERCA DE'));
@@ -100,11 +98,11 @@ void main() {
     await tester.tap(find.text('VOLVER'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Opciones'), findsOneWidget);
+    expect(find.text('JUGAR'), findsOneWidget);
+    expect(find.text('ACERCA DE'), findsOneWidget);
   });
 
-  testWidgets('menu principal muestra login multijugador',
-      (tester) async {
+  testWidgets('menu principal muestra login multijugador', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
 
@@ -335,6 +333,41 @@ void main() {
     expect(find.text('Manos prefijadas'), findsNothing);
   });
 
+  testWidgets('ayuda de señas muestra orden de cartas y señales',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    await tester.tap(find.text('AYUDA SEÑAS'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Orden y señas'), findsOneWidget);
+    expect(find.text('4 de Bastos'), findsOneWidget);
+    expect(find.text('7 de Copas'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('As de Espadas'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('As de Espadas'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Mala'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Mala'), findsOneWidget);
+    expect(find.text('Orden Númerico de Valor'), findsNothing);
+
+    await tester.tap(find.text('CERRAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Orden y señas'), findsNothing);
+  });
+
   testWidgets('la mesa no desborda en movil vertical', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -448,6 +481,73 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
+  testWidgets('voy a ti cambia a mata si no es el turno humano',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.turnIndex = 1;
+    });
+    await tester.pump();
+
+    expect(find.text('MATA'), findsOneWidget);
+  });
+
+  testWidgets('pasar mano no aparece si la regla esta desactivada',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    expect(find.text('PASAR MANO'), findsNothing);
+  });
+
+  testWidgets('pasar mano aparece si la regla esta activada y sale el humano',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.allowPassHand = true;
+    });
+    await tester.pump();
+
+    expect(find.text('PASAR MANO'), findsOneWidget);
+    expect(find.text('CANTAR TRUCO'), findsOneWidget);
+  });
+
+  testWidgets('pasar mano no aparece si no sale el humano', (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.allowPassHand = true;
+      gameState.gameController.turnIndex = 1;
+    });
+    await tester.pump();
+
+    expect(find.text('PASAR MANO'), findsNothing);
+  });
+
   testWidgets('opciones desde la mesa no muestra ayuda', (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
@@ -462,6 +562,7 @@ void main() {
     expect(find.text('Opciones'), findsOneWidget);
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Mostrar ayuda'), findsNothing);
+    expect(find.text('Permitir pasar mano'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -474,6 +575,19 @@ void main() {
     await startGame(tester);
 
     await tester.tap(find.text('VOLVER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Salir de la partida'), findsOneWidget);
+    expect(find.text('CANCELAR'), findsOneWidget);
+    await tester.tap(find.text('CANCELAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Ronda 1/3'), findsOneWidget);
+    expect(find.text('Salir de la partida'), findsNothing);
+
+    await tester.tap(find.text('VOLVER'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SALIR').last);
     await tester.pumpAndSettle();
 
     expect(find.text('TUTORIAL'), findsOneWidget);

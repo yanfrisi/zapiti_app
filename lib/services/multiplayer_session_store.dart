@@ -17,6 +17,7 @@ class MultiplayerSessionStore {
   Map<String, List<SpanishCard>>? fixedHands;
   int? seed;
   int? botDifficulty;
+  bool allowPassHand = false;
   bool matchStarted = false;
 
   void clearMatchData() {
@@ -27,6 +28,7 @@ class MultiplayerSessionStore {
     fixedHands = null;
     seed = null;
     botDifficulty = null;
+    allowPassHand = false;
     matchStarted = false;
   }
 

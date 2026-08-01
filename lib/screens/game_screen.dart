@@ -137,8 +137,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static const _multiplayerUsernamePrefsKey = 'multiplayer_username';
   static const _multiplayerPasswordPrefsKey = 'multiplayer_password';
   static const _multiplayerPlayerPinPrefsKey = 'multiplayer_player_pin';
-  static const _multiplayerSessionTokenPrefsKey =
-      'multiplayer_session_token';
+  static const _multiplayerSessionTokenPrefsKey = 'multiplayer_session_token';
   static const _multiplayerTeamNamePrefsKey = 'multiplayer_team_name';
 
   final Map<String, String> _playerMessages = {};
@@ -148,6 +147,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final Map<int, String> _opponentSignalsSeenByTeam = {};
   final Set<String> _playersSignaledThisHand = {};
   final Set<String> _forceWinRequestedPlayerIds = {};
+  final Set<String> _forceHighestRequestedPlayerIds = {};
   final Set<int> _aiTeamsConsideredTrucoThisHand = {};
   String? _companionPrivateSignalStatus;
   Random _random = Random();
@@ -162,6 +162,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   int _handVersion = 0;
   int? _multiplayerServerHandSequence;
+  int? _turnDeadlineAt;
+  int? _turnSecondsRemaining;
+  Timer? _turnCountdownTimer;
   bool _isAutoPlaying = false;
   bool _isWaitingHumanTrucoResponse = false;
   bool _isRequestingCompanionSignal = false;
@@ -172,8 +175,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _audioEnabled = true;
   double _audioVolume = 0.65;
   bool _confirmCardPlay = false;
+  bool _allowPassHand = false;
   bool _isAlVerDecisionDialogOpen = false;
-  int _alVerDecisionPromptedForHandVersion = -1;
+  String? _alVerDecisionPromptedKey;
   _MainMenuPanel _mainMenuPanel = _MainMenuPanel.home;
   _BotSpeed _botSpeed = _BotSpeed.normal;
   String _selectedHumanCharacterId = 'p1';
@@ -264,6 +268,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     return _game.raiseOptions;
   }
 
+  bool get _canHumanPassHand =>
+      _game.canPassHand(from: _humanPlayer, to: _companionPlayer);
+
   int get _displayedRoundNumber => _game.displayedRoundNumber;
   Player get _companionPlayer => _players.firstWhere(
         (player) =>
@@ -282,6 +289,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _players,
         ZapitiPlayers.human.id,
       ),
+      allowPassHand: _allowPassHand,
       autoStart: false,
     );
     _startNewHand();
@@ -316,6 +324,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       timer.cancel();
     }
     _playerMessageTimers.clear();
+    _turnCountdownTimer?.cancel();
     _musicPlayer.dispose();
     super.dispose();
   }
@@ -336,6 +345,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _playerMessageTimers.remove(playerId);
       });
     });
+  }
+
+  void _humanCompanionCommand() {
+    if (_isHumanTurn) {
+      _humanVoyATi();
+    } else {
+      _humanMata();
+    }
   }
 
   void _humanVoyATi() {
@@ -363,6 +380,55 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _humanMata() {
+    if (_handFinished || _isGameFinished) return;
+    _updateState(() {
+      _showTemporaryPlayerMessage(_humanPlayer.id, 'Mata');
+      if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
+          !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
+        _forceHighestRequestedPlayerIds.add(_companionPlayer.id);
+      }
+      _status = 'Le pides a ${_companionPlayer.name}: Mata.';
+    });
+    if (_isMultiplayerMatch) {
+      final socket = MultiplayerSessionStore.instance.socket;
+      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final playerId =
+          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
+      if (socket != null && socket.isConnected && roomId != null) {
+        socket.signal(
+          roomId: roomId,
+          playerId: playerId,
+          label: 'Mata',
+          kind: 'mata',
+        );
+      }
+    }
+  }
+
+  void _humanPassHand() {
+    if (!_canHumanPassHand) return;
+    if (_isMultiplayerMatch) {
+      final socket = MultiplayerSessionStore.instance.socket;
+      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final playerId =
+          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
+      if (socket != null && socket.isConnected && roomId != null) {
+        socket.passHand(
+          roomId: roomId,
+          playerId: playerId,
+          toPlayerId: _companionPlayer.id,
+        );
+      }
+      return;
+    }
+
+    _updateState(() {
+      _game.passHand(from: _humanPlayer, to: _companionPlayer);
+    });
+    _advanceBots();
+  }
+
   @override
   void setState(VoidCallback fn) {
     super.setState(fn);
@@ -382,27 +448,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (_showMainMenu) {
       return Scaffold(
         resizeToAvoidBottomInset: false,
-        body: SafeArea(
-          child: _MainMenuScreen(
-            onPlay: _startFromMainMenu,
-            onTutorial: _openMainMenuTutorial,
-            onOptions: _openMainMenuOptions,
-            onMultiplayer: _openMainMenuMultiplayer,
-            onAbout: _openAboutScreen,
-            onEnterGame: _enterMultiplayerMatch,
-            selectedCharacterId: _selectedHumanCharacterId,
-            onSelectedCharacterChanged: _selectHumanCharacter,
-            onBack: _closeMainMenuPanel,
-            panel: _mainMenuPanel,
-            audioEnabled: _audioEnabled,
-            onAudioChanged: _setAudioEnabled,
-            audioVolume: _audioVolume,
-            onAudioVolumeChanged: _setAudioVolume,
-            botSpeed: _botSpeed,
-            onBotSpeedChanged: _setBotSpeed,
-            confirmCardPlay: _confirmCardPlay,
-            onConfirmCardPlayChanged: _setConfirmCardPlay,
-          ),
+        body: _MainMenuScreen(
+          onPlay: _startFromMainMenu,
+          onTutorial: _openMainMenuTutorial,
+          onOptions: _openMainMenuOptions,
+          onMultiplayer: _openMainMenuMultiplayer,
+          onAbout: _openAboutScreen,
+          onExit: () => unawaited(SystemNavigator.pop()),
+          onEnterGame: _enterMultiplayerMatch,
+          selectedCharacterId: _selectedHumanCharacterId,
+          onSelectedCharacterChanged: _selectHumanCharacter,
+          onBack: _closeMainMenuPanel,
+          panel: _mainMenuPanel,
+          audioEnabled: _audioEnabled,
+          onAudioChanged: _setAudioEnabled,
+          audioVolume: _audioVolume,
+          onAudioVolumeChanged: _setAudioVolume,
+          botSpeed: _botSpeed,
+          onBotSpeedChanged: _setBotSpeed,
+          confirmCardPlay: _confirmCardPlay,
+          onConfirmCardPlayChanged: _setConfirmCardPlay,
         ),
       );
     }
@@ -470,6 +535,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         isHandFinished: _handFinished,
                         isRoundAwaitingContinue: _isRoundAwaitingContinue,
                         isWaitingHumanResponse: _isWaitingHumanTrucoResponse,
+                        isHumanTurn: _isHumanTurn,
+                        canPassHand: _canHumanPassHand,
                         canCallTruco: _canHumanCallTruco,
                         handValue: _handValue,
                         pendingTrucoValue: _pendingTrucoValue,
@@ -478,8 +545,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         raiseOptions: _humanRaiseOptions,
                         onSignalStart: _startSignal,
                         onSignalEnd: _endSignal,
+                        onShowSignalHelp: _showSignalHelpDialog,
                         onAskCompanionSignal: _requestCompanionSignal,
-                        onVoyATi: _humanVoyATi,
+                        onPassHand: _humanPassHand,
+                        onVoyATi: _humanCompanionCommand,
                         onCallTruco: _humanCallsTruco,
                         onAcceptTruco: _humanAcceptsTruco,
                         onPassTruco: _humanPassesTruco,
@@ -488,7 +557,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         onNewHand: _newHand,
                         onRestart: _restartGame,
                         onOptions: _openGameOptions,
-                        onBack: _returnToMainMenu,
+                        onBack: _confirmReturnToMainMenu,
                       );
                       Widget table() {
                         return LayoutBuilder(
@@ -502,11 +571,39 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               playerMessages: _playerMessages,
                               characterIdsByPlayer: _characterIdsByPlayer,
                               cardsRemaining: cardsRemaining,
+                              turnSecondsRemaining: _turnSecondsRemaining,
                               isHumanTurn: _isHumanTurn,
                               showHumanSeat: isPortrait,
                               onPlayCard: _playHumanCard,
                             );
                           },
+                        );
+                      }
+
+                      Widget tableWithAlVerOverlay() {
+                        return Stack(
+                          children: [
+                            Positioned.fill(child: table()),
+                            if (_isAlVerDecisionDialogOpen &&
+                                _game.alVerState ==
+                                    AlVerState.awaitingDecision &&
+                                _game.alVerTeamId != null &&
+                                _isTeamControlledByHuman(_game.alVerTeamId!))
+                              _AlVerDecisionOverlay(
+                                teamId: _game.alVerTeamId!,
+                                onAskCompanionSignal: _requestCompanionSignal,
+                                onSignalStart: _startSignal,
+                                onSignalEnd: _endSignal,
+                                onPlay: (teamId) => _handleHumanAlVerDecision(
+                                  teamId,
+                                  play: true,
+                                ),
+                                onGoHome: (teamId) => _handleHumanAlVerDecision(
+                                  teamId,
+                                  play: false,
+                                ),
+                              ),
+                          ],
                         );
                       }
 
@@ -556,7 +653,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 ),
                               ),
                               SizedBox(height: gap * 0.55),
-                              Expanded(flex: 67, child: table()),
+                              Expanded(
+                                  flex: 67, child: tableWithAlVerOverlay()),
                               SizedBox(height: gap * 0.55),
                               Flexible(flex: 15, child: controls),
                             ],
@@ -622,23 +720,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               right: tableSideInset,
                               top: tableTop,
                               bottom: tableBottom,
-                              child: LayoutBuilder(
-                                builder: (context, tableConstraints) {
-                                  return ZapitiGameTable(
-                                    height: tableConstraints.maxHeight,
-                                    players: _players,
-                                    currentPlayer: _currentPlayer,
-                                    humanHand: _humanHand,
-                                    playedCards: _playedCards,
-                                    playerMessages: _playerMessages,
-                                    characterIdsByPlayer: _characterIdsByPlayer,
-                                    cardsRemaining: cardsRemaining,
-                                    isHumanTurn: _isHumanTurn,
-                                    showHumanSeat: false,
-                                    onPlayCard: _playHumanCard,
-                                  );
-                                },
-                              ),
+                              child: tableWithAlVerOverlay(),
                             ),
                             Positioned(
                               left: 0,
@@ -652,6 +734,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 enabled: _isHumanTurn,
                                 isCurrent: _humanPlayer.id == _currentPlayer.id,
                                 message: _playerMessages[_humanPlayer.id],
+                                turnSecondsRemaining:
+                                    _humanPlayer.id == _currentPlayer.id
+                                        ? _turnSecondsRemaining
+                                        : null,
                                 companionMessage: _companionPrivateSignalStatus,
                                 characterId:
                                     _characterIdsByPlayer[_humanPlayer.id] ??
@@ -664,18 +750,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     _isRoundAwaitingContinue,
                                 isWaitingHumanResponse:
                                     _isWaitingHumanTrucoResponse,
+                                isHumanTurn: _isHumanTurn,
+                                canPassHand: _canHumanPassHand,
                                 canCallTruco: _canHumanCallTruco,
                                 onPlayCard: _playHumanCard,
                                 onSignalStart: _startSignal,
                                 onSignalEnd: _endSignal,
+                                onShowSignalHelp: _showSignalHelpDialog,
                                 onAskCompanionSignal: _requestCompanionSignal,
-                                onVoyATi: _humanVoyATi,
+                                onPassHand: _humanPassHand,
+                                onVoyATi: _humanCompanionCommand,
                                 onCallTruco: _humanCallsTruco,
                                 onContinueRound: _continueAfterRound,
                                 onNewHand: _newHand,
                                 onRestart: _restartGame,
                                 onOptions: _openGameOptions,
-                                onBack: _returnToMainMenu,
+                                onBack: _confirmReturnToMainMenu,
                               ),
                             ),
                           ],
@@ -693,19 +783,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   onAccept: _humanAcceptsTruco,
                   onPass: _humanPassesTruco,
                   onRaise: _humanRaisesTruco,
-                ),
-              if (_isAlVerDecisionDialogOpen &&
-                  _game.alVerState == AlVerState.awaitingDecision &&
-                  _game.alVerTeamId == _humanPlayer.teamId)
-                _AlVerDecisionOverlay(
-                  teamId: _humanPlayer.teamId,
-                  onAskCompanionSignal: _requestCompanionSignal,
-                  onSignalStart: _startSignal,
-                  onSignalEnd: _endSignal,
-                  onPlay: (teamId) =>
-                      _handleHumanAlVerDecision(teamId, play: true),
-                  onGoHome: (teamId) =>
-                      _handleHumanAlVerDecision(teamId, play: false),
                 ),
               if (_isGameFinished && _winningTeamId != null)
                 _GameFinishedOverlay(
@@ -727,7 +804,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   onBotSpeedChanged: _setBotSpeed,
                   confirmCardPlay: _confirmCardPlay,
                   onConfirmCardPlayChanged: _setConfirmCardPlay,
-                  onAbout: _openAboutScreen,
                   onClose: _closeGameOptions,
                 ),
             ],

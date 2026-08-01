@@ -1,4 +1,4 @@
-part of 'game_screen.dart';
+﻿part of 'game_screen.dart';
 
 class _WoodBackground extends StatelessWidget {
   final Widget child;
@@ -67,6 +67,7 @@ class _MainMenuScreen extends StatelessWidget {
   final VoidCallback onOptions;
   final VoidCallback onMultiplayer;
   final VoidCallback onAbout;
+  final VoidCallback onExit;
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
@@ -87,6 +88,7 @@ class _MainMenuScreen extends StatelessWidget {
     required this.onOptions,
     required this.onMultiplayer,
     required this.onAbout,
+    required this.onExit,
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
@@ -109,8 +111,14 @@ class _MainMenuScreen extends StatelessWidget {
         return LayoutBuilder(
           builder: (context, constraints) {
             final shortest = min(constraints.maxWidth, constraints.maxHeight);
-            final gap = shortest * 0.035;
-            final padding = EdgeInsets.all(shortest * 0.055);
+            final basePadding = shortest * 0.055;
+            final safePadding = MediaQuery.paddingOf(context);
+            final padding = EdgeInsets.fromLTRB(
+              max(basePadding, safePadding.left + basePadding * 0.45),
+              max(basePadding, safePadding.top + basePadding * 0.45),
+              max(basePadding, safePadding.right + basePadding * 0.45),
+              max(basePadding, safePadding.bottom + basePadding * 0.45),
+            );
             final showingPanel = panel != _MainMenuPanel.home;
             final actions = AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
@@ -126,7 +134,6 @@ class _MainMenuScreen extends StatelessWidget {
                       onBotSpeedChanged: onBotSpeedChanged,
                       confirmCardPlay: confirmCardPlay,
                       onConfirmCardPlayChanged: onConfirmCardPlayChanged,
-                      onAbout: onAbout,
                       onEnterGame: onEnterGame,
                       selectedCharacterId: selectedCharacterId,
                       onSelectedCharacterChanged: onSelectedCharacterChanged,
@@ -138,6 +145,8 @@ class _MainMenuScreen extends StatelessWidget {
                       onTutorial: onTutorial,
                       onOptions: onOptions,
                       onMultiplayer: onMultiplayer,
+                      onAbout: onAbout,
+                      onExit: onExit,
                     ),
             );
             final panelContent = Center(
@@ -150,77 +159,45 @@ class _MainMenuScreen extends StatelessWidget {
                 child: Center(child: actions),
               ),
             );
-
-            return DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [ZapitiColors.tableGreen, ZapitiColors.darkBrown],
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/menu/portada.png',
+                  fit: BoxFit.cover,
+                  alignment: orientation == Orientation.portrait
+                      ? Alignment.center
+                      : const Alignment(0, -0.34),
+                  errorBuilder: (_, __, ___) {
+                    return const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            ZapitiColors.tableGreen,
+                            ZapitiColors.darkBrown,
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-              child: Padding(
-                padding: padding,
-                child: showingPanel
-                    ? panelContent
-                    : orientation == Orientation.portrait
-                        ? Column(
-                            children: [
-                              const Expanded(
-                                flex: 48,
-                                child: _MainMenuLogo(),
-                              ),
-                              SizedBox(height: gap),
-                              Expanded(
-                                flex: 52,
-                                child: Center(child: actions),
-                              ),
-                            ],
-                          )
-                        : Row(
-                            children: [
-                              const Expanded(
-                                flex: 52,
-                                child: _MainMenuLogo(),
-                              ),
-                              SizedBox(width: gap),
-                              Expanded(
-                                flex: 48,
-                                child: Center(child: actions),
-                              ),
-                            ],
-                          ),
-              ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color:
+                        Colors.black.withValues(alpha: showingPanel ? 0.34 : 0.06),
+                  ),
+                ),
+                Padding(
+                  padding: padding,
+                  child: showingPanel ? panelContent : actions,
+                ),
+              ],
             );
           },
         );
       },
-    );
-  }
-}
-
-class _MainMenuLogo extends StatelessWidget {
-  const _MainMenuLogo();
-
-  @override
-  Widget build(BuildContext context) {
-    return FractionallySizedBox(
-      widthFactor: 1,
-      heightFactor: 1,
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: Image.asset(
-          'assets/menu/portada.png',
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) {
-            return Icon(
-              Icons.style,
-              color: ZapitiColors.oldGold,
-              size: MediaQuery.sizeOf(context).shortestSide * 0.24,
-            );
-          },
-        ),
-      ),
     );
   }
 }
@@ -230,6 +207,8 @@ class _MainMenuActions extends StatelessWidget {
   final VoidCallback onTutorial;
   final VoidCallback onOptions;
   final VoidCallback onMultiplayer;
+  final VoidCallback onAbout;
+  final VoidCallback onExit;
 
   const _MainMenuActions({
     super.key,
@@ -237,14 +216,21 @@ class _MainMenuActions extends StatelessWidget {
     required this.onTutorial,
     required this.onOptions,
     required this.onMultiplayer,
+    required this.onAbout,
+    required this.onExit,
   });
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final gap = min(constraints.maxWidth, constraints.maxHeight) * 0.045;
-        final actions = [
+        final shortest = min(constraints.maxWidth, constraints.maxHeight);
+        final gap = max(8.0, shortest * 0.032);
+        final centerWidth =
+            min(constraints.maxWidth * 0.52, shortest < 430 ? 220.0 : 260.0);
+        final cornerWidth =
+            min(constraints.maxWidth * 0.34, shortest < 430 ? 170.0 : 210.0);
+        final centerActions = [
           ZapitiActionButton(
             label: 'JUGAR',
             icon: Icons.play_arrow,
@@ -252,14 +238,21 @@ class _MainMenuActions extends StatelessWidget {
             primary: true,
           ),
           ZapitiActionButton(
-            label: 'TUTORIAL',
-            icon: Icons.menu_book_outlined,
-            onPressed: onTutorial,
-          ),
-          ZapitiActionButton(
             label: 'MULTIJUGADOR',
             icon: Icons.groups_outlined,
             onPressed: onMultiplayer,
+          ),
+          ZapitiActionButton(
+            label: 'SALIR',
+            icon: Icons.logout,
+            onPressed: onExit,
+          ),
+        ];
+        final rightActions = [
+          ZapitiActionButton(
+            label: 'TUTORIAL',
+            icon: Icons.menu_book_outlined,
+            onPressed: onTutorial,
           ),
           ZapitiActionButton(
             label: 'OPCIONES',
@@ -268,23 +261,48 @@ class _MainMenuActions extends StatelessWidget {
           ),
         ];
 
-        return FractionallySizedBox(
-          widthFactor: 1,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (var index = 0; index < actions.length; index++) ...[
-                Flexible(child: actions[index]),
-                if (index != actions.length - 1) SizedBox(height: gap),
+        Widget verticalButtons(List<Widget> buttons, double width) {
+          return SizedBox(
+            width: width,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < buttons.length; index++) ...[
+                  buttons[index],
+                  if (index != buttons.length - 1) SizedBox(height: gap),
+                ],
               ],
-            ],
-          ),
+            ),
+          );
+        }
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(child: verticalButtons(centerActions, centerWidth)),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: verticalButtons(
+                [
+                  ZapitiActionButton(
+                    label: 'ACERCA DE',
+                    icon: Icons.badge_outlined,
+                    onPressed: onAbout,
+                  ),
+                ],
+                cornerWidth,
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: verticalButtons(rightActions, cornerWidth),
+            ),
+          ],
         );
       },
     );
   }
 }
-
 class _MainMenuInfoPanel extends StatelessWidget {
   final _MainMenuPanel panel;
   final bool audioEnabled;
@@ -295,7 +313,6 @@ class _MainMenuInfoPanel extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
-  final VoidCallback onAbout;
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
@@ -312,7 +329,6 @@ class _MainMenuInfoPanel extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
-    required this.onAbout,
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
@@ -423,7 +439,6 @@ class _MainMenuInfoPanel extends StatelessWidget {
                                 confirmCardPlay: confirmCardPlay,
                                 onConfirmCardPlayChanged:
                                     onConfirmCardPlayChanged,
-                                onAbout: onAbout,
                               ),
                             ),
                           ),
@@ -471,21 +486,21 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
       body:
           'Cada reparto tiene hasta tres rondas. Gana quien domina las cartas jugadas.',
       icon: Icons.style_outlined,
-      prompt: 'Si el rival ya ganó una ronda, la siguiente pesa más.',
+      prompt: 'Si el rival ya ganÃ³ una ronda, la siguiente pesa mÃ¡s.',
       options: ['Salvar ronda', 'Regalar carta'],
       correctIndex: 0,
       answer:
-          'Exacto: con una ronda rival, la IA intenta salvar con la mínima carta útil.',
+          'Exacto: con una ronda rival, la IA intenta salvar con la mÃ­nima carta Ãºtil.',
     ),
     _TutorialStep(
       title: 'Valor de cartas',
       body: '4 de bastos -> 7 de copas -> 7 de oros -> as de espadas -> '
           '3 -> 2 -> as -> 12 -> 11 -> 10 -> 7 -> 6 -> 5 -> 4.',
       icon: Icons.workspace_premium_outlined,
-      prompt: 'El 4 de bastos es la carta máxima.',
+      prompt: 'El 4 de bastos es la carta mÃ¡xima.',
       options: ['Verdadero', 'Falso'],
       correctIndex: 0,
-      answer: 'Sí: el 4 de bastos manda sobre toda la baraja.',
+      answer: 'SÃ­: el 4 de bastos manda sobre toda la baraja.',
     ),
     _TutorialStep(
       title: 'Truco y puntos',
@@ -499,21 +514,21 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
           'Eso es: aceptar sin opciones reales solo regala chinos al rival.',
     ),
     _TutorialStep(
-      title: 'Señas',
+      title: 'SeÃ±as',
       body:
-          'Pide seña a tu pareja o usa las tuyas para comunicar cartas fuertes.',
+          'Pide seÃ±a a tu pareja o usa las tuyas para comunicar cartas fuertes.',
       icon: Icons.visibility_outlined,
-      prompt: 'Una seña fuerte ayuda a decidir carta y truco.',
-      options: ['Pedir seña', 'Ignorar'],
+      prompt: 'Una seÃ±a fuerte ayuda a decidir carta y truco.',
+      options: ['Pedir seÃ±a', 'Ignorar'],
       correctIndex: 0,
-      answer: 'Buena lectura: la seña cambia cuánto arriesga tu equipo.',
+      answer: 'Buena lectura: la seÃ±a cambia cuÃ¡nto arriesga tu equipo.',
     ),
     _TutorialStep(
       title: 'Voy a ti',
       body:
-          'Sirve para pedir a tu pareja que intente ganar, pero sin quemar carta inútil.',
+          'Sirve para pedir a tu pareja que intente ganar, pero sin quemar carta inÃºtil.',
       icon: Icons.record_voice_over_outlined,
-      prompt: 'Si tu pareja no puede ganar la mesa, debería...',
+      prompt: 'Si tu pareja no puede ganar la mesa, deberÃ­a...',
       options: ['Tirar menor', 'Tirar mayor'],
       correctIndex: 0,
       answer:
@@ -522,24 +537,24 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
     _TutorialStep(
       title: 'Faroles',
       body:
-          'La IA puede cantar o subir con historia de mesa, presión o cartas rivales gastadas.',
+          'La IA puede cantar o subir con historia de mesa, presiÃ³n o cartas rivales gastadas.',
       icon: Icons.theater_comedy_outlined,
       prompt: 'Un farol funciona mejor cuando...',
       options: ['Hay contexto', 'No hay nada'],
       correctIndex: 0,
       answer:
-          'Sí: una carta fuerte ya gastada o marcador en contra hace creíble el farol.',
+          'SÃ­: una carta fuerte ya gastada o marcador en contra hace creÃ­ble el farol.',
     ),
     _TutorialStep(
       title: 'Dificultad',
       body:
-          'Cada nivel cambia errores, lectura de señas, paciencia y agresividad con el truco.',
+          'Cada nivel cambia errores, lectura de seÃ±as, paciencia y agresividad con el truco.',
       icon: Icons.psychology_alt_outlined,
       prompt: 'En experto la IA...',
       options: ['Lee mejor', 'Acepta todo'],
       correctIndex: 0,
       answer:
-          'Exacto: en niveles altos lee mesa y señales antes de comprometer chinos.',
+          'Exacto: en niveles altos lee mesa y seÃ±ales antes de comprometer chinos.',
     ),
   ];
 
@@ -1123,6 +1138,7 @@ class _MainMenuMultiplayerContentState
   GameSocket? _socket;
   String? _playerId;
   String? _sessionToken;
+  String? _profilePasswordFallback;
   String? _connectedRoomId;
   MultiplayerRoomSnapshot? _roomSnapshot;
   bool _keepSocketAliveOnDispose = false;
@@ -1138,13 +1154,19 @@ class _MainMenuMultiplayerContentState
   bool _showCreateAccount = false;
   bool _teamModalShownForCurrentRoom = false;
   bool _teamDialogAutoClosed = false;
+  bool _allowPassHandForRoom = false;
   String? _teamDialogTeammatePlayerId;
   BuildContext? _teamDialogContext;
   String? _pendingRoomAction;
   bool _roomActionRetriedWithoutCharacter = false;
+  bool _roomActionRetriedWithoutSession = false;
   String _profileStatus = 'Configura tu perfil multijugador.';
   late String _selectedCharacterId;
   String? _confirmedCharacterId;
+  bool _characterSelectionReleased = false;
+  String? _teamPromptConfirmedCharacterId;
+  String? _teamPromptDismissedCharacterId;
+  BuildContext? _characterConfirmDialogContext;
   Map<String, dynamic> _playerStats = const {};
   List<Map<String, dynamic>> _rankingPairs = const [];
   List<Map<String, dynamic>> _rankingMatches = const [];
@@ -1189,7 +1211,7 @@ class _MainMenuMultiplayerContentState
 
       _socket!.onMessage = _handleSocketMessage;
       _socket!.onError = (error) {
-        _clearSessionAfterConnectionLoss('Error de conexión: $error');
+        _clearSessionAfterConnectionLoss('Error de conexiÃ³n: $error');
       };
       _socket!.onDone = () {
         _clearSessionAfterConnectionLoss('Servidor desconectado.');
@@ -1226,6 +1248,11 @@ class _MainMenuMultiplayerContentState
   String get _playerName => _cleanPlayerName(_nameController.text);
   String get _username => _cleanUsername(_usernameController.text);
   String get _profilePassword => _passwordController.text.trim();
+  String? get _usableProfilePassword {
+    final password = _profilePassword;
+    if (password.isNotEmpty) return password;
+    return _profilePasswordFallback;
+  }
   String get _teamName => _cleanTeamName(_teamNameController.text);
   String get _selectedTeamName {
     final selected = _selectedTeam;
@@ -1452,50 +1479,121 @@ class _MainMenuMultiplayerContentState
     socket.close();
   }
 
-  String? _localSeatCharacterId() {
-    final roomId = _connectedRoomId ?? _roomController.text.trim();
+  Set<String> _occupiedCharacterIdsByOtherPlayers() {
     final snapshot = _roomSnapshot;
-    if (roomId.isEmpty || snapshot == null) return null;
     final localId = _playerId;
-    if (localId == null) return null;
-    final seat = snapshot.seats.firstWhere(
-      (entry) => entry.playerId == localId,
-      orElse: () => const MultiplayerSeat(
-        playerId: '',
-        name: '',
-        seatIndex: -1,
-        ready: false,
-        connected: false,
-      ),
-    );
-    return seat.playerId.isEmpty ? null : seat.characterId;
+    if (snapshot == null || localId == null) return const {};
+    return {
+      for (final seat in snapshot.seats)
+        if (seat.playerId != localId &&
+            seat.characterId != null &&
+            seat.characterId!.isNotEmpty)
+          seat.characterId!,
+    };
+  }
+
+  Map<String, String> _characterTeamBadges() {
+    return {
+      for (final characterId in CharacterAssets.characterIds)
+        characterId: switch (characterId) {
+          'p1' || 'p3' => 'Eq1',
+          'p2' || 'p4' => 'Eq2',
+          _ => '',
+        },
+    };
   }
 
   void _syncSelectedCharacterFromRoom() {
-    final characterId = _localSeatCharacterId();
-    if (characterId == null) return;
+    final snapshot = _roomSnapshot;
+    if (snapshot == null) return;
+    final localSeat = _localSeatFor(snapshot);
+    if (localSeat == null) return;
+    final characterId = localSeat.characterId;
+    if (characterId == null || characterId.isEmpty) {
+      setState(() {
+        _characterSelectionReleased = true;
+        _confirmedCharacterId = null;
+        _teamPromptConfirmedCharacterId = null;
+        _teamPromptDismissedCharacterId = null;
+      });
+      return;
+    }
     setState(() {
       _selectedCharacterId = characterId;
       _confirmedCharacterId = characterId;
+      _characterSelectionReleased = false;
     });
     widget.onSelectedCharacterChanged(characterId);
   }
 
   void _revertSelectedCharacter() {
     final confirmed = _confirmedCharacterId;
-    if (confirmed == null || confirmed == _selectedCharacterId) return;
+    if (confirmed == null) {
+      setState(() {
+        _characterSelectionReleased = true;
+      });
+      return;
+    }
+    if (confirmed == _selectedCharacterId && !_characterSelectionReleased) {
+      return;
+    }
     setState(() {
       _selectedCharacterId = confirmed;
+      _characterSelectionReleased = false;
     });
     widget.onSelectedCharacterChanged(confirmed);
   }
 
   void _selectCharacter(String characterId) {
+    if (_occupiedCharacterIdsByOtherPlayers().contains(characterId)) {
+      setState(() {
+        _status =
+            '${CharacterAssets.displayNames[characterId] ?? characterId} ya esta ocupado.';
+      });
+      return;
+    }
     setState(() {
       _selectedCharacterId = characterId;
+      _characterSelectionReleased = false;
+      _teamPromptConfirmedCharacterId = null;
+      _teamPromptDismissedCharacterId = null;
     });
     widget.onSelectedCharacterChanged(characterId);
     unawaited(_sendCharacterSelection(characterId));
+  }
+
+  Future<void> _releaseCharacterSelection() async {
+    final socket = _socket;
+    final roomId = _connectedRoomId ?? _roomController.text.trim();
+    if (socket == null ||
+        !socket.isConnected ||
+        roomId.isEmpty ||
+        _playerId == null ||
+        _roomSnapshot?.phase != 'lobby') {
+      setState(() {
+        _characterSelectionReleased = true;
+        _confirmedCharacterId = null;
+        _teamPromptConfirmedCharacterId = null;
+        _teamPromptDismissedCharacterId = null;
+        _status = 'Personaje liberado para la proxima sala.';
+      });
+      return;
+    }
+
+    try {
+      socket.releaseCharacter(roomId: roomId, playerId: _playerId!);
+      setState(() {
+        _characterSelectionReleased = true;
+        _confirmedCharacterId = null;
+        _teamPromptConfirmedCharacterId = null;
+        _teamPromptDismissedCharacterId = null;
+        _status = 'Personaje liberado. Esperando sincronizacion...';
+      });
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudo liberar el personaje: $error';
+      });
+    }
   }
 
   Future<void> _sendCharacterSelection(String characterId) async {
@@ -1555,7 +1653,7 @@ class _MainMenuMultiplayerContentState
     if (serverUrl.isEmpty) {
       _setConnectionState(
         _ServerConnectionState.error,
-        status: 'Escribe la dirección del servidor.',
+        status: 'Escribe la direcciÃ³n del servidor.',
       );
       return false;
     }
@@ -1574,7 +1672,7 @@ class _MainMenuMultiplayerContentState
       if (ServerConfig.useLocalServer)
         'Reconectando...'
       else
-        'El servidor gratuito está arrancando. Esto puede tardar unos segundos...',
+        'El servidor gratuito estÃ¡ arrancando. Esto puede tardar unos segundos...',
       'Reconectando...',
       'Reconectando...',
     ];
@@ -1614,11 +1712,11 @@ class _MainMenuMultiplayerContentState
       nextSocket.onMessage = _handleSocketMessage;
       nextSocket.onError = (error) {
         if (!mounted || generation != _connectionGeneration) return;
-        _handleSocketDropped('Error de conexión: $error');
+        _handleSocketDropped('Error de conexiÃ³n: $error');
       };
       nextSocket.onDone = () {
         if (!mounted || generation != _connectionGeneration) return;
-        _handleSocketDropped('Conexión cerrada.');
+        _handleSocketDropped('ConexiÃ³n cerrada.');
       };
 
       try {
@@ -1663,7 +1761,7 @@ class _MainMenuMultiplayerContentState
     if (hadSession) {
       _setConnectionState(
         _ServerConnectionState.reconnecting,
-        status: 'La conexión se ha cerrado. Reintentando...',
+        status: 'La conexiÃ³n se ha cerrado. Reintentando...',
       );
       unawaited(_recoverAfterConnectionLoss());
       return;
@@ -1684,7 +1782,7 @@ class _MainMenuMultiplayerContentState
     }
 
     _clearSessionAfterConnectionLoss(
-      'Conexión restablecida. La partida anterior no se puede recuperar. Vuelve a crear o unirte de nuevo.',
+      'ConexiÃ³n restablecida. La partida anterior no se puede recuperar. Vuelve a crear o unirte de nuevo.',
       preserveSocket: true,
       connectionState: _ServerConnectionState.connected,
     );
@@ -1699,6 +1797,7 @@ class _MainMenuMultiplayerContentState
         setState(() {
           _pendingRoomAction = null;
           _roomActionRetriedWithoutCharacter = false;
+          _roomActionRetriedWithoutSession = false;
           _roomSnapshot = snapshot;
           _connectedRoomId = snapshot.roomId;
           _roomController.text = snapshot.roomId;
@@ -1719,17 +1818,22 @@ class _MainMenuMultiplayerContentState
           _sessionStarted = snapshot.phase != 'lobby';
           _connectionState = _ServerConnectionState.connected;
           _status = switch (snapshot.phase) {
-            'starting' => 'Todos listos. La partida está arrancando.',
+            'starting' => 'Todos listos. La partida estÃ¡ arrancando.',
             'playing' => 'Partida en curso.',
             _ => 'Sala ${snapshot.roomId} sincronizada.',
           };
         });
         MultiplayerSessionStore.instance.roomSnapshot = snapshot;
+        final allowPassHand = snapshot.match?['allowPassHand'];
+        if (allowPassHand is bool) {
+          MultiplayerSessionStore.instance.allowPassHand = allowPassHand;
+        }
         _syncSelectedCharacterFromRoom();
         _resolveTeamForRoomSnapshot(snapshot);
         _maybeAutoEnterGame();
         break;
       case MultiplayerMessageType.error:
+        var shouldRetryRoomActionWithoutSession = false;
         setState(() {
           final code = message.payload['code']?.toString() ?? 'error';
           final text =
@@ -1740,13 +1844,24 @@ class _MainMenuMultiplayerContentState
           } else if (code == 'auth_failed') {
             _sessionToken = null;
             unawaited(_clearSavedSessionToken());
-            _profileReady = false;
-            _showCreateAccount = false;
-            _teamsLoaded = false;
-            _playerTeams = const [];
-            _selectedPairId = null;
-            _profileStatus =
-                'Sesion caducada. Inicia sesion con tu contrasena.';
+            shouldRetryRoomActionWithoutSession =
+                _pendingRoomAction != null &&
+                    !_roomActionRetriedWithoutSession &&
+                    _usableProfilePassword != null;
+            if (shouldRetryRoomActionWithoutSession) {
+              _profileReady = true;
+              _showCreateAccount = false;
+              _profileStatus =
+                  'Sesion caducada. Reintentando con tu contrasena...';
+            } else {
+              _profileReady = false;
+              _showCreateAccount = false;
+              _teamsLoaded = false;
+              _playerTeams = const [];
+              _selectedPairId = null;
+              _profileStatus =
+                  'Sesion caducada. Inicia sesion con tu contrasena.';
+            }
           } else if (code == 'invalid_payload' && !_profileReady) {
             _profileStatus = 'Revisa usuario, nombre y contrasena.';
           }
@@ -1761,11 +1876,18 @@ class _MainMenuMultiplayerContentState
               'Sesion caducada. Vuelve a iniciar sesion con tu contrasena.',
             'character_taken' =>
               'Ese personaje ya esta ocupado en esta sala. Elige otro.',
+            'player_already_in_room' =>
+              'Ese jugador ya esta conectado a esta sala. Cierra la otra conexion o espera unos segundos.',
             _ => 'Servidor: $code - $text',
           };
         });
         final errorCode = message.payload['code']?.toString();
-        if (errorCode == 'character_taken') {
+        if (errorCode == 'auth_failed' &&
+            shouldRetryRoomActionWithoutSession) {
+          if (_retryPendingRoomActionWithoutSession()) {
+            break;
+          }
+        } else if (errorCode == 'character_taken') {
           if (_retryPendingRoomActionWithoutCharacter()) {
             break;
           }
@@ -1898,14 +2020,18 @@ class _MainMenuMultiplayerContentState
         if (profileSessionToken != null && profileSessionToken.isNotEmpty) {
           _sessionToken = profileSessionToken;
           unawaited(_saveSessionToken(profileSessionToken));
+          _passwordController.clear();
         }
-        _passwordController.clear();
         setState(() {
           _playerStats = Map<String, dynamic>.from(message.payload);
-          _profileReady = true;
+          _profileReady = _hasUsableSessionOrCredentials();
           _showCreateAccount = false;
-          _profileStatus = 'Sesion iniciada.';
-          _status = 'Perfil ${_cleanPlayerName(profileName)} sincronizado.';
+          _profileStatus = _profileReady
+              ? 'Sesion iniciada.'
+              : 'Sesion iniciada, pero falta confirmar credenciales.';
+          _status = _profileReady
+              ? 'Perfil ${_cleanPlayerName(profileName)} sincronizado.'
+              : 'Perfil sincronizado. Vuelve a iniciar sesion para crear salas.';
         });
         _requestTeamsIfReady();
         break;
@@ -1965,14 +2091,18 @@ class _MainMenuMultiplayerContentState
       unawaited(_savePlayerId(localPlayerId));
       _pendingRoomAction = 'create';
       _roomActionRetriedWithoutCharacter = false;
+      _roomActionRetriedWithoutSession = false;
+      MultiplayerSessionStore.instance.allowPassHand = _allowPassHandForRoom;
       socket.createRoom(
         playerId: localPlayerId,
         username: username,
         playerName: playerName,
-        password: _sessionToken == null ? _profilePassword : null,
+        password: _sessionToken == null ? _usableProfilePassword : null,
         teamName: _selectedTeamName,
         sessionToken: _sessionToken,
-        characterId: _selectedCharacterId,
+        characterId:
+            _characterSelectionReleased ? null : _selectedCharacterId,
+        allowPassHand: _allowPassHandForRoom,
       );
       setState(() {
         _status = 'Solicitud enviada. Esperando sala...';
@@ -1991,7 +2121,7 @@ class _MainMenuMultiplayerContentState
 
     if (roomCode.isEmpty) {
       setState(() {
-        _status = 'Escribe un código de sala para unirte.';
+        _status = 'Escribe un cÃ³digo de sala para unirte.';
       });
       return;
     }
@@ -2041,15 +2171,17 @@ class _MainMenuMultiplayerContentState
       unawaited(_savePlayerId(localPlayerId));
       _pendingRoomAction = 'join';
       _roomActionRetriedWithoutCharacter = false;
+      _roomActionRetriedWithoutSession = false;
       socket.joinRoom(
         roomId: roomCode,
         playerId: localPlayerId,
         username: username,
         playerName: playerName,
-        password: _sessionToken == null ? _profilePassword : null,
+        password: _sessionToken == null ? _usableProfilePassword : null,
         teamName: _selectedTeamName,
         sessionToken: _sessionToken,
-        characterId: _selectedCharacterId,
+        characterId:
+            _characterSelectionReleased ? null : _selectedCharacterId,
       );
       setState(() {
         _status = 'Solicitud enviada a $roomCode.';
@@ -2078,9 +2210,10 @@ class _MainMenuMultiplayerContentState
           playerId: localPlayerId,
           username: username,
           playerName: playerName,
-          password: _sessionToken == null ? _profilePassword : null,
+          password: _sessionToken == null ? _usableProfilePassword : null,
           teamName: _selectedTeamName,
           sessionToken: _sessionToken,
+          allowPassHand: _allowPassHandForRoom,
         );
         setState(() {
           _status =
@@ -2097,7 +2230,7 @@ class _MainMenuMultiplayerContentState
           playerId: localPlayerId,
           username: username,
           playerName: playerName,
-          password: _sessionToken == null ? _profilePassword : null,
+          password: _sessionToken == null ? _usableProfilePassword : null,
           teamName: _selectedTeamName,
           sessionToken: _sessionToken,
         );
@@ -2110,6 +2243,69 @@ class _MainMenuMultiplayerContentState
     } catch (error) {
       setState(() {
         _status = 'No se pudo reintentar sin personaje: $error';
+      });
+    }
+    return false;
+  }
+
+  bool _retryPendingRoomActionWithoutSession() {
+    if (_roomActionRetriedWithoutSession) return false;
+    final action = _pendingRoomAction;
+    final socket = _socket;
+    final password = _usableProfilePassword;
+    if (action == null ||
+        socket == null ||
+        !socket.isConnected ||
+        password == null) {
+      return false;
+    }
+
+    final playerName = _playerName;
+    final username = _username;
+    final localPlayerId = _localPlayerId;
+    _roomActionRetriedWithoutSession = true;
+
+    try {
+      if (action == 'create') {
+        socket.createRoom(
+          playerId: localPlayerId,
+          username: username,
+          playerName: playerName,
+          password: password,
+          teamName: _selectedTeamName,
+          characterId:
+              _characterSelectionReleased ? null : _selectedCharacterId,
+          allowPassHand: _allowPassHandForRoom,
+        );
+        setState(() {
+          _status =
+              'Sesion caducada. Reintentando creacion con contrasena...';
+        });
+        return true;
+      }
+
+      if (action == 'join') {
+        final roomId = _connectedRoomId ?? _roomController.text.trim();
+        if (roomId.isEmpty) return false;
+        socket.joinRoom(
+          roomId: roomId,
+          playerId: localPlayerId,
+          username: username,
+          playerName: playerName,
+          password: password,
+          teamName: _selectedTeamName,
+          characterId:
+              _characterSelectionReleased ? null : _selectedCharacterId,
+        );
+        setState(() {
+          _status =
+              'Sesion caducada. Reintentando union con contrasena...';
+        });
+        return true;
+      }
+    } catch (error) {
+      setState(() {
+        _status = 'No se pudo reintentar con contrasena: $error';
       });
     }
     return false;
@@ -2263,6 +2459,25 @@ class _MainMenuMultiplayerContentState
       return;
     }
 
+    final localCharacterId = localSeat?.characterId;
+    if (localCharacterId == null || localCharacterId.isEmpty) {
+      setState(() {
+        _status =
+            'Elige y confirma personaje antes de crear equipo con tu companero.';
+      });
+      return;
+    }
+    if (_teamPromptConfirmedCharacterId != localCharacterId) {
+      if (_teamPromptDismissedCharacterId != localCharacterId &&
+          _characterConfirmDialogContext == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
+          _showConfirmCharacterDialog(localCharacterId);
+        });
+      }
+      return;
+    }
+
     if (_teamModalShownForCurrentRoom) return;
     _teamModalShownForCurrentRoom = true;
     _teamDialogTeammatePlayerId = teammate.playerId;
@@ -2368,6 +2583,50 @@ class _MainMenuMultiplayerContentState
     _teamDialogTeammatePlayerId = null;
     _teamModalShownForCurrentRoom = true;
     Navigator.of(dialogContext).pop(false);
+  }
+
+  Future<void> _showConfirmCharacterDialog(String characterId) async {
+    final characterName =
+        CharacterAssets.displayNames[characterId] ?? characterId;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        _characterConfirmDialogContext = context;
+        return AlertDialog(
+          title: const Text('Confirmar personaje'),
+          content: Text('Quieres jugar con $characterName?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Seguir eligiendo'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+    _characterConfirmDialogContext = null;
+    if (!mounted) return;
+    if (confirmed == true) {
+      setState(() {
+        _teamPromptConfirmedCharacterId = characterId;
+        _teamPromptDismissedCharacterId = null;
+        _status = 'Personaje confirmado: $characterName.';
+      });
+      final snapshot = _roomSnapshot;
+      if (snapshot != null) {
+        _resolveTeamForRoomSnapshot(snapshot);
+      }
+      return;
+    }
+
+    setState(() {
+      _teamPromptDismissedCharacterId = characterId;
+      _status = 'Puedes seguir cambiando personaje antes de crear equipo.';
+    });
   }
 
   Future<void> _showCreateTeamDialog(MultiplayerSeat teammate) async {
@@ -2479,6 +2738,7 @@ class _MainMenuMultiplayerContentState
     }
 
     final localPlayerId = _localPlayerId;
+    _profilePasswordFallback = password;
     await Future.wait([
       _savePlayerName(playerName),
       _savePlayerId(localPlayerId),
@@ -2535,6 +2795,7 @@ class _MainMenuMultiplayerContentState
     }
     final socket = _socket;
     if (socket == null) return;
+    _profilePasswordFallback = password;
     setState(() {
       _profileStatus = 'Iniciando sesion...';
     });
@@ -2552,9 +2813,11 @@ class _MainMenuMultiplayerContentState
 
   bool _hasUsableSessionOrCredentials() {
     if (_sessionToken != null && _sessionToken!.isNotEmpty) return true;
+    final password = _usableProfilePassword;
     return RegExp(r'^[a-z0-9_.-]{3,24}$').hasMatch(_username) &&
-        _profilePassword.length >= 6 &&
-        _profilePassword.length <= 72;
+        password != null &&
+        password.length >= 6 &&
+        password.length <= 72;
   }
 
   Future<void> _copyRoomInvitation() async {
@@ -2589,7 +2852,7 @@ class _MainMenuMultiplayerContentState
         socket.leaveRoom(roomId: roomId, playerId: playerId);
       }
     } catch (_) {
-      // Si el leave falla, cerramos igualmente la conexión local.
+      // Si el leave falla, cerramos igualmente la conexiÃ³n local.
     }
 
     _closeSocketIntentionally();
@@ -2793,7 +3056,7 @@ class _MainMenuMultiplayerContentState
                 Text('Lobby multijugador', style: titleStyle),
                 const SizedBox(height: 8),
                 Text(
-                  'Crea una sala, comparte el código y jugad en la misma mesa por WebSocket.',
+                  'Crea una sala, comparte el cÃ³digo y jugad en la misma mesa por WebSocket.',
                   style: bodyStyle,
                 ),
                 const SizedBox(height: 10),
@@ -2971,14 +3234,16 @@ class _MainMenuMultiplayerContentState
                   textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
                     isDense: true,
-                    labelText: 'Código de sala',
+                    labelText: 'CÃ³digo de sala',
                     prefixIcon: Icon(Icons.tag_outlined),
                     border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Personaje: ${CharacterAssets.displayNames[_selectedCharacterId] ?? _selectedCharacterId}',
+                  _characterSelectionReleased
+                      ? 'Personaje: sin seleccionar'
+                      : 'Personaje: ${CharacterAssets.displayNames[_selectedCharacterId] ?? _selectedCharacterId}',
                   style: bodyStyle.copyWith(
                     color: ZapitiColors.darkBrown,
                     fontWeight: FontWeight.w900,
@@ -2990,14 +3255,44 @@ class _MainMenuMultiplayerContentState
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return _CharacterChoiceGrid(
-                        selectedCharacterId: _selectedCharacterId,
+                        selectedCharacterId: _characterSelectionReleased
+                            ? ''
+                            : _selectedCharacterId,
                         onSelected: _selectCharacter,
                         columns: constraints.maxWidth > 360 ? 4 : 2,
+                        disabledCharacterIds:
+                            _occupiedCharacterIdsByOtherPlayers(),
+                        characterBadges: _characterTeamBadges(),
                       );
                     },
                   ),
                 ),
                 const SizedBox(height: 8),
+                SizedBox(
+                  height: 42,
+                  child: ZapitiActionButton(
+                    label: 'LIBERAR PERSONAJE',
+                    icon: Icons.lock_open_outlined,
+                    onPressed: _connecting || _characterSelectionReleased
+                        ? null
+                        : _releaseCharacterSelection,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (_roomSnapshot == null)
+                  _MainMenuSwitchOption(
+                    title: 'Permitir pasar mano',
+                    icon: Icons.swap_horiz_outlined,
+                    value: _allowPassHandForRoom,
+                    onChanged: _connecting
+                        ? (_) {}
+                        : (enabled) {
+                            setState(() {
+                              _allowPassHandForRoom = enabled;
+                            });
+                          },
+                  ),
+                if (_roomSnapshot == null) const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -4058,7 +4353,6 @@ class _MainMenuOptionsContent extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
-  final VoidCallback onAbout;
 
   const _MainMenuOptionsContent({
     required this.audioEnabled,
@@ -4069,7 +4363,6 @@ class _MainMenuOptionsContent extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
-    required this.onAbout,
   });
 
   @override
@@ -4128,24 +4421,6 @@ class _MainMenuOptionsContent extends StatelessWidget {
             value: confirmCardPlay,
             onChanged: onConfirmCardPlayChanged,
           ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Más',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ZapitiColors.darkBrown,
-                    fontWeight: FontWeight.w900,
-                  ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ZapitiActionButton(
-            label: 'ACERCA DE',
-            icon: Icons.badge_outlined,
-            onPressed: onAbout,
-          ),
-          const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(

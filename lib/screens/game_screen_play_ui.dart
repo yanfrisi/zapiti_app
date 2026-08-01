@@ -469,6 +469,8 @@ class _VisibleGameControls extends StatelessWidget {
   final bool isHandFinished;
   final bool isRoundAwaitingContinue;
   final bool isWaitingHumanResponse;
+  final bool isHumanTurn;
+  final bool canPassHand;
   final bool canCallTruco;
   final int handValue;
   final int? pendingTrucoValue;
@@ -477,7 +479,9 @@ class _VisibleGameControls extends StatelessWidget {
   final List<int> raiseOptions;
   final ValueChanged<String> onSignalStart;
   final ValueChanged<String> onSignalEnd;
+  final VoidCallback onShowSignalHelp;
   final VoidCallback onAskCompanionSignal;
+  final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
   final VoidCallback onCallTruco;
   final VoidCallback onAcceptTruco;
@@ -496,6 +500,8 @@ class _VisibleGameControls extends StatelessWidget {
     required this.isHandFinished,
     required this.isRoundAwaitingContinue,
     required this.isWaitingHumanResponse,
+    required this.isHumanTurn,
+    required this.canPassHand,
     required this.canCallTruco,
     required this.handValue,
     required this.pendingTrucoValue,
@@ -504,7 +510,9 @@ class _VisibleGameControls extends StatelessWidget {
     required this.raiseOptions,
     required this.onSignalStart,
     required this.onSignalEnd,
+    required this.onShowSignalHelp,
     required this.onAskCompanionSignal,
+    required this.onPassHand,
     required this.onVoyATi,
     required this.onCallTruco,
     required this.onAcceptTruco,
@@ -530,14 +538,22 @@ class _VisibleGameControls extends StatelessWidget {
       builder: (context, constraints) {
         final gap = min(constraints.maxWidth, constraints.maxHeight) * 0.035;
         final primaryAction = _primaryAction();
+        final passHand = ZapitiActionButton(
+          label: 'PASAR MANO',
+          icon: Icons.swap_horiz_outlined,
+          onPressed: canPassHand ? onPassHand : null,
+          primary: true,
+        );
         final askSignal = ZapitiActionButton(
           label: 'PEDIR SEÑA',
           icon: Icons.visibility_outlined,
           onPressed: signalsEnabled ? onAskCompanionSignal : null,
         );
-        final voyATi = ZapitiActionButton(
-          label: '¡VOY A TI!',
-          icon: Icons.record_voice_over_outlined,
+        final companionCommand = ZapitiActionButton(
+          label: isHumanTurn ? '¡VOY A TI!' : 'MATA',
+          icon: isHumanTurn
+              ? Icons.record_voice_over_outlined
+              : Icons.local_fire_department_outlined,
           onPressed: signalsEnabled ? onVoyATi : null,
         );
         final options = ZapitiActionButton(
@@ -545,6 +561,11 @@ class _VisibleGameControls extends StatelessWidget {
           icon: Icons.settings_outlined,
           onPressed: onOptions,
           primary: false,
+        );
+        final signalHelp = ZapitiActionButton(
+          label: 'AYUDA SEÑAS',
+          icon: Icons.help_outline,
+          onPressed: onShowSignalHelp,
         );
         if (compact) {
           return Row(
@@ -555,9 +576,13 @@ class _VisibleGameControls extends StatelessWidget {
                   children: [
                     Expanded(child: primaryAction),
                     SizedBox(height: gap),
+                    if (canPassHand) ...[
+                      Expanded(child: passHand),
+                      SizedBox(height: gap),
+                    ],
                     Expanded(child: askSignal),
                     SizedBox(height: gap),
-                    Expanded(child: voyATi),
+                    Expanded(child: companionCommand),
                     SizedBox(height: gap),
                     Expanded(child: options),
                     SizedBox(height: gap),
@@ -566,7 +591,18 @@ class _VisibleGameControls extends StatelessWidget {
                 ),
               ),
               SizedBox(width: gap),
-              Expanded(child: signals),
+              Expanded(
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: max(36.0, constraints.maxHeight * 0.18),
+                      child: signalHelp,
+                    ),
+                    SizedBox(height: gap),
+                    Expanded(child: signals),
+                  ],
+                ),
+              ),
             ],
           );
         }
@@ -578,14 +614,18 @@ class _VisibleGameControls extends StatelessWidget {
             Row(
               children: [
                 SizedBox(
-                  width: constraints.maxWidth * 0.46,
+                  width: constraints.maxWidth * (canPassHand ? 0.56 : 0.46),
                   child: Row(
                     children: [
                       Expanded(child: primaryAction),
                       SizedBox(width: gap),
+                      if (canPassHand) ...[
+                        Expanded(child: passHand),
+                        SizedBox(width: gap),
+                      ],
                       Expanded(child: askSignal),
                       SizedBox(width: gap),
-                      Expanded(child: voyATi),
+                      Expanded(child: companionCommand),
                       SizedBox(width: gap),
                       Expanded(child: options),
                     ],
@@ -593,10 +633,23 @@ class _VisibleGameControls extends StatelessWidget {
                 ),
                 SizedBox(width: gap),
                 SizedBox(
-                  width: constraints.maxWidth * 0.36,
-                  height:
-                      min(constraints.maxHeight, constraints.maxWidth) * 0.12,
-                  child: signals,
+                  width: constraints.maxWidth * (canPassHand ? 0.26 : 0.36),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        height: min(constraints.maxHeight, constraints.maxWidth) *
+                            0.11,
+                        child: signalHelp,
+                      ),
+                      SizedBox(height: gap * 0.6),
+                      SizedBox(
+                        height: min(constraints.maxHeight, constraints.maxWidth) *
+                            0.12,
+                        child: signals,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -662,7 +715,6 @@ class _GameOptionsOverlay extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
-  final VoidCallback onAbout;
   final VoidCallback onClose;
 
   const _GameOptionsOverlay({
@@ -674,7 +726,6 @@ class _GameOptionsOverlay extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
-    required this.onAbout,
     required this.onClose,
   });
 
@@ -757,7 +808,6 @@ class _GameOptionsOverlay extends StatelessWidget {
                               confirmCardPlay: confirmCardPlay,
                               onConfirmCardPlayChanged:
                                   onConfirmCardPlayChanged,
-                              onAbout: onAbout,
                             ),
                           ),
                         ),
@@ -780,7 +830,7 @@ class _GameOptionsOverlay extends StatelessWidget {
   }
 }
 
-class _AlVerDecisionOverlay extends StatelessWidget {
+class _AlVerDecisionOverlay extends StatefulWidget {
   final int teamId;
   final VoidCallback onAskCompanionSignal;
   final ValueChanged<String> onSignalStart;
@@ -798,6 +848,20 @@ class _AlVerDecisionOverlay extends StatelessWidget {
   });
 
   @override
+  State<_AlVerDecisionOverlay> createState() => _AlVerDecisionOverlayState();
+}
+
+class _AlVerDecisionOverlayState extends State<_AlVerDecisionOverlay> {
+  bool _peekThroughOverlay = false;
+
+  void _setPeekThroughOverlay(bool value) {
+    if (_peekThroughOverlay == value) return;
+    setState(() {
+      _peekThroughOverlay = value;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final titleStyle = Theme.of(context).textTheme.titleLarge?.copyWith(
           color: ZapitiColors.oldGold,
@@ -810,103 +874,146 @@ class _AlVerDecisionOverlay extends StatelessWidget {
         );
 
     return Positioned.fill(
-      child: ColoredBox(
-        color: Colors.black.withValues(alpha: 0.28),
-        child: Align(
-          alignment: Alignment.center,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final shortest = min(constraints.maxWidth, constraints.maxHeight);
-              final isNarrow = constraints.maxWidth < 560;
-              final gap = shortest * (isNarrow ? 0.022 : 0.018);
-              final panelWidth = min(
-                constraints.maxWidth * (isNarrow ? 0.86 : 0.54),
-                isNarrow ? 420.0 : 460.0,
-              );
+      child: Align(
+        alignment: const Alignment(0, -0.12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final shortest = min(constraints.maxWidth, constraints.maxHeight);
+            final isNarrow = constraints.maxWidth < 560;
+            final gap = shortest * (isNarrow ? 0.015 : 0.014);
+            final panelWidth = min(
+              constraints.maxWidth * (isNarrow ? 0.78 : 0.46),
+              isNarrow ? 360.0 : 390.0,
+            );
+            final signalHeight = (isNarrow ? 44.0 : 50.0).clamp(
+              shortest * 0.11,
+              shortest * 0.16,
+            );
 
-              return Material(
-                color: Colors.transparent,
-                child: Padding(
-                  padding: EdgeInsets.all(gap),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.center,
-                    child: SizedBox(
-                      width: panelWidth,
-                      child: Container(
-                        padding: EdgeInsets.all(gap),
-                        decoration: BoxDecoration(
-                          color: const Color(0xDD2A170F),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: ZapitiColors.oldGold,
-                            width: max(gap * 0.12, 1),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.32),
-                              blurRadius: gap * 2,
-                              offset: Offset(0, gap * 0.7),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text('Estás al ver', style: titleStyle),
-                            SizedBox(height: gap * 0.75),
-                            Text(
-                              'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
-                              style: bodyStyle,
-                            ),
-                            SizedBox(height: gap),
-                            ZapitiActionButton(
-                              label: 'PEDIR SEÑA',
-                              icon: Icons.visibility_outlined,
-                              onPressed: onAskCompanionSignal,
-                            ),
-                            SizedBox(height: gap),
-                            SizedBox(
-                              height: isNarrow ? 64 : 72,
-                              child: _SignalsBar(
-                                enabled: true,
-                                compact: true,
-                                scale: isNarrow ? 0.82 : 0.94,
-                                onSignalStart: onSignalStart,
-                                onSignalEnd: onSignalEnd,
+            return Material(
+              color: Colors.transparent,
+              child: Padding(
+                padding: EdgeInsets.all(gap),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: panelWidth,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedOpacity(
+                          opacity: _peekThroughOverlay ? 0.16 : 1,
+                          duration: const Duration(milliseconds: 90),
+                          child: Container(
+                            padding: EdgeInsets.all(gap),
+                            decoration: BoxDecoration(
+                              color: const Color(0xDD2A170F),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: ZapitiColors.oldGold,
+                                width: max(gap * 0.12, 1),
                               ),
-                            ),
-                            SizedBox(height: gap),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ZapitiActionButton(
-                                    label: 'JUGAR',
-                                    icon: Icons.check,
-                                    onPressed: () => onPlay(teamId),
-                                    primary: true,
-                                  ),
-                                ),
-                                SizedBox(width: gap),
-                                Expanded(
-                                  child: ZapitiActionButton(
-                                    label: 'IRSE A CASA',
-                                    icon: Icons.block,
-                                    onPressed: () => onGoHome(teamId),
-                                  ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.32),
+                                  blurRadius: gap * 2,
+                                  offset: Offset(0, gap * 0.7),
                                 ),
                               ],
                             ),
-                          ],
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text('Estás al ver', style: titleStyle),
+                                SizedBox(height: gap * 0.75),
+                                Text(
+                                  'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
+                                  style: bodyStyle,
+                                ),
+                                SizedBox(height: gap),
+                                ZapitiActionButton(
+                                  label: 'PEDIR SEÑA',
+                                  icon: Icons.visibility_outlined,
+                                  onPressed: widget.onAskCompanionSignal,
+                                ),
+                                SizedBox(height: gap),
+                                SizedBox(
+                                  height: signalHeight,
+                                  child: _SignalsBar(
+                                    enabled: true,
+                                    compact: true,
+                                    scale: isNarrow ? 0.68 : 0.78,
+                                    onSignalStart: widget.onSignalStart,
+                                    onSignalEnd: widget.onSignalEnd,
+                                  ),
+                                ),
+                                SizedBox(height: gap),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ZapitiActionButton(
+                                        label: 'JUGAR',
+                                        icon: Icons.check,
+                                        onPressed: () =>
+                                            widget.onPlay(widget.teamId),
+                                        primary: true,
+                                      ),
+                                    ),
+                                    SizedBox(width: gap),
+                                    Expanded(
+                                      child: ZapitiActionButton(
+                                        label: 'IRSE A CASA',
+                                        icon: Icons.block,
+                                        onPressed: () =>
+                                            widget.onGoHome(widget.teamId),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          top: max(4.0, gap * 0.55),
+                          right: max(4.0, gap * 0.55),
+                          child: GestureDetector(
+                            onTapDown: (_) => _setPeekThroughOverlay(true),
+                            onTapUp: (_) => _setPeekThroughOverlay(false),
+                            onTapCancel: () => _setPeekThroughOverlay(false),
+                            child: Tooltip(
+                              message: 'Mantener para ver cartas',
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: ZapitiColors.cardCream
+                                      .withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: ZapitiColors.oldGold,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: SizedBox.square(
+                                  dimension: max(34.0, gap * 3.3),
+                                  child: Icon(
+                                    Icons.visibility_outlined,
+                                    color: ZapitiColors.darkBrown,
+                                    size: max(18.0, gap * 1.55),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1031,6 +1138,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final List<SpanishCard> cards;
   final bool enabled;
   final bool isCurrent;
+  final int? turnSecondsRemaining;
   final String? message;
   final String? companionMessage;
   final String characterId;
@@ -1039,11 +1147,15 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final bool isHandFinished;
   final bool isRoundAwaitingContinue;
   final bool isWaitingHumanResponse;
+  final bool isHumanTurn;
+  final bool canPassHand;
   final bool canCallTruco;
   final ValueChanged<SpanishCard> onPlayCard;
   final ValueChanged<String> onSignalStart;
   final ValueChanged<String> onSignalEnd;
+  final VoidCallback onShowSignalHelp;
   final VoidCallback onAskCompanionSignal;
+  final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
   final VoidCallback onCallTruco;
   final VoidCallback onContinueRound;
@@ -1058,6 +1170,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
     required this.cards,
     required this.enabled,
     required this.isCurrent,
+    required this.turnSecondsRemaining,
     required this.message,
     required this.companionMessage,
     required this.characterId,
@@ -1066,11 +1179,15 @@ class _LandscapeBottomBoard extends StatelessWidget {
     required this.isHandFinished,
     required this.isRoundAwaitingContinue,
     required this.isWaitingHumanResponse,
+    required this.isHumanTurn,
+    required this.canPassHand,
     required this.canCallTruco,
     required this.onPlayCard,
     required this.onSignalStart,
     required this.onSignalEnd,
+    required this.onShowSignalHelp,
     required this.onAskCompanionSignal,
+    required this.onPassHand,
     required this.onVoyATi,
     required this.onCallTruco,
     required this.onContinueRound,
@@ -1107,8 +1224,11 @@ class _LandscapeBottomBoard extends StatelessWidget {
                 isHandFinished: isHandFinished,
                 isRoundAwaitingContinue: isRoundAwaitingContinue,
                 isWaitingHumanResponse: isWaitingHumanResponse,
+                isHumanTurn: isHumanTurn,
+                canPassHand: canPassHand,
                 canCallTruco: canCallTruco,
                 onAskCompanionSignal: onAskCompanionSignal,
+                onPassHand: onPassHand,
                 onVoyATi: onVoyATi,
                 onCallTruco: onCallTruco,
                 onContinueRound: onContinueRound,
@@ -1126,6 +1246,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
                 cards: cards,
                 enabled: enabled,
                 isCurrent: isCurrent,
+                turnSecondsRemaining: turnSecondsRemaining,
                 message: message,
                 companionMessage: companionMessage,
                 characterId: characterId,
@@ -1135,13 +1256,28 @@ class _LandscapeBottomBoard extends StatelessWidget {
             SizedBox(width: gap),
             SizedBox(
               width: historyWidth,
-              child: _SignalsBar(
-                enabled: signalsEnabled,
-                compact: true,
-                twoRows: true,
-                scale: scale,
-                onSignalStart: onSignalStart,
-                onSignalEnd: onSignalEnd,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: (30 * scale).clamp(26.0, 38.0),
+                    child: ZapitiActionButton(
+                      label: 'AYUDA SEÑAS',
+                      icon: Icons.help_outline,
+                      onPressed: onShowSignalHelp,
+                    ),
+                  ),
+                  SizedBox(height: gap),
+                  Expanded(
+                    child: _SignalsBar(
+                      enabled: signalsEnabled,
+                      compact: true,
+                      twoRows: true,
+                      scale: scale,
+                      onSignalStart: onSignalStart,
+                      onSignalEnd: onSignalEnd,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1159,8 +1295,11 @@ class _LandscapeActionPanel extends StatelessWidget {
   final bool isHandFinished;
   final bool isRoundAwaitingContinue;
   final bool isWaitingHumanResponse;
+  final bool isHumanTurn;
+  final bool canPassHand;
   final bool canCallTruco;
   final VoidCallback onAskCompanionSignal;
+  final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
   final VoidCallback onCallTruco;
   final VoidCallback onContinueRound;
@@ -1177,8 +1316,11 @@ class _LandscapeActionPanel extends StatelessWidget {
     required this.isHandFinished,
     required this.isRoundAwaitingContinue,
     required this.isWaitingHumanResponse,
+    required this.isHumanTurn,
+    required this.canPassHand,
     required this.canCallTruco,
     required this.onAskCompanionSignal,
+    required this.onPassHand,
     required this.onVoyATi,
     required this.onCallTruco,
     required this.onContinueRound,
@@ -1212,6 +1354,17 @@ class _LandscapeActionPanel extends StatelessWidget {
             height: secondaryHeight,
             child: Row(
               children: [
+                if (canPassHand) ...[
+                  Expanded(
+                    child: ZapitiActionButton(
+                      label: 'PASAR MANO',
+                      icon: Icons.swap_horiz_outlined,
+                      onPressed: onPassHand,
+                      primary: true,
+                    ),
+                  ),
+                  SizedBox(width: gap),
+                ],
                 Expanded(
                   child: ZapitiActionButton(
                     label: 'PEDIR SEÑA',
@@ -1222,8 +1375,10 @@ class _LandscapeActionPanel extends StatelessWidget {
                 SizedBox(width: gap),
                 Expanded(
                   child: ZapitiActionButton(
-                    label: '¡VOY A TI!',
-                    icon: Icons.record_voice_over_outlined,
+                    label: isHumanTurn ? '¡VOY A TI!' : 'MATA',
+                    icon: isHumanTurn
+                        ? Icons.record_voice_over_outlined
+                        : Icons.local_fire_department_outlined,
                     onPressed: signalsEnabled ? onVoyATi : null,
                   ),
                 ),
@@ -1359,6 +1514,7 @@ class _LandscapeHumanPanel extends StatelessWidget {
   final List<SpanishCard> cards;
   final bool enabled;
   final bool isCurrent;
+  final int? turnSecondsRemaining;
   final String? message;
   final String? companionMessage;
   final String characterId;
@@ -1370,6 +1526,7 @@ class _LandscapeHumanPanel extends StatelessWidget {
     required this.cards,
     required this.enabled,
     required this.isCurrent,
+    required this.turnSecondsRemaining,
     required this.message,
     required this.companionMessage,
     required this.characterId,
@@ -1422,6 +1579,7 @@ class _LandscapeHumanPanel extends StatelessWidget {
                     children: [
                       _LandscapeAvatarSlot(
                         isCurrent: isCurrent,
+                        turnSecondsRemaining: turnSecondsRemaining,
                         playerName: playerName,
                         message: message,
                         characterId: characterId,
@@ -1604,6 +1762,7 @@ class _LandscapeCardSlot extends StatelessWidget {
 
 class _LandscapeAvatarSlot extends StatelessWidget {
   final bool isCurrent;
+  final int? turnSecondsRemaining;
   final String playerName;
   final String? message;
   final String characterId;
@@ -1613,6 +1772,7 @@ class _LandscapeAvatarSlot extends StatelessWidget {
 
   const _LandscapeAvatarSlot({
     required this.isCurrent,
+    required this.turnSecondsRemaining,
     required this.playerName,
     required this.message,
     required this.characterId,
@@ -1685,6 +1845,16 @@ class _LandscapeAvatarSlot extends StatelessWidget {
                 alignment: TextAlign.center,
               ),
             ),
+          if (turnSecondsRemaining != null)
+            Positioned(
+              right: -max(4.0, gap * 0.35),
+              bottom: max(4.0, gap * 0.45),
+              child: _LandscapeTurnTimerBadge(
+                seconds: turnSecondsRemaining!,
+                gap: gap,
+                scale: width / 90,
+              ),
+            ),
           ZapitiPlayerNameBadge(
             playerName: playerName,
             avatarWidth: width,
@@ -1715,9 +1885,299 @@ class _LandscapeAvatarSlot extends StatelessWidget {
       'As Espadas' => 0.13,
       'Treses' => 0.15,
       'Doses' => 0.15,
+      'Ases' => 0,
       'Mala' => 0.13,
       _ => 0,
     };
+  }
+}
+
+class _LandscapeTurnTimerBadge extends StatelessWidget {
+  final int seconds;
+  final double gap;
+  final double scale;
+
+  const _LandscapeTurnTimerBadge({
+    required this.seconds,
+    required this.gap,
+    required this.scale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = seconds <= 5;
+    final fontSize = (11 * scale).clamp(9.0, 13.0);
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: urgent
+              ? ZapitiColors.wineRed.withValues(alpha: 0.94)
+              : const Color(0xE62A170F),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: urgent ? ZapitiColors.oldGold : ZapitiColors.cardCream,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.30),
+              blurRadius: max(4.0, gap * 0.8),
+              offset: Offset(0, max(1.0, gap * 0.25)),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: max(5.0, gap * 0.75),
+            vertical: max(2.5, gap * 0.35),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.timer_outlined,
+                size: (fontSize + 2).clamp(11.0, 16.0),
+                color: ZapitiColors.cardCream,
+              ),
+              SizedBox(width: max(2.0, gap * 0.28)),
+              Text(
+                '${seconds}s',
+                style: TextStyle(
+                  color: ZapitiColors.cardCream,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SignalHelpDialog extends StatelessWidget {
+  final VoidCallback onClose;
+
+  const _SignalHelpDialog({required this.onClose});
+
+  static const _rows = [
+    _SignalHelpRowData(
+      card: SpanishCard(value: 4, suit: Suit.bastos),
+      label: '4 de Bastos',
+      signal: '4 Bastos',
+    ),
+    _SignalHelpRowData(
+      card: SpanishCard(value: 7, suit: Suit.copas),
+      label: '7 de Copas',
+      signal: '7 Copas',
+    ),
+    _SignalHelpRowData(
+      card: SpanishCard(value: 7, suit: Suit.oros),
+      label: '7 de Oros',
+      signal: '7 Oros',
+    ),
+    _SignalHelpRowData(
+      card: SpanishCard(value: 1, suit: Suit.espadas),
+      label: 'As de Espadas',
+      signal: 'As Espadas',
+    ),
+    _SignalHelpRowData(
+      card: SpanishCard(value: 3, suit: Suit.oros),
+      label: 'Treses',
+      signal: 'Treses',
+    ),
+    _SignalHelpRowData(
+      card: SpanishCard(value: 2, suit: Suit.oros),
+      label: 'Doses',
+      signal: 'Doses',
+    ),
+    _SignalHelpRowData(
+      card: SpanishCard(value: 1, suit: Suit.oros),
+      label: 'Ases',
+      signal: 'Ases',
+    ),
+    _SignalHelpRowData(
+      card: null,
+      label: 'Mala',
+      signal: 'Mala',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isNarrow = size.width < 560;
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w900,
+        );
+    final width = min(size.width * (isNarrow ? 0.92 : 0.72), 620.0);
+    final height = min(size.height * 0.86, 640.0);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.all(isNarrow ? 12 : 20),
+      child: Container(
+        width: width,
+        height: height,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ZapitiColors.cardCream.withValues(alpha: 0.97),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: ZapitiColors.oldGold, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.34),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.help_outline,
+                  color: ZapitiColors.wineRed,
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Orden y señas', style: titleStyle)),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close),
+                  color: ZapitiColors.darkBrown,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.separated(
+                itemCount: _rows.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 8,
+                  color: ZapitiColors.darkBrown.withValues(alpha: 0.10),
+                ),
+                itemBuilder: (context, index) {
+                  return _SignalHelpRow(row: _rows[index]);
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            ZapitiActionButton(
+              label: 'CERRAR',
+              icon: Icons.check,
+              onPressed: onClose,
+              primary: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SignalHelpRowData {
+  final SpanishCard? card;
+  final String label;
+  final String? signal;
+
+  const _SignalHelpRowData({
+    required this.card,
+    required this.label,
+    required this.signal,
+  });
+}
+
+class _SignalHelpRow extends StatelessWidget {
+  final _SignalHelpRowData row;
+
+  const _SignalHelpRow({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w800,
+          height: 1.08,
+        );
+
+    return SizedBox(
+      height: 92,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: row.card == null
+                ? const ZapitiCardWidget(
+                    card: null,
+                    hidden: true,
+                    width: 24,
+                    enabled: false,
+                  )
+                : ZapitiCardWidget(
+                    card: row.card,
+                    width: 24,
+                    enabled: false,
+                  ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 5,
+            child: Text(
+              row.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: bodyStyle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 138,
+            height: 86,
+            child: row.signal == null
+                ? Center(
+                    child: Text(
+                      'Del 12 al 4',
+                      textAlign: TextAlign.center,
+                      style: bodyStyle?.copyWith(
+                        color: ZapitiColors.darkBrown.withValues(alpha: 0.62),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0x332A170F),
+                        border: Border.all(
+                          color: ZapitiColors.oldGold.withValues(alpha: 0.42),
+                        ),
+                      ),
+                      child: AvatarWithSilhouette(
+                        assetPath: CharacterAssets.frontForSignal(
+                          'p1',
+                          row.signal,
+                        ),
+                        width: 138,
+                        height: 86,
+                        alignment: Alignment.topCenter,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person,
+                          color: ZapitiColors.darkBrown,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1774,6 +2234,11 @@ class _SignalsBar extends StatelessWidget {
       card: SpanishCard(value: 2, suit: Suit.oros),
       hiddenCard: false,
     ),
+    (
+      label: 'Ases',
+      card: SpanishCard(value: 1, suit: Suit.oros),
+      hiddenCard: false,
+    ),
     (label: 'Mala', card: null, hiddenCard: true),
   ];
 
@@ -1828,15 +2293,18 @@ class _SignalsBar extends StatelessWidget {
             );
           }
 
+          final panelPadding = max(2.0, 3 * scale);
           final horizontalGap = max(4.0, 5 * scale);
-          final verticalGap = max(4.0, 6 * scale);
-          final availableWidth = max(0.0, constraints.maxWidth - gap * 2);
-          final availableHeight = max(0.0, constraints.maxHeight - gap * 2);
+          final verticalGap = max(2.0, 4 * scale);
+          final availableWidth =
+              max(0.0, constraints.maxWidth - panelPadding * 2);
+          final availableHeight =
+              max(0.0, constraints.maxHeight - panelPadding * 2);
           final widthBound = max(0.0, (availableWidth - horizontalGap * 3) / 4);
           final heightBound = (availableHeight - verticalGap) / 2;
           final signalSize = min(
             widthBound,
-            min(52 * scale, heightBound).clamp(36.0, 66.0).toDouble(),
+            min(52 * scale, max(0.0, heightBound)),
           );
           final firstRow = _signals.take(4).toList();
           final secondRow = _signals.skip(4).toList();
@@ -1872,7 +2340,7 @@ class _SignalsBar extends StatelessWidget {
           }
 
           return Container(
-            padding: EdgeInsets.all(gap),
+            padding: EdgeInsets.all(panelPadding),
             decoration: BoxDecoration(
               color: const Color(0xCC2A170F),
               borderRadius: BorderRadius.circular(10 * scale),
@@ -1888,11 +2356,10 @@ class _SignalsBar extends StatelessWidget {
                 ),
               ],
             ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FittedBox(
+            child: Column(
+              children: [
+                Expanded(
+                  child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1900,8 +2367,10 @@ class _SignalsBar extends StatelessWidget {
                       children: rowButtons(firstRow),
                     ),
                   ),
-                  SizedBox(height: verticalGap),
-                  FittedBox(
+                ),
+                SizedBox(height: verticalGap),
+                Expanded(
+                  child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1909,8 +2378,8 @@ class _SignalsBar extends StatelessWidget {
                       children: rowButtons(secondRow),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         },

@@ -147,11 +147,15 @@ class _CharacterChoiceGrid extends StatelessWidget {
   final String selectedCharacterId;
   final ValueChanged<String> onSelected;
   final int columns;
+  final Set<String> disabledCharacterIds;
+  final Map<String, String> characterBadges;
 
   const _CharacterChoiceGrid({
     required this.selectedCharacterId,
     required this.onSelected,
     required this.columns,
+    this.disabledCharacterIds = const {},
+    this.characterBadges = const {},
   });
 
   @override
@@ -176,6 +180,8 @@ class _CharacterChoiceGrid extends StatelessWidget {
               _CharacterChoice(
                 characterId: characterId,
                 selected: characterId == selectedCharacterId,
+                disabled: disabledCharacterIds.contains(characterId),
+                badgeLabel: characterBadges[characterId],
                 onTap: () => onSelected(characterId),
               ),
           ],
@@ -317,11 +323,15 @@ class _SelectedCharacterLabel extends StatelessWidget {
 class _CharacterChoice extends StatelessWidget {
   final String characterId;
   final bool selected;
+  final bool disabled;
+  final String? badgeLabel;
   final VoidCallback onTap;
 
   const _CharacterChoice({
     required this.characterId,
     required this.selected,
+    this.disabled = false,
+    this.badgeLabel,
     required this.onTap,
   });
 
@@ -332,10 +342,11 @@ class _CharacterChoice extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      enabled: !disabled,
       label: name,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
+        onTap: disabled ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
           padding:
@@ -343,12 +354,16 @@ class _CharacterChoice extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? ZapitiColors.oldGold.withValues(alpha: 0.94)
-                : ZapitiColors.tableGreenDark.withValues(alpha: 0.74),
+                : disabled
+                    ? ZapitiColors.darkBrown.withValues(alpha: 0.42)
+                    : ZapitiColors.tableGreenDark.withValues(alpha: 0.74),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: selected
                   ? ZapitiColors.cardCream
-                  : ZapitiColors.oldGold.withValues(alpha: 0.28),
+                  : disabled
+                      ? ZapitiColors.darkBrown.withValues(alpha: 0.26)
+                      : ZapitiColors.oldGold.withValues(alpha: 0.28),
               width: selected ? 3 : 1,
             ),
           ),
@@ -361,16 +376,75 @@ class _CharacterChoice extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Image.asset(
-                    CharacterAssets.selection(characterId),
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) {
-                      return Icon(
-                        Icons.person,
-                        size: MediaQuery.sizeOf(context).shortestSide * 0.12,
-                        color: ZapitiColors.darkBrown.withValues(alpha: 0.7),
-                      );
-                    },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        CharacterAssets.selection(characterId),
+                        fit: BoxFit.contain,
+                        color: disabled
+                            ? Colors.black.withValues(alpha: 0.42)
+                            : null,
+                        colorBlendMode: disabled ? BlendMode.saturation : null,
+                        errorBuilder: (_, __, ___) {
+                          return Icon(
+                            Icons.person,
+                            size:
+                                MediaQuery.sizeOf(context).shortestSide * 0.12,
+                            color:
+                                ZapitiColors.darkBrown.withValues(alpha: 0.7),
+                          );
+                        },
+                      ),
+                      if (disabled)
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.34),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.lock_outline,
+                              color: ZapitiColors.cardCream,
+                            ),
+                          ),
+                        ),
+                      if (badgeLabel != null)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? ZapitiColors.oldGold
+                                  : ZapitiColors.wineRed,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: ZapitiColors.cardCream.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 2,
+                              ),
+                              child: Text(
+                                badgeLabel!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: selected
+                                          ? ZapitiColors.darkBrown
+                                          : ZapitiColors.cardCream,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -384,6 +458,10 @@ class _CharacterChoice extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: selected
                               ? ZapitiColors.darkBrown
+                              : disabled
+                                  ? ZapitiColors.cardCream.withValues(
+                                      alpha: 0.56,
+                                    )
                               : ZapitiColors.cardCream,
                           fontWeight: FontWeight.w900,
                         ),

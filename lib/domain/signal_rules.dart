@@ -28,6 +28,10 @@ class SignalRules {
     if (hand.any((card) => card.value == 2)) {
       return 'Doses';
     }
+    if (hand.any((card) =>
+        card.value == 1 && card.suit != Suit.espadas)) {
+      return 'Ases';
+    }
 
     final strongest = hand.isEmpty
         ? 0

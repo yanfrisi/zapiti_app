@@ -44,13 +44,23 @@ void main() {
       expect(SignalRules.isStrongSignal(signal), isTrue);
     });
 
-    test('no inventa senya con mano media sin especial', () {
+    test('marca ases para cualquier as que no sea espadas', () {
       final signal = SignalRules.signalForHand(const [
         SpanishCard(value: 1, suit: Suit.oros),
         SpanishCard(value: 6, suit: Suit.espadas),
       ]);
 
-      expect(signal, isNull);
+      expect(signal, 'Ases');
+      expect(SignalRules.isStrongSignal(signal), isTrue);
+    });
+
+    test('marca mala con mano floja sin especial', () {
+      final signal = SignalRules.signalForHand(const [
+        SpanishCard(value: 6, suit: Suit.espadas),
+        SpanishCard(value: 5, suit: Suit.copas),
+      ]);
+
+      expect(signal, 'Mala');
     });
   });
 }

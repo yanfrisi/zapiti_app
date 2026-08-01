@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zapiti_app/domain/debug_deals.dart';
+import 'package:zapiti_app/domain/played_card.dart';
 import 'package:zapiti_app/domain/spanish_card.dart';
 import 'package:zapiti_app/domain/suit.dart';
 import 'package:zapiti_app/domain/team_rules.dart';
@@ -798,7 +799,261 @@ void main() {
       expect(controller.alVerTeamId, isNull);
       expect(controller.alVerTeamIds, isEmpty);
     });
+
+    group('pasar mano', () {
+      test('con la opcion desactivada no cambia el estado', () {
+        final controller = _passHandController(allowPassHand: false);
+        final originalTurn = controller.turnIndex;
+        final originalScore = Map<int, int>.from(controller.score);
+
+        expect(
+          controller.canPassHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+          ),
+          isFalse,
+        );
+        expect(
+          () => controller.passHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+          ),
+          throwsStateError,
+        );
+        expect(controller.turnIndex, originalTurn);
+        expect(controller.score, originalScore);
+      });
+
+      test('el jugador con salida puede pasar mano al companero', () {
+        final controller = _passHandController();
+
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        expect(controller.currentPlayer, ZapitiPlayers.companion);
+        expect(controller.passedHandState.originalLeaderId,
+            ZapitiPlayers.human.id);
+        expect(controller.passedHandState.passedToPlayerId,
+            ZapitiPlayers.companion.id);
+      });
+
+      test('no se puede pasar mano a un rival', () {
+        final controller = _passHandController();
+
+        expect(
+          controller.canPassHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.rightRival,
+          ),
+          isFalse,
+        );
+      });
+
+      test('no se puede pasar mano despues de una carta jugada', () {
+        final controller = _passHandController();
+        controller.playCard(
+          ZapitiPlayers.human,
+          controller.hands[ZapitiPlayers.human.id]!.first,
+        );
+
+        expect(
+          controller.canPassHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+          ),
+          isFalse,
+        );
+      });
+
+      test('no se puede pasar mano si el jugador original ya jugo', () {
+        final controller = _passHandController();
+        controller.playedCards.add(
+          PlayedCard(
+            player: ZapitiPlayers.human,
+            card: controller.hands[ZapitiPlayers.human.id]!.first,
+          ),
+        );
+
+        expect(
+          controller.canPassHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+          ),
+          isFalse,
+        );
+      });
+
+      test('no se puede pasar mano si el companero ya jugo', () {
+        final controller = _passHandController();
+        controller.playedCards.add(
+          PlayedCard(
+            player: ZapitiPlayers.companion,
+            card: controller.hands[ZapitiPlayers.companion.id]!.first,
+          ),
+        );
+
+        expect(
+          controller.canPassHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+          ),
+          isFalse,
+        );
+      });
+
+      test('no se puede pasar mano dos veces en el mismo chico', () {
+        final controller = _passHandController();
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        expect(
+          () => controller.passHand(
+            from: ZapitiPlayers.companion,
+            to: ZapitiPlayers.human,
+          ),
+          throwsStateError,
+        );
+        expect(controller.currentPlayer, ZapitiPlayers.companion);
+      });
+
+      test('despues de que el companero juegue sigue el orden normal', () {
+        final controller = _passHandController();
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        controller.playCard(
+          ZapitiPlayers.companion,
+          controller.hands[ZapitiPlayers.companion.id]!.first,
+        );
+
+        expect(controller.currentPlayer, ZapitiPlayers.leftRival);
+      });
+
+      test('pasar mano no suma chicos, chinos ni cambia truc', () {
+        final controller = _passHandController();
+        final score = Map<int, int>.from(controller.score);
+        final roundWins = Map<int, int>.from(controller.roundWins);
+
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        expect(controller.score, score);
+        expect(controller.roundWins, roundWins);
+        expect(controller.handValue, 1);
+        expect(controller.pendingTrucoValue, isNull);
+        expect(controller.isTrucoAccepted, isFalse);
+        expect(controller.handFinished, isFalse);
+        expect(controller.roundHistory, isEmpty);
+      });
+
+      test('no acepta ni rechaza truc ni inicia nuevo reparto', () {
+        final controller = _passHandController();
+        final nextLeadIndex = controller.nextLeadIndex;
+        final hand = controller.hands.map(
+          (key, value) => MapEntry(key, List<SpanishCard>.from(value)),
+        );
+
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        expect(controller.trucoState, TrucoNegotiationState.notStarted);
+        expect(controller.nextLeadIndex, nextLeadIndex);
+        expect(controller.hands, hand);
+      });
+
+      test('al empezar un nuevo chico ya no se puede pasar mano', () {
+        final controller = _passHandController();
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        _playFullRound(controller);
+        controller.resolveRound();
+        controller.continueRound();
+
+        expect(controller.passedHandState.hasPassed, isFalse);
+        expect(controller.passedHandState.originalLeaderId,
+            controller.currentPlayer.id);
+        expect(
+          controller.canPassHand(
+            from: controller.currentPlayer,
+            to: ZapitiPlayers.tableOrder.firstWhere(
+              (player) =>
+                  player.teamId == controller.currentPlayer.teamId &&
+                  player.id != controller.currentPlayer.id,
+            ),
+          ),
+          isFalse,
+        );
+      });
+
+      test('al empezar una nueva mano se reinicia completamente', () {
+        final controller = _passHandController();
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+
+        controller.startNewHand(fixedHands: DebugDeals.presets.first);
+
+        expect(controller.passedHandState.hasPassed, isFalse);
+        expect(controller.passedHandState.originalLeaderId,
+            controller.currentPlayer.id);
+        expect(controller.playedCards, isEmpty);
+      });
+
+      test('solo el actor con salida puede ejecutar la accion', () {
+        final controller = _passHandController();
+
+        expect(
+          controller.canPassHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+            actorPlayerId: ZapitiPlayers.rightRival.id,
+          ),
+          isFalse,
+        );
+      });
+
+      test('un mensaje duplicado no cambia dos veces el estado', () {
+        final controller = _passHandController();
+        controller.passHand(
+          from: ZapitiPlayers.human,
+          to: ZapitiPlayers.companion,
+        );
+        final status = controller.status;
+
+        expect(
+          () => controller.passHand(
+            from: ZapitiPlayers.human,
+            to: ZapitiPlayers.companion,
+          ),
+          throwsStateError,
+        );
+        expect(controller.currentPlayer, ZapitiPlayers.companion);
+        expect(controller.status, status);
+      });
+    });
   });
+}
+
+ZapitiGameController _passHandController({bool allowPassHand = true}) {
+  return ZapitiGameController(
+    players: ZapitiPlayers.tableOrder,
+    allowPassHand: allowPassHand,
+    autoStart: false,
+  )..startNewHand(fixedHands: DebugDeals.presets.first);
 }
 
 void _playFullRound(ZapitiGameController controller) {

@@ -24,6 +24,25 @@ enum TrucoNegotiationState {
   rejectedHandFinished,
 }
 
+class PassedHandState {
+  final String originalLeaderId;
+  final String? passedToPlayerId;
+
+  const PassedHandState({
+    required this.originalLeaderId,
+    this.passedToPlayerId,
+  });
+
+  bool get hasPassed => passedToPlayerId != null;
+
+  PassedHandState passTo(String playerId) {
+    return PassedHandState(
+      originalLeaderId: originalLeaderId,
+      passedToPlayerId: playerId,
+    );
+  }
+}
+
 class ZapitiGameController {
   static const defaultTargetScore = 30;
 
@@ -35,6 +54,7 @@ class ZapitiGameController {
   final Map<int, int> roundWins = {1: 0, 2: 0};
   final LimitedHistory eventLog;
   final LimitedHistory handSummaries;
+  bool allowPassHand;
 
   late Map<String, List<SpanishCard>> hands;
   final List<PlayedCard> playedCards = [];
@@ -45,6 +65,7 @@ class ZapitiGameController {
   int turnIndex = 0;
   int leadIndex = 0;
   int nextLeadIndex = 0;
+  late PassedHandState passedHandState;
   int handValue = 1;
   int? pendingTrucoValue;
   int? trucoCallerTeamId;
@@ -63,6 +84,7 @@ class ZapitiGameController {
     Iterable<String>? authorizedTrucoPlayerIds,
     LimitedHistory? eventLog,
     LimitedHistory? handSummaries,
+    this.allowPassHand = false,
     bool autoStart = true,
   })  : authorizedTrucoPlayerIds = Set.unmodifiable(
           authorizedTrucoPlayerIds ??
@@ -70,6 +92,7 @@ class ZapitiGameController {
         ),
         eventLog = eventLog ?? LimitedHistory(limit: 6),
         handSummaries = handSummaries ?? LimitedHistory(limit: 8) {
+    passedHandState = PassedHandState(originalLeaderId: players.first.id);
     if (autoStart) {
       startNewHand();
     }
@@ -184,6 +207,7 @@ class ZapitiGameController {
     leadIndex = nextLeadIndex;
     nextLeadIndex = (nextLeadIndex + 1) % players.length;
     turnIndex = leadIndex;
+    _resetPassedHandState();
     _refreshAlVerState();
     status = currentPlayer.id == humanPlayer.id
         ? 'Sales tú. Juega tu primera carta.'
@@ -248,7 +272,47 @@ class ZapitiGameController {
     if (!isRoundAwaitingContinue) return;
     playedCards.clear();
     isRoundAwaitingContinue = false;
+    _resetPassedHandState();
     status = 'Turno de ${currentPlayer.name}.';
+  }
+
+  bool canPassHand({
+    required Player from,
+    required Player to,
+    String? actorPlayerId,
+  }) {
+    if (!allowPassHand) return false;
+    if (actorPlayerId != null && actorPlayerId != from.id) return false;
+    if (handFinished || isGameFinished || isRoundAwaitingContinue) {
+      return false;
+    }
+    if (alVerState == AlVerState.awaitingDecision) return false;
+    if (trucoState == TrucoNegotiationState.awaitingResponse) return false;
+    if (roundHistory.isNotEmpty) return false;
+    if (playedCards.isNotEmpty) return false;
+    if (passedHandState.hasPassed) return false;
+    if (from.id != currentPlayer.id) return false;
+    if (from.id != passedHandState.originalLeaderId) return false;
+    if (from.id == to.id || from.teamId != to.teamId) return false;
+    if ((hands[from.id] ?? const <SpanishCard>[]).isEmpty) return false;
+    if ((hands[to.id] ?? const <SpanishCard>[]).isEmpty) return false;
+    if (playedCards.any((card) => card.player.id == from.id)) return false;
+    if (playedCards.any((card) => card.player.id == to.id)) return false;
+    return true;
+  }
+
+  void passHand({
+    required Player from,
+    required Player to,
+    String? actorPlayerId,
+  }) {
+    if (!canPassHand(from: from, to: to, actorPlayerId: actorPlayerId)) {
+      throw StateError('No se puede pasar mano en el estado actual.');
+    }
+    turnIndex = players.indexWhere((player) => player.id == to.id);
+    passedHandState = passedHandState.passTo(to.id);
+    status = '${from.name} pasa mano a ${to.name}. Sale ${to.name}.';
+    _log(status);
   }
 
   /// Lanza o contra-sube truco para el equipo del jugador.
@@ -437,6 +501,10 @@ class ZapitiGameController {
     status =
         '${winner.player.name} gana con ${winner.card}. Ronda para Equipo $winningTeam. Sale ${winner.player.name}.';
     _log('Ronda para Equipo $winningTeam.');
+  }
+
+  void _resetPassedHandState() {
+    passedHandState = PassedHandState(originalLeaderId: players[leadIndex].id);
   }
 
   void _handleTiedRound(

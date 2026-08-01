@@ -215,6 +215,14 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final teamSignal = _teamSignalsByTeam[bot.teamId];
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
+    final shouldPlayHighest = _forceHighestRequestedPlayerIds.contains(bot.id);
+    if (shouldPlayHighest) {
+      _forceHighestRequestedPlayerIds.remove(bot.id);
+      final sorted = [...hand]..sort(
+          (a, b) => ZapitiRules.strength(a).compareTo(ZapitiRules.strength(b)),
+        );
+      return sorted.last;
+    }
     final memory = BotMemoryContext.from(
       bot: bot,
       playedCards: _playedCards,
@@ -543,6 +551,34 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isAutoPlaying = false;
         });
         break;
+      case MultiplayerMessageType.passHand:
+        final playerId = message.playerId;
+        final toPlayerId = message.payload['toPlayerId']?.toString();
+        if (playerId == null || toPlayerId == null) return;
+        final player = _players.firstWhere(
+          (candidate) => candidate.id == playerId,
+          orElse: () => _players.first,
+        );
+        final teammate = _players.firstWhere(
+          (candidate) => candidate.id == toPlayerId,
+          orElse: () => _players.first,
+        );
+        if (!_game.canPassHand(
+          from: player,
+          to: teammate,
+          actorPlayerId: player.id,
+        )) {
+          return;
+        }
+        _updateState(() {
+          _game.passHand(from: player, to: teammate, actorPlayerId: player.id);
+          _showTemporaryPlayerMessage(player.id, 'Paso mano.');
+          _isAutoPlaying = false;
+        });
+        if (_isLocalBotPlayer(_currentPlayer)) {
+          _advanceBots();
+        }
+        break;
       case MultiplayerMessageType.continueRound:
         _updateState(() {
           _game.continueRound();
@@ -595,6 +631,23 @@ extension _GameScreenPlayLogic on _GameScreenState {
                 !_playedCards
                     .any((card) => card.player.id == _humanPlayer.id)) {
               _forceWinRequestedPlayerIds.add(_humanPlayer.id);
+            }
+          });
+          return;
+        }
+        if (kind == 'mata') {
+          if (!active) return;
+          _updateState(() {
+            _showTemporaryPlayerMessage(player.id, rawLabel);
+            if (player.teamId == _humanPlayer.teamId &&
+                player.id != _humanPlayer.id) {
+              _status = '${player.name}: $rawLabel';
+            }
+            if (player.teamId == _humanPlayer.teamId &&
+                !_controlledHumanPlayerIds.contains(_humanPlayer.id) &&
+                !_playedCards
+                    .any((card) => card.player.id == _humanPlayer.id)) {
+              _forceHighestRequestedPlayerIds.add(_humanPlayer.id);
             }
           });
           return;

@@ -10,6 +10,7 @@ class _OpponentSeat extends StatelessWidget {
   final _SeatPosition position;
   final String playerName;
   final bool isCurrent;
+  final int? turnSecondsRemaining;
   final int cardsRemaining;
   final String? message;
   final String characterId;
@@ -19,6 +20,7 @@ class _OpponentSeat extends StatelessWidget {
     required this.position,
     required this.playerName,
     required this.isCurrent,
+    required this.turnSecondsRemaining,
     required this.cardsRemaining,
     required this.message,
     required this.characterId,
@@ -35,6 +37,7 @@ class _OpponentSeat extends StatelessWidget {
     }) {
       return _SeatAvatar(
         isCurrent: isCurrent,
+        turnSecondsRemaining: turnSecondsRemaining,
         playerName: playerName,
         message: message,
         characterId: characterId,
@@ -216,6 +219,7 @@ class _OpponentSeat extends StatelessWidget {
 class _HumanSeat extends StatelessWidget {
   final String playerName;
   final bool isCurrent;
+  final int? turnSecondsRemaining;
   final String? message;
   final String characterId;
   final List<SpanishCard> cards;
@@ -226,6 +230,7 @@ class _HumanSeat extends StatelessWidget {
   const _HumanSeat({
     required this.playerName,
     required this.isCurrent,
+    required this.turnSecondsRemaining,
     required this.message,
     required this.characterId,
     required this.cards,
@@ -246,6 +251,7 @@ class _HumanSeat extends StatelessWidget {
         final contentWidth = cardWidth * 4 + metrics.gap * 3.2;
         final avatar = _SeatAvatar(
           isCurrent: isCurrent,
+          turnSecondsRemaining: turnSecondsRemaining,
           playerName: playerName,
           message: message,
           characterId: characterId,
@@ -421,6 +427,7 @@ class _HiddenCards extends StatelessWidget {
 
 class _SeatAvatar extends StatelessWidget {
   final bool isCurrent;
+  final int? turnSecondsRemaining;
   final String playerName;
   final String? message;
   final String characterId;
@@ -434,6 +441,7 @@ class _SeatAvatar extends StatelessWidget {
 
   const _SeatAvatar({
     required this.isCurrent,
+    required this.turnSecondsRemaining,
     required this.playerName,
     required this.message,
     required this.characterId,
@@ -483,6 +491,13 @@ class _SeatAvatar extends StatelessWidget {
                 gap: gap,
                 text: visibleMessage,
               ),
+            if (turnSecondsRemaining != null)
+              _PositionedTurnTimer(
+                seconds: turnSecondsRemaining!,
+                avatarWidth: effectiveWidth,
+                gap: gap,
+                compact: true,
+              ),
             ZapitiPlayerNameBadge(
               playerName: playerName,
               avatarWidth: effectiveWidth,
@@ -522,6 +537,12 @@ class _SeatAvatar extends StatelessWidget {
               gap: gap,
               text: visibleMessage,
             ),
+          if (turnSecondsRemaining != null)
+            _PositionedTurnTimer(
+              seconds: turnSecondsRemaining!,
+              avatarWidth: effectiveWidth,
+              gap: gap,
+            ),
           ZapitiPlayerNameBadge(
             playerName: playerName,
             avatarWidth: effectiveWidth,
@@ -553,6 +574,7 @@ class _SeatAvatar extends StatelessWidget {
       'As Espadas' => 0.13,
       'Treses' => 0.15,
       'Doses' => 0.15,
+      'Ases' => 0,
       'Mala' => 0.13,
       _ => 0,
     };
@@ -608,6 +630,82 @@ class ZapitiPlayerNameBadge extends StatelessWidget {
                 fontWeight: FontWeight.w900,
                 height: 1,
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PositionedTurnTimer extends StatelessWidget {
+  final int seconds;
+  final double avatarWidth;
+  final double gap;
+  final bool compact;
+
+  const _PositionedTurnTimer({
+    required this.seconds,
+    required this.avatarWidth,
+    required this.gap,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = seconds <= 5;
+    final fontSize = (avatarWidth * (compact ? 0.16 : 0.15))
+        .clamp(9.0, compact ? 12.0 : 13.0)
+        .toDouble();
+    final iconSize = (fontSize + 2).clamp(11.0, 16.0).toDouble();
+
+    return Positioned(
+      right: -max(4.0, gap * 0.35),
+      bottom: max(4.0, gap * 0.45),
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: urgent
+                ? ZapitiColors.wineRed.withValues(alpha: 0.94)
+                : const Color(0xE62A170F),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: urgent ? ZapitiColors.oldGold : ZapitiColors.cardCream,
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.30),
+                blurRadius: max(4.0, gap * 0.8),
+                offset: Offset(0, max(1.0, gap * 0.25)),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: max(5.0, gap * 0.75),
+              vertical: max(2.5, gap * 0.35),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: iconSize,
+                  color: ZapitiColors.cardCream,
+                ),
+                SizedBox(width: max(2.0, gap * 0.28)),
+                Text(
+                  '${seconds}s',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: ZapitiColors.cardCream,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

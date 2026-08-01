@@ -66,6 +66,7 @@ class GameSocket {
     String? sessionToken,
     String? pairId,
     String? characterId,
+    bool allowPassHand = false,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.createRoom,
@@ -78,6 +79,7 @@ class GameSocket {
         if (sessionToken == null && password != null) 'password': password,
         if (pairId != null) 'pairId': pairId,
         if (characterId != null) 'characterId': characterId,
+        'allowPassHand': allowPassHand,
       },
     ));
   }
@@ -143,6 +145,18 @@ class GameSocket {
       roomId: roomId,
       playerId: playerId,
       payload: {'characterId': characterId},
+    ));
+  }
+
+  void releaseCharacter({
+    required String roomId,
+    required String playerId,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.selectCharacter,
+      roomId: roomId,
+      playerId: playerId,
+      payload: {'characterId': null},
     ));
   }
 
@@ -303,6 +317,19 @@ class GameSocket {
       roomId: roomId,
       playerId: playerId,
       payload: {'card': cardToJson(card)},
+    ));
+  }
+
+  void passHand({
+    required String roomId,
+    required String playerId,
+    required String toPlayerId,
+  }) {
+    send(MultiplayerMessage(
+      type: MultiplayerMessageType.passHand,
+      roomId: roomId,
+      playerId: playerId,
+      payload: {'toPlayerId': toPlayerId},
     ));
   }
 

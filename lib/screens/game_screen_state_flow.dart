@@ -56,7 +56,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (_isGameFinished) return;
 
     _handVersion += 1;
-    _alVerDecisionPromptedForHandVersion = -1;
+    _alVerDecisionPromptedKey = null;
     _isAlVerDecisionDialogOpen = false;
     final fixedHands = _isMultiplayerMatch
         ? MultiplayerSessionStore.instance.fixedHands ?? _debugFixedHands
@@ -71,6 +71,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _teamSignalsByTeam.clear();
     _opponentSignalsSeenByTeam.clear();
     _forceWinRequestedPlayerIds.clear();
+    _forceHighestRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
@@ -78,6 +79,9 @@ extension _GameScreenStateFlow on _GameScreenState {
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _companionVoyATiPromptedHandVersion = -1;
+    _turnDeadlineAt = null;
+    _turnSecondsRemaining = null;
+    _syncTurnCountdownTimer();
   }
 
   void _maybeHandleAlVerDecision() {
@@ -95,18 +99,19 @@ extension _GameScreenStateFlow on _GameScreenState {
       return;
     }
 
-    if (_alVerDecisionPromptedForHandVersion == _handVersion) {
+    final teamId = _game.alVerTeamId;
+    final promptKey = _alVerDecisionPromptKey(teamId);
+    if (_alVerDecisionPromptedKey == promptKey) {
       return;
     }
 
-    final teamId = _game.alVerTeamId;
     if (teamId == null) {
-      _alVerDecisionPromptedForHandVersion = _handVersion;
+      _alVerDecisionPromptedKey = promptKey;
       return;
     }
 
     final teamIsHumanControlled = _isTeamControlledByHuman(teamId);
-    _alVerDecisionPromptedForHandVersion = _handVersion;
+    _alVerDecisionPromptedKey = promptKey;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(
@@ -116,6 +121,14 @@ extension _GameScreenStateFlow on _GameScreenState {
         ),
       );
     });
+  }
+
+  String _alVerDecisionPromptKey(int? teamId) {
+    final handKey =
+        _isMultiplayerMatch && _multiplayerServerHandSequence != null
+            ? 'server:${_multiplayerServerHandSequence!}'
+            : 'local:$_handVersion';
+    return '$handKey:team:${teamId ?? 'multiple'}';
   }
 
   bool _isTeamControlledByHuman(int teamId) {
@@ -226,7 +239,8 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId = _humanPlayer.id;
+      final playerId =
+          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
         socket.chooseAlVerDecision(
           roomId: roomId,
@@ -328,11 +342,73 @@ extension _GameScreenStateFlow on _GameScreenState {
     }
   }
 
+  Future<void> _confirmReturnToMainMenu() async {
+    if (!mounted) return;
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: ZapitiColors.cardCream,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(
+              color: ZapitiColors.oldGold,
+              width: 2,
+            ),
+          ),
+          title: Row(
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: ZapitiColors.wineRed,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Salir de la partida',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: ZapitiColors.darkBrown,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            '¿Seguro que quieres volver al menú? La partida actual se cerrará.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: ZapitiColors.darkBrown,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              icon: const Icon(Icons.close),
+              label: const Text('CANCELAR'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.logout),
+              label: const Text('SALIR'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldExit == true && mounted) {
+      _returnToMainMenu();
+    }
+  }
+
   void _returnToMainMenu() {
     _updateState(() {
       _isMultiplayerMatch = false;
       _multiplayerPlayers = const [];
       _multiplayerServerHandSequence = null;
+      _alVerDecisionPromptedKey = null;
       _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
       _showMainMenu = true;
       _showCharacterSelection = false;
@@ -341,6 +417,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       _mainMenuPanel = _MainMenuPanel.home;
       _isWaitingHumanTrucoResponse = false;
       _isRequestingCompanionSignal = false;
+      _turnDeadlineAt = null;
+      _turnSecondsRemaining = null;
       _playerMessages.clear();
       _forceWinRequestedPlayerIds.clear();
       _companionPrivateSignalStatus = null;
@@ -354,6 +432,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       _isMultiplayerMatch = false;
       _multiplayerPlayers = const [];
       _multiplayerServerHandSequence = null;
+      _alVerDecisionPromptedKey = null;
       _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
       _showMainMenu = true;
       _showCharacterSelection = false;
@@ -362,6 +441,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       _mainMenuPanel = _MainMenuPanel.multiplayer;
       _isWaitingHumanTrucoResponse = false;
       _isRequestingCompanionSignal = false;
+      _turnDeadlineAt = null;
+      _turnSecondsRemaining = null;
       _playerMessages.clear();
       _forceWinRequestedPlayerIds.clear();
       _companionPrivateSignalStatus = null;
@@ -384,12 +465,16 @@ extension _GameScreenStateFlow on _GameScreenState {
     _teamSignalsByTeam.clear();
     _opponentSignalsSeenByTeam.clear();
     _forceWinRequestedPlayerIds.clear();
+    _forceHighestRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _companionPrivateSignalStatus = null;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _isAutoPlaying = false;
     _companionVoyATiPromptedHandVersion = -1;
+    _alVerDecisionPromptedKey = null;
+    _turnDeadlineAt = null;
+    _turnSecondsRemaining = null;
     _pendingTrucoValue = null;
     _trucoCallerTeamId = null;
     _game.lastTrucoRaiserTeamId = null;
@@ -490,6 +575,18 @@ extension _GameScreenStateFlow on _GameScreenState {
     });
   }
 
+  Future<void> _showSignalHelpDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return _SignalHelpDialog(
+          onClose: () => Navigator.of(dialogContext).pop(),
+        );
+      },
+    );
+  }
+
   void _openMainMenuMultiplayer() {
     _updateState(() {
       _mainMenuPanel = _MainMenuPanel.multiplayer;
@@ -528,6 +625,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       if (session.botDifficulty != null) {
         _selectedDifficulty = session.botDifficulty!.clamp(1, 5);
       }
+      _allowPassHand = session.allowPassHand;
       _multiplayerServerHandSequence = null;
       _controlledHumanPlayerIds = {localGamePlayerId};
       _game = ZapitiGameController(
@@ -535,6 +633,7 @@ extension _GameScreenStateFlow on _GameScreenState {
         players: _players,
         humanPlayerId: localGamePlayerId,
         authorizedTrucoPlayerIds: _players.map((player) => player.id),
+        allowPassHand: _allowPassHand,
         autoStart: false,
       );
       final sessionCharacterIds = session.characterIdsByPlayer;
@@ -687,6 +786,9 @@ extension _GameScreenStateFlow on _GameScreenState {
     }
     _pendingTrucoValue = match['pendingTrucoValue'] as int?;
     _trucoCallerTeamId = match['trucoCallerTeamId'] as int?;
+    _allowPassHand = match['allowPassHand'] as bool? ?? _allowPassHand;
+    _game.allowPassHand = _allowPassHand;
+    _syncPassedHandFromMatch(match);
     _handFinished = match['handFinished'] as bool? ?? _handFinished;
     final snapshotAccepted =
         match['isTrucoAccepted'] as bool? ?? _isTrucoAccepted;
@@ -701,10 +803,74 @@ extension _GameScreenStateFlow on _GameScreenState {
         match['isRoundAwaitingContinue'] as bool? ?? _isRoundAwaitingContinue;
     _winningTeamId = match['winningTeamId'] as int?;
     _status = match['status']?.toString() ?? _status;
+    _turnDeadlineAt = _parseNullableInt(match['turnDeadlineAt']);
+    _turnSecondsRemaining = _calculateTurnSecondsRemaining(_turnDeadlineAt);
     _syncAlVerFromMatch(match);
     _isWaitingHumanTrucoResponse = _pendingTrucoValue != null &&
         _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
     _isAutoPlaying = false;
+    _syncTurnCountdownTimer();
+  }
+
+  void _syncPassedHandFromMatch(Map<String, dynamic> match) {
+    final rawState = match['passedHandState'];
+    if (rawState is Map) {
+      final originalLeaderId = rawState['originalLeaderId']?.toString();
+      final passedToPlayerId = rawState['passedToPlayerId']?.toString();
+      if (originalLeaderId != null &&
+          _players.any((player) => player.id == originalLeaderId)) {
+        _game.passedHandState = PassedHandState(
+          originalLeaderId: originalLeaderId,
+          passedToPlayerId: passedToPlayerId,
+        );
+        return;
+      }
+    }
+    final originalLeaderId = match['originalLeadPlayerId']?.toString();
+    final passedToPlayerId = match['passedHandToPlayerId']?.toString();
+    if (originalLeaderId != null &&
+        _players.any((player) => player.id == originalLeaderId)) {
+      _game.passedHandState = PassedHandState(
+        originalLeaderId: originalLeaderId,
+        passedToPlayerId: passedToPlayerId,
+      );
+    } else if (_playedCards.isEmpty) {
+      _game.passedHandState = PassedHandState(
+        originalLeaderId: _players[_game.leadIndex].id,
+      );
+    }
+  }
+
+  int? _parseNullableInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  int? _calculateTurnSecondsRemaining(int? deadlineAt) {
+    if (deadlineAt == null) return null;
+    final remainingMillis = deadlineAt - DateTime.now().millisecondsSinceEpoch;
+    if (remainingMillis <= 0) return 0;
+    return (remainingMillis / 1000).ceil();
+  }
+
+  void _syncTurnCountdownTimer() {
+    _turnCountdownTimer?.cancel();
+    _turnCountdownTimer = null;
+    if (!_isMultiplayerMatch || _turnDeadlineAt == null) return;
+    _turnCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final remaining = _calculateTurnSecondsRemaining(_turnDeadlineAt);
+      if (remaining == _turnSecondsRemaining) return;
+      _updateState(() {
+        _turnSecondsRemaining = remaining;
+      });
+      if (remaining == null || remaining <= 0) {
+        _turnCountdownTimer?.cancel();
+        _turnCountdownTimer = null;
+      }
+    });
   }
 
   void _syncAlVerFromMatch(Map<String, dynamic> match) {

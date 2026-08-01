@@ -39,6 +39,7 @@ class CharacterAssets {
     'Mala': 'signal_mala_eyes_closed.png',
     'Treses': 'signal_treses_kiss.png',
     'Doses': 'signal_doses_tongue.png',
+    'Ases': 'signal_ases_open_mouth.png',
   };
 
   /// Imagen neutral frontal para el jugador indicado (`p1`, `p2`, `p3`, `p4`).
