@@ -1,5 +1,335 @@
 part of 'game_screen.dart';
 
+class _TutorialPreplay {
+  final Player player;
+  final SpanishCard card;
+
+  const _TutorialPreplay({
+    required this.player,
+    required this.card,
+  });
+}
+
+class _TutorialTableScenario {
+  final String titleKey;
+  final String instructionKey;
+  final String successKey;
+  final Map<String, List<SpanishCard>> hands;
+  final int leadIndex;
+  final List<_TutorialPreplay> preplays;
+  final SpanishCard? expectedCard;
+  final String? expectedSignal;
+  final _TutorialScenarioAction expectedAction;
+  final Player? pendingTrucoCaller;
+  final int pendingTrucoValue = TrucoRules.firstTrucoValue;
+
+  const _TutorialTableScenario({
+    required this.titleKey,
+    required this.instructionKey,
+    required this.successKey,
+    required this.hands,
+    required this.leadIndex,
+    required this.preplays,
+    this.expectedCard,
+    this.expectedSignal,
+    this.expectedAction = _TutorialScenarioAction.playCard,
+    this.pendingTrucoCaller,
+  });
+}
+
+enum _TutorialScenarioAction {
+  playCard,
+  requestSignal,
+  giveSignal,
+  callTruco,
+  passTruco,
+}
+
+const _guidedTutorialScenarios = [
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario1Title',
+    instructionKey: 'guidedScenario1Instruction',
+    successKey: 'guidedScenario1Success',
+    leadIndex: 1,
+    expectedCard: SpanishCard(value: 4, suit: Suit.copas),
+    hands: {
+      'p1': [
+        SpanishCard(value: 4, suit: Suit.copas),
+        SpanishCard(value: 1, suit: Suit.espadas),
+        SpanishCard(value: 5, suit: Suit.bastos),
+      ],
+      'p2': [
+        SpanishCard(value: 3, suit: Suit.copas),
+        SpanishCard(value: 11, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.espadas),
+      ],
+      'p3': [
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.bastos),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 10, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+    },
+    preplays: [
+      _TutorialPreplay(
+        player: ZapitiPlayers.rightRival,
+        card: SpanishCard(value: 3, suit: Suit.copas),
+      ),
+      _TutorialPreplay(
+        player: ZapitiPlayers.companion,
+        card: SpanishCard(value: 7, suit: Suit.oros),
+      ),
+      _TutorialPreplay(
+        player: ZapitiPlayers.leftRival,
+        card: SpanishCard(value: 6, suit: Suit.copas),
+      ),
+    ],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario2Title',
+    instructionKey: 'guidedScenario2Instruction',
+    successKey: 'guidedScenario2Success',
+    leadIndex: 1,
+    expectedCard: SpanishCard(value: 3, suit: Suit.bastos),
+    hands: {
+      'p1': [
+        SpanishCard(value: 3, suit: Suit.bastos),
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.oros),
+      ],
+      'p2': [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+      'p3': [
+        SpanishCard(value: 11, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 1, suit: Suit.oros),
+        SpanishCard(value: 10, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+    },
+    preplays: [
+      _TutorialPreplay(
+        player: ZapitiPlayers.rightRival,
+        card: SpanishCard(value: 2, suit: Suit.copas),
+      ),
+      _TutorialPreplay(
+        player: ZapitiPlayers.companion,
+        card: SpanishCard(value: 11, suit: Suit.bastos),
+      ),
+      _TutorialPreplay(
+        player: ZapitiPlayers.leftRival,
+        card: SpanishCard(value: 1, suit: Suit.oros),
+      ),
+    ],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario3Title',
+    instructionKey: 'guidedScenario3Instruction',
+    successKey: 'guidedScenario3Success',
+    leadIndex: 1,
+    expectedCard: SpanishCard(value: 5, suit: Suit.copas),
+    hands: {
+      'p1': [
+        SpanishCard(value: 5, suit: Suit.copas),
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.bastos),
+      ],
+      'p2': [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 3, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.espadas),
+      ],
+      'p3': [
+        SpanishCard(value: 7, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+      'p4': [
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 10, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+    },
+    preplays: [
+      _TutorialPreplay(
+        player: ZapitiPlayers.rightRival,
+        card: SpanishCard(value: 4, suit: Suit.bastos),
+      ),
+      _TutorialPreplay(
+        player: ZapitiPlayers.companion,
+        card: SpanishCard(value: 7, suit: Suit.bastos),
+      ),
+      _TutorialPreplay(
+        player: ZapitiPlayers.leftRival,
+        card: SpanishCard(value: 7, suit: Suit.oros),
+      ),
+    ],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario4Title',
+    instructionKey: 'guidedScenario4Instruction',
+    successKey: 'guidedScenario4Success',
+    leadIndex: 0,
+    expectedAction: _TutorialScenarioAction.requestSignal,
+    expectedSignal: '7 Copas',
+    hands: {
+      'p1': [
+        SpanishCard(value: 3, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+      'p2': [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+      'p3': [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 11, suit: Suit.bastos),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 2, suit: Suit.oros),
+        SpanishCard(value: 10, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.copas),
+      ],
+    },
+    preplays: [],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario5Title',
+    instructionKey: 'guidedScenario5Instruction',
+    successKey: 'guidedScenario5Success',
+    leadIndex: 0,
+    expectedAction: _TutorialScenarioAction.giveSignal,
+    expectedSignal: '4 Bastos',
+    hands: {
+      'p1': [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ],
+      'p2': [
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 11, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+      'p3': [
+        SpanishCard(value: 3, suit: Suit.espadas),
+        SpanishCard(value: 10, suit: Suit.bastos),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 1, suit: Suit.copas),
+        SpanishCard(value: 10, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.copas),
+      ],
+    },
+    preplays: [],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario6Title',
+    instructionKey: 'guidedScenario6Instruction',
+    successKey: 'guidedScenario6Success',
+    leadIndex: 0,
+    expectedAction: _TutorialScenarioAction.callTruco,
+    hands: {
+      'p1': [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 3, suit: Suit.espadas),
+      ],
+      'p2': [
+        SpanishCard(value: 12, suit: Suit.copas),
+        SpanishCard(value: 6, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+      'p3': [
+        SpanishCard(value: 2, suit: Suit.oros),
+        SpanishCard(value: 11, suit: Suit.bastos),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 1, suit: Suit.copas),
+        SpanishCard(value: 10, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+    },
+    preplays: [],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario7Title',
+    instructionKey: 'guidedScenario7Instruction',
+    successKey: 'guidedScenario7Success',
+    leadIndex: 0,
+    expectedAction: _TutorialScenarioAction.callTruco,
+    hands: {
+      'p1': [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+      'p2': [
+        SpanishCard(value: 5, suit: Suit.oros),
+        SpanishCard(value: 11, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+      'p3': [
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 3, suit: Suit.bastos),
+        SpanishCard(value: 10, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 6, suit: Suit.bastos),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.copas),
+      ],
+    },
+    preplays: [],
+  ),
+  _TutorialTableScenario(
+    titleKey: 'guidedScenario8Title',
+    instructionKey: 'guidedScenario8Instruction',
+    successKey: 'guidedScenario8Success',
+    leadIndex: 0,
+    expectedAction: _TutorialScenarioAction.passTruco,
+    pendingTrucoCaller: ZapitiPlayers.rightRival,
+    hands: {
+      'p1': [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+      'p2': [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 3, suit: Suit.oros),
+      ],
+      'p3': [
+        SpanishCard(value: 11, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.espadas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ],
+      'p4': [
+        SpanishCard(value: 2, suit: Suit.oros),
+        SpanishCard(value: 1, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ],
+    },
+    preplays: [],
+  ),
+];
+
 extension _GameScreenStateFlow on _GameScreenState {
   Future<void> _loadSavedCharacterSelection() async {
     final saved = await _preferencesStore.load(
@@ -10,6 +340,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       botSpeedKey: _GameScreenState._botSpeedPrefsKey,
       showGameplayHelpKey: _GameScreenState._showGameplayHelpPrefsKey,
       confirmCardPlayKey: _GameScreenState._confirmCardPlayPrefsKey,
+      languageKey: _GameScreenState._languagePrefsKey,
     );
     if (!mounted) return;
 
@@ -29,6 +360,7 @@ extension _GameScreenStateFlow on _GameScreenState {
           orElse: () => _BotSpeed.normal,
         );
       }
+      _language = ZapitiLanguage.fromCode(saved.languageCode);
       if (saved.selectedDifficulty != null) {
         _selectedDifficulty = saved.selectedDifficulty!.clamp(1, 5);
       }
@@ -82,6 +414,120 @@ extension _GameScreenStateFlow on _GameScreenState {
     _turnDeadlineAt = null;
     _turnSecondsRemaining = null;
     _syncTurnCountdownTimer();
+  }
+
+  void _startGuidedTutorialMatch() {
+    _updateState(() {
+      _applyCharacterSelection(_selectedHumanCharacterId);
+      _isMultiplayerMatch = false;
+      _multiplayerPlayers = const [];
+      _isGuidedTutorialMatch = true;
+      _guidedTutorialCompleted = false;
+      _guidedTutorialScenarioIndex = 0;
+      _showMainMenu = false;
+      _showCharacterSelection = false;
+      _showDifficultySelection = false;
+      _showGameOptions = false;
+      _mainMenuPanel = _MainMenuPanel.home;
+      _score
+        ..[1] = 0
+        ..[2] = 0;
+      _handSummaries.clear();
+      _winningTeamId = null;
+      _loadGuidedTutorialScenario(0);
+    });
+    unawaited(_syncMusic());
+  }
+
+  void _loadGuidedTutorialScenario(int index) {
+    final scenario =
+        _guidedTutorialScenarios[index % _guidedTutorialScenarios.length];
+    _handVersion += 1;
+    _guidedTutorialCompleted = false;
+    _guidedTutorialScenarioIndex = index % _guidedTutorialScenarios.length;
+    _alVerDecisionPromptedKey = null;
+    _isAlVerDecisionDialogOpen = false;
+    for (final timer in _playerMessageTimers.values) {
+      timer.cancel();
+    }
+    _playerMessageTimers.clear();
+    _playerMessages.clear();
+    _knownSignalsByTeam.clear();
+    _teamSignalsByTeam.clear();
+    _opponentSignalsSeenByTeam.clear();
+    _forceWinRequestedPlayerIds.clear();
+    _forceHighestRequestedPlayerIds.clear();
+    _playersSignaledThisHand.clear();
+    _aiTeamsConsideredTrucoThisHand.clear();
+    _companionPrivateSignalStatus = null;
+    _isAutoPlaying = false;
+    _isWaitingHumanTrucoResponse = false;
+    _isRequestingCompanionSignal = false;
+    _companionVoyATiPromptedHandVersion = -1;
+    _turnDeadlineAt = null;
+    _turnSecondsRemaining = null;
+    _syncTurnCountdownTimer();
+
+    _game.nextLeadIndex = scenario.leadIndex;
+    _game.startNewHand(
+      fixedHands: {
+        for (final entry in scenario.hands.entries) entry.key: [...entry.value],
+      },
+    );
+    for (final preplay in scenario.preplays) {
+      _game.playCard(preplay.player, preplay.card);
+    }
+    if (scenario.pendingTrucoCaller != null) {
+      _game.callTruco(
+        scenario.pendingTrucoCaller!,
+        value: scenario.pendingTrucoValue,
+        actorPlayerId: scenario.pendingTrucoCaller!.id,
+      );
+      _isWaitingHumanTrucoResponse = true;
+      _isAutoPlaying = false;
+    }
+    _status = context.tr(scenario.instructionKey);
+  }
+
+  Future<void> _advanceGuidedTutorialAfterSuccess({
+    required bool correct,
+    String? fallbackMessage,
+  }) async {
+    final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+    _updateState(() {
+      _status = correct
+          ? context.tr(scenario.successKey)
+          : context.tr(
+              'guidedAlmost',
+              params: {
+                'message': fallbackMessage ?? context.tr(scenario.successKey),
+              },
+            );
+      _showTemporaryPlayerMessage(
+        _humanPlayer.id,
+        correct ? context.tr('guidedGoodSpeech') : context.tr('guidedAlmostSpeech'),
+        duration: const Duration(milliseconds: 900),
+      );
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted || !_isGuidedTutorialMatch) return;
+
+    final nextIndex = _guidedTutorialScenarioIndex + 1;
+    _updateState(() {
+      if (nextIndex >= _guidedTutorialScenarios.length) {
+        _status = context.tr('guidedCompleteStatus');
+        _showTemporaryPlayerMessage(
+          _humanPlayer.id,
+          context.tr('guidedCompleteSpeech'),
+          duration: const Duration(seconds: 2),
+        );
+        _isGuidedTutorialMatch = false;
+        _guidedTutorialCompleted = true;
+        _isAutoPlaying = false;
+        return;
+      }
+      _loadGuidedTutorialScenario(nextIndex);
+    });
   }
 
   void _maybeHandleAlVerDecision() {
@@ -291,11 +737,11 @@ extension _GameScreenStateFlow on _GameScreenState {
       if (socket != null && socket.isConnected && roomId != null) {
         socket.newHand(roomId: roomId, playerId: playerId);
         _updateState(() {
-          _status = 'Pidiendo nuevo reparto...';
+          _status = context.tr('onlineHandRequesting');
         });
       } else {
         _updateState(() {
-          _status = 'La nueva mano online no pudo enviarse.';
+          _status = context.tr('onlineHandSendError');
         });
       }
       return;
@@ -318,11 +764,11 @@ extension _GameScreenStateFlow on _GameScreenState {
       if (socket != null && socket.isConnected && roomId != null) {
         socket.restartGame(roomId: roomId, playerId: playerId);
         _updateState(() {
-          _status = 'Pidiendo nueva partida...';
+          _status = context.tr('onlineRestartRequesting');
         });
       } else {
         _updateState(() {
-          _status = 'El reinicio online no pudo enviarse.';
+          _status = context.tr('onlineRestartSendError');
         });
       }
       return;
@@ -366,7 +812,7 @@ extension _GameScreenStateFlow on _GameScreenState {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Salir de la partida',
+                  context.tr('exitMatchTitle'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: ZapitiColors.darkBrown,
                         fontWeight: FontWeight.w900,
@@ -376,7 +822,7 @@ extension _GameScreenStateFlow on _GameScreenState {
             ],
           ),
           content: Text(
-            '¿Seguro que quieres volver al menú? La partida actual se cerrará.',
+            context.tr('exitMatchBody'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: ZapitiColors.darkBrown,
                   fontWeight: FontWeight.w700,
@@ -386,12 +832,12 @@ extension _GameScreenStateFlow on _GameScreenState {
             TextButton.icon(
               onPressed: () => Navigator.of(dialogContext).pop(false),
               icon: const Icon(Icons.close),
-              label: const Text('CANCELAR'),
+              label: Text(context.tr('cancelUpper')),
             ),
             FilledButton.icon(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               icon: const Icon(Icons.logout),
-              label: const Text('SALIR'),
+              label: Text(context.tr('exit')),
             ),
           ],
         );
@@ -413,6 +859,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       _showMainMenu = true;
       _showCharacterSelection = false;
       _showDifficultySelection = false;
+      _isGuidedTutorialMatch = false;
+      _guidedTutorialCompleted = false;
       _showGameOptions = false;
       _mainMenuPanel = _MainMenuPanel.home;
       _isWaitingHumanTrucoResponse = false;
@@ -437,6 +885,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       _showMainMenu = true;
       _showCharacterSelection = false;
       _showDifficultySelection = false;
+      _isGuidedTutorialMatch = false;
+      _guidedTutorialCompleted = false;
       _showGameOptions = false;
       _mainMenuPanel = _MainMenuPanel.multiplayer;
       _isWaitingHumanTrucoResponse = false;
@@ -546,6 +996,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       _showMainMenu = false;
       _showCharacterSelection = true;
       _showDifficultySelection = false;
+      _isGuidedTutorialMatch = false;
+      _guidedTutorialCompleted = false;
       _mainMenuPanel = _MainMenuPanel.home;
     });
     unawaited(_syncMusic());
@@ -587,10 +1039,14 @@ extension _GameScreenStateFlow on _GameScreenState {
     );
   }
 
-  void _openMainMenuMultiplayer() {
+  Future<void> _openMainMenuMultiplayer() async {
+    if (_versionCheck.status == AppVersionCheckStatus.checking) {
+      return;
+    }
     _updateState(() {
       _mainMenuPanel = _MainMenuPanel.multiplayer;
     });
+    await _checkAppVersion();
   }
 
   void _openAboutScreen() {
@@ -609,7 +1065,7 @@ extension _GameScreenStateFlow on _GameScreenState {
         session.localGamePlayerId == null ||
         session.players.isEmpty) {
       _updateState(() {
-        _status = 'La partida todavía no está lista para entrar.';
+        _status = context.tr('matchNotReady');
       });
       return;
     }
@@ -620,6 +1076,8 @@ extension _GameScreenStateFlow on _GameScreenState {
         : _GameScreenState._defaultPlayers;
     _updateState(() {
       _isMultiplayerMatch = true;
+      _isGuidedTutorialMatch = false;
+      _guidedTutorialCompleted = false;
       _random = session.seed == null ? Random() : Random(session.seed!);
       _multiplayerPlayers = multiplayerPlayers;
       if (session.botDifficulty != null) {
@@ -669,7 +1127,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       socket.onError = (error) {
         if (!mounted) return;
         _updateState(() {
-          _status = 'Error multijugador: $error';
+          _status = context.tr('connectionLostMatch');
         });
       };
       socket.onDone = () {
@@ -959,6 +1417,13 @@ extension _GameScreenStateFlow on _GameScreenState {
     unawaited(_saveMenuOptions());
   }
 
+  void _setLanguage(ZapitiLanguage language) {
+    _updateState(() {
+      _language = language;
+    });
+    unawaited(_saveMenuOptions());
+  }
+
   void _selectDifficulty(int difficulty) {
     _updateState(() {
       _selectedDifficulty = difficulty.clamp(1, 5);
@@ -971,6 +1436,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       _showMainMenu = false;
       _showCharacterSelection = false;
       _showDifficultySelection = false;
+      _isGuidedTutorialMatch = false;
+      _guidedTutorialCompleted = false;
       _score
         ..[1] = 0
         ..[2] = 0;
@@ -1007,6 +1474,8 @@ extension _GameScreenStateFlow on _GameScreenState {
       showGameplayHelp: true,
       confirmCardPlayKey: _GameScreenState._confirmCardPlayPrefsKey,
       confirmCardPlay: _confirmCardPlay,
+      languageKey: _GameScreenState._languagePrefsKey,
+      languageCode: _language.code,
     );
   }
 }

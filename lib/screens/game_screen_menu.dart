@@ -68,6 +68,7 @@ class _MainMenuScreen extends StatelessWidget {
   final VoidCallback onMultiplayer;
   final VoidCallback onAbout;
   final VoidCallback onExit;
+  final VoidCallback onStartTableTutorial;
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
@@ -81,6 +82,9 @@ class _MainMenuScreen extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
+  final ZapitiLanguage language;
+  final ValueChanged<ZapitiLanguage> onLanguageChanged;
+  final AppVersionCheckResult versionCheck;
 
   const _MainMenuScreen({
     required this.onPlay,
@@ -89,6 +93,7 @@ class _MainMenuScreen extends StatelessWidget {
     required this.onMultiplayer,
     required this.onAbout,
     required this.onExit,
+    required this.onStartTableTutorial,
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
@@ -102,6 +107,9 @@ class _MainMenuScreen extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
+    required this.language,
+    required this.onLanguageChanged,
+    required this.versionCheck,
   });
 
   @override
@@ -134,6 +142,10 @@ class _MainMenuScreen extends StatelessWidget {
                       onBotSpeedChanged: onBotSpeedChanged,
                       confirmCardPlay: confirmCardPlay,
                       onConfirmCardPlayChanged: onConfirmCardPlayChanged,
+                      language: language,
+                      onLanguageChanged: onLanguageChanged,
+                      versionCheck: versionCheck,
+                      onStartTableTutorial: onStartTableTutorial,
                       onEnterGame: onEnterGame,
                       selectedCharacterId: selectedCharacterId,
                       onSelectedCharacterChanged: onSelectedCharacterChanged,
@@ -147,6 +159,7 @@ class _MainMenuScreen extends StatelessWidget {
                       onMultiplayer: onMultiplayer,
                       onAbout: onAbout,
                       onExit: onExit,
+                      versionCheck: versionCheck,
                     ),
             );
             final panelContent = Center(
@@ -209,6 +222,7 @@ class _MainMenuActions extends StatelessWidget {
   final VoidCallback onMultiplayer;
   final VoidCallback onAbout;
   final VoidCallback onExit;
+  final AppVersionCheckResult versionCheck;
 
   const _MainMenuActions({
     super.key,
@@ -218,6 +232,7 @@ class _MainMenuActions extends StatelessWidget {
     required this.onMultiplayer,
     required this.onAbout,
     required this.onExit,
+    required this.versionCheck,
   });
 
   @override
@@ -232,30 +247,52 @@ class _MainMenuActions extends StatelessWidget {
             min(constraints.maxWidth * 0.34, shortest < 430 ? 170.0 : 210.0);
         final centerActions = [
           ZapitiActionButton(
-            label: 'JUGAR',
+            label: context.tr('play'),
             icon: Icons.play_arrow,
             onPressed: onPlay,
             primary: true,
           ),
           ZapitiActionButton(
-            label: 'MULTIJUGADOR',
+            label: context.tr('multiplayer'),
             icon: Icons.groups_outlined,
-            onPressed: onMultiplayer,
+            onPressed: versionCheck.status == AppVersionCheckStatus.checking
+                ? null
+                : onMultiplayer,
           ),
+          if (versionCheck.status == AppVersionCheckStatus.checking)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                versionCheck.multiplayerStatusMessage,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: ZapitiColors.cardCream,
+                      fontWeight: FontWeight.w900,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black,
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+              ),
+            ),
           ZapitiActionButton(
-            label: 'SALIR',
+            label: context.tr('exit'),
             icon: Icons.logout,
             onPressed: onExit,
           ),
         ];
         final rightActions = [
           ZapitiActionButton(
-            label: 'TUTORIAL',
+            label: context.tr('tutorial'),
             icon: Icons.menu_book_outlined,
             onPressed: onTutorial,
           ),
           ZapitiActionButton(
-            label: 'OPCIONES',
+            label: context.tr('options'),
             icon: Icons.settings_outlined,
             onPressed: onOptions,
           ),
@@ -285,7 +322,7 @@ class _MainMenuActions extends StatelessWidget {
               child: verticalButtons(
                 [
                   ZapitiActionButton(
-                    label: 'ACERCA DE',
+                    label: context.tr('about'),
                     icon: Icons.badge_outlined,
                     onPressed: onAbout,
                   ),
@@ -313,6 +350,10 @@ class _MainMenuInfoPanel extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
+  final ZapitiLanguage language;
+  final ValueChanged<ZapitiLanguage> onLanguageChanged;
+  final AppVersionCheckResult versionCheck;
+  final VoidCallback onStartTableTutorial;
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
@@ -329,6 +370,10 @@ class _MainMenuInfoPanel extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
+    required this.language,
+    required this.onLanguageChanged,
+    required this.versionCheck,
+    required this.onStartTableTutorial,
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
@@ -340,9 +385,9 @@ class _MainMenuInfoPanel extends StatelessWidget {
     final isTutorial = panel == _MainMenuPanel.tutorial;
     final isMultiplayer = panel == _MainMenuPanel.multiplayer;
     final title = switch (panel) {
-      _MainMenuPanel.tutorial => 'Tutorial',
-      _MainMenuPanel.options => 'Opciones',
-      _MainMenuPanel.multiplayer => 'Multijugador',
+      _MainMenuPanel.tutorial => context.tr('tutorial'),
+      _MainMenuPanel.options => context.tr('options'),
+      _MainMenuPanel.multiplayer => context.tr('multiplayer'),
       _MainMenuPanel.home => '',
     };
     final icon = switch (panel) {
@@ -396,7 +441,7 @@ class _MainMenuInfoPanel extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Volver',
+                    tooltip: context.tr('back'),
                     onPressed: onBack,
                     icon: const Icon(Icons.close),
                     color: ZapitiColors.darkBrown,
@@ -411,7 +456,9 @@ class _MainMenuInfoPanel extends StatelessWidget {
               SizedBox(height: panelGap),
               Expanded(
                 child: isTutorial
-                    ? const _MainMenuTutorialContent()
+                    ? _MainMenuTutorialContent(
+                        onStartTableTutorial: onStartTableTutorial,
+                      )
                     : isMultiplayer
                         ? SingleChildScrollView(
                             child: SizedBox(
@@ -421,6 +468,7 @@ class _MainMenuInfoPanel extends StatelessWidget {
                                 selectedCharacterId: selectedCharacterId,
                                 onSelectedCharacterChanged:
                                     onSelectedCharacterChanged,
+                                versionCheck: versionCheck,
                               ),
                             ),
                           )
@@ -439,13 +487,16 @@ class _MainMenuInfoPanel extends StatelessWidget {
                                 confirmCardPlay: confirmCardPlay,
                                 onConfirmCardPlayChanged:
                                     onConfirmCardPlayChanged,
+                                language: language,
+                                onLanguageChanged: onLanguageChanged,
+                                onBack: onBack,
                               ),
                             ),
                           ),
               ),
               SizedBox(height: panelGap),
               ZapitiActionButton(
-                label: 'VOLVER',
+                label: context.tr('back'),
                 icon: Icons.arrow_back,
                 onPressed: onBack,
               ),
@@ -458,7 +509,11 @@ class _MainMenuInfoPanel extends StatelessWidget {
 }
 
 class _MainMenuTutorialContent extends StatefulWidget {
-  const _MainMenuTutorialContent();
+  final VoidCallback onStartTableTutorial;
+
+  const _MainMenuTutorialContent({
+    required this.onStartTableTutorial,
+  });
 
   @override
   State<_MainMenuTutorialContent> createState() =>
@@ -466,95 +521,163 @@ class _MainMenuTutorialContent extends StatefulWidget {
 }
 
 class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
+  _TutorialMode _mode = _TutorialMode.lessons;
   int _stepIndex = 0;
+  int _practiceIndex = 0;
   final Map<int, int> _selectedAnswers = {};
+  final Map<int, int> _practiceAnswers = {};
 
   static const _steps = [
     _TutorialStep(
-      title: 'Mesa por parejas',
-      body: '1. Juegas en pareja contra dos rivales.',
+      title: 'tutorialObjectiveTitle',
+      body: 'tutorialObjectiveBody',
       icon: Icons.groups_outlined,
-      prompt:
-          'Tu aliado se sienta enfrente. Si gana tu equipo, no gastes carta.',
-      options: ['Guardar fuerte', 'Tirar alta'],
+      prompt: 'tutorialObjectivePrompt',
+      options: ['tutorialObjectiveOption1', 'tutorialObjectiveOption2'],
       correctIndex: 0,
-      answer:
-          'Bien: cuando tu pareja ya domina, conservar cartas fuertes vale media partida.',
+      answer: 'tutorialObjectiveAnswer',
     ),
     _TutorialStep(
-      title: 'Tres rondas',
-      body:
-          'Cada reparto tiene hasta tres rondas. Gana quien domina las cartas jugadas.',
+      title: 'tutorialHandsTitle',
+      body: 'tutorialHandsBody',
       icon: Icons.style_outlined,
-      prompt: 'Si el rival ya ganÃ³ una ronda, la siguiente pesa mÃ¡s.',
-      options: ['Salvar ronda', 'Regalar carta'],
+      prompt: 'tutorialHandsPrompt',
+      options: ['tutorialHandsOption1', 'tutorialHandsOption2'],
       correctIndex: 0,
-      answer:
-          'Exacto: con una ronda rival, la IA intenta salvar con la mÃ­nima carta Ãºtil.',
+      answer: 'tutorialHandsAnswer',
     ),
     _TutorialStep(
-      title: 'Valor de cartas',
-      body: '4 de bastos -> 7 de copas -> 7 de oros -> as de espadas -> '
-          '3 -> 2 -> as -> 12 -> 11 -> 10 -> 7 -> 6 -> 5 -> 4.',
+      title: 'tutorialCardsTitle',
+      body: 'tutorialCardsBody',
       icon: Icons.workspace_premium_outlined,
-      prompt: 'El 4 de bastos es la carta mÃ¡xima.',
-      options: ['Verdadero', 'Falso'],
+      prompt: 'tutorialCardsPrompt',
+      options: ['tutorialCardsOption1', 'tutorialCardsOption2'],
       correctIndex: 0,
-      answer: 'SÃ­: el 4 de bastos manda sobre toda la baraja.',
+      answer: 'tutorialCardsAnswer',
     ),
     _TutorialStep(
-      title: 'Truco y puntos',
-      body:
-          'Puedes cantar truco, aceptar, pasar o subir para aumentar el valor del reparto.',
-      icon: Icons.campaign_outlined,
-      prompt: 'Si ya no puedes ganar la ronda visible, lo prudente es...',
-      options: ['Pasar', 'Aceptar'],
-      correctIndex: 0,
-      answer:
-          'Eso es: aceptar sin opciones reales solo regala chinos al rival.',
-    ),
-    _TutorialStep(
-      title: 'SeÃ±as',
-      body:
-          'Pide seÃ±a a tu pareja o usa las tuyas para comunicar cartas fuertes.',
-      icon: Icons.visibility_outlined,
-      prompt: 'Una seÃ±a fuerte ayuda a decidir carta y truco.',
-      options: ['Pedir seÃ±a', 'Ignorar'],
-      correctIndex: 0,
-      answer: 'Buena lectura: la seÃ±a cambia cuÃ¡nto arriesga tu equipo.',
-    ),
-    _TutorialStep(
-      title: 'Voy a ti',
-      body:
-          'Sirve para pedir a tu pareja que intente ganar, pero sin quemar carta inÃºtil.',
-      icon: Icons.record_voice_over_outlined,
-      prompt: 'Si tu pareja no puede ganar la mesa, deberÃ­a...',
-      options: ['Tirar menor', 'Tirar mayor'],
-      correctIndex: 0,
-      answer:
-          'Correcto: si no puede ganar, guarda fuerza para la siguiente ronda.',
-    ),
-    _TutorialStep(
-      title: 'Faroles',
-      body:
-          'La IA puede cantar o subir con historia de mesa, presiÃ³n o cartas rivales gastadas.',
-      icon: Icons.theater_comedy_outlined,
-      prompt: 'Un farol funciona mejor cuando...',
-      options: ['Hay contexto', 'No hay nada'],
-      correctIndex: 0,
-      answer:
-          'SÃ­: una carta fuerte ya gastada o marcador en contra hace creÃ­ble el farol.',
-    ),
-    _TutorialStep(
-      title: 'Dificultad',
-      body:
-          'Cada nivel cambia errores, lectura de seÃ±as, paciencia y agresividad con el truco.',
+      title: 'tutorialFinePlayTitle',
+      body: 'tutorialFinePlayBody',
       icon: Icons.psychology_alt_outlined,
-      prompt: 'En experto la IA...',
-      options: ['Lee mejor', 'Acepta todo'],
+      prompt: 'tutorialFinePlayPrompt',
+      options: ['tutorialFinePlayOption1', 'tutorialFinePlayOption2'],
       correctIndex: 0,
-      answer:
-          'Exacto: en niveles altos lee mesa y seÃ±ales antes de comprometer chinos.',
+      answer: 'tutorialFinePlayAnswer',
+    ),
+    _TutorialStep(
+      title: 'tutorialTrucoTitle',
+      body: 'tutorialTrucoBody',
+      icon: Icons.campaign_outlined,
+      prompt: 'tutorialTrucoPrompt',
+      options: ['tutorialTrucoOption1', 'tutorialTrucoOption2'],
+      correctIndex: 0,
+      answer: 'tutorialTrucoAnswer',
+    ),
+    _TutorialStep(
+      title: 'tutorialSignalsTitle',
+      body: 'tutorialSignalsBody',
+      icon: Icons.visibility_outlined,
+      prompt: 'tutorialSignalsPrompt',
+      options: ['tutorialSignalsOption1', 'tutorialSignalsOption2'],
+      correctIndex: 0,
+      answer: 'tutorialSignalsAnswer',
+    ),
+    _TutorialStep(
+      title: 'tutorialVoyMataTitle',
+      body: 'tutorialVoyMataBody',
+      icon: Icons.record_voice_over_outlined,
+      prompt: 'tutorialVoyMataPrompt',
+      options: ['tutorialVoyMataOption1', 'tutorialVoyMataOption2'],
+      correctIndex: 0,
+      answer: 'tutorialVoyMataAnswer',
+    ),
+    _TutorialStep(
+      title: 'tutorialAlVerTitle',
+      body: 'tutorialAlVerBody',
+      icon: Icons.flag_outlined,
+      prompt: 'tutorialAlVerPrompt',
+      options: ['tutorialAlVerOption1', 'tutorialAlVerOption2'],
+      correctIndex: 0,
+      answer: 'tutorialAlVerAnswer',
+    ),
+  ];
+
+  static const _practiceChallenges = [
+    _PracticeChallenge(
+      title: 'practiceSaveStrongTitle',
+      situation: 'practiceSaveStrongSituation',
+      icon: Icons.savings_outlined,
+      tableCards: [
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 3, suit: Suit.copas),
+      ],
+      handCards: [
+        SpanishCard(value: 4, suit: Suit.copas),
+        SpanishCard(value: 1, suit: Suit.espadas),
+      ],
+      options: ['practiceSaveStrongOption1', 'practiceSaveStrongOption2'],
+      correctIndex: 0,
+      feedback: 'practiceSaveStrongFeedback',
+    ),
+    _PracticeChallenge(
+      title: 'practiceSaveRoundTitle',
+      situation: 'practiceSaveRoundSituation',
+      icon: Icons.shield_outlined,
+      tableCards: [
+        SpanishCard(value: 2, suit: Suit.copas),
+      ],
+      handCards: [
+        SpanishCard(value: 3, suit: Suit.bastos),
+        SpanishCard(value: 7, suit: Suit.copas),
+      ],
+      options: ['practiceSaveRoundOption1', 'practiceSaveRoundOption2'],
+      correctIndex: 0,
+      feedback: 'practiceSaveRoundFeedback',
+    ),
+    _PracticeChallenge(
+      title: 'practiceBadTrucoTitle',
+      situation: 'practiceBadTrucoSituation',
+      icon: Icons.campaign_outlined,
+      tableCards: [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.oros),
+      ],
+      handCards: [
+        SpanishCard(value: 12, suit: Suit.copas),
+        SpanishCard(value: 6, suit: Suit.bastos),
+      ],
+      options: ['practiceBadTrucoOption1', 'practiceBadTrucoOption2'],
+      correctIndex: 0,
+      feedback: 'practiceBadTrucoFeedback',
+    ),
+    _PracticeChallenge(
+      title: 'practiceReadSignalTitle',
+      situation: 'practiceReadSignalSituation',
+      icon: Icons.visibility_outlined,
+      tableCards: [
+        SpanishCard(value: 6, suit: Suit.espadas),
+      ],
+      handCards: [
+        SpanishCard(value: 4, suit: Suit.oros),
+        SpanishCard(value: 1, suit: Suit.bastos),
+      ],
+      options: ['practiceReadSignalOption1', 'practiceReadSignalOption2'],
+      correctIndex: 0,
+      feedback: 'practiceReadSignalFeedback',
+    ),
+    _PracticeChallenge(
+      title: 'practiceAlVerTitle',
+      situation: 'practiceAlVerSituation',
+      icon: Icons.flag_outlined,
+      tableCards: [],
+      handCards: [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.espadas),
+      ],
+      options: ['practiceAlVerOption1', 'practiceAlVerOption2'],
+      correctIndex: 0,
+      feedback: 'practiceAlVerFeedback',
     ),
   ];
 
@@ -568,6 +691,53 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
     setState(() {
       _stepIndex = (_stepIndex + 1) % _steps.length;
     });
+  }
+
+  void _previousPractice() {
+    setState(() {
+      _practiceIndex =
+          (_practiceIndex - 1 + _practiceChallenges.length) %
+              _practiceChallenges.length;
+    });
+  }
+
+  void _nextPractice() {
+    setState(() {
+      _practiceIndex = (_practiceIndex + 1) % _practiceChallenges.length;
+    });
+  }
+
+  Widget _modeSelector(bool compact) {
+    return SegmentedButton<_TutorialMode>(
+      segments: [
+        ButtonSegment(
+          value: _TutorialMode.lessons,
+          icon: const Icon(Icons.menu_book_outlined),
+          label: Text(context.tr('tutorialLessons')),
+        ),
+        ButtonSegment(
+          value: _TutorialMode.practice,
+          icon: const Icon(Icons.touch_app_outlined),
+          label: Text(context.tr('tutorialPracticeTab')),
+        ),
+      ],
+      selected: {_mode},
+      onSelectionChanged: (selected) {
+        setState(() {
+          _mode = selected.first;
+        });
+      },
+      showSelectedIcon: false,
+      style: ButtonStyle(
+        visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+        textStyle: WidgetStatePropertyAll(
+          TextStyle(
+            fontSize: compact ? 10 : 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -590,22 +760,176 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
             ? constraints.maxHeight
             : shortest * 0.62;
         final compact = maxHeight < 300;
-        final showPrompt = maxHeight >= 430 && step.prompt != null;
+        final modeSelectorHeight = compact ? 36.0 : 46.0;
+        final contentHeight = max(0.0, maxHeight - modeSelectorHeight);
+        final showPrompt = contentHeight >= 390 && step.prompt != null;
         final visualHeight = max(
-          compact ? 110.0 : 150.0,
-          min(maxHeight * (showPrompt ? 0.42 : 0.62),
-              showPrompt ? 210.0 : 260.0),
+          compact ? 96.0 : 128.0,
+          min(
+            contentHeight * (showPrompt ? 0.34 : 0.50),
+            showPrompt ? 180.0 : 220.0,
+          ),
         );
         final cardWidth = min(
           shortest * 0.22,
           min(visualHeight * 0.74, 110.0),
         );
-        final bodyMaxLines = compact ? 1 : 2;
+        final bodyMaxLines = compact ? 1 : (contentHeight < 430 ? 2 : 3);
         final selectedAnswer = _selectedAnswers[_stepIndex];
+
+        if (_mode == _TutorialMode.practice) {
+          final challenge = _practiceChallenges[_practiceIndex];
+          final selectedPracticeAnswer = _practiceAnswers[_practiceIndex];
+          final answerIsCorrect =
+              selectedPracticeAnswer == challenge.correctIndex;
+          final showPracticePrompt = contentHeight >= 330;
+          final practiceVisualHeight = max(
+            compact ? 82.0 : 96.0,
+            min(contentHeight * 0.30, 124.0),
+          );
+
+          return Column(
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              _modeSelector(compact),
+              SizedBox(height: compact ? 4 : 8),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: ZapitiColors.oldGold.withValues(alpha: 0.72),
+                  ),
+                ),
+                child: SizedBox(
+                  height: practiceVisualHeight,
+                  width: double.infinity,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: _PracticeVisual(
+                      key: ValueKey(_practiceIndex),
+                      challenge: challenge,
+                      cardWidth: cardWidth,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: compact ? 3 : 10),
+              Row(
+                children: [
+                  Icon(
+                    challenge.icon,
+                    color: ZapitiColors.wineRed,
+                    size: compact ? 18 : 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      context.tr(challenge.title),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: titleStyle,
+                    ),
+                  ),
+                  SizedBox(
+                    width: compact ? 76 : 94,
+                    height: compact ? 28 : 32,
+                    child: ZapitiActionButton(
+                      label: context.tr('tutorialTableUpper'),
+                      icon: Icons.table_bar_outlined,
+                      onPressed: widget.onStartTableTutorial,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: compact ? 1 : 5),
+              Expanded(
+                child: Text(
+                  context.tr(challenge.situation),
+                  maxLines: bodyMaxLines,
+                  overflow: TextOverflow.ellipsis,
+                  style: bodyStyle,
+                ),
+              ),
+              if (showPracticePrompt) ...[
+                SizedBox(height: compact ? 2 : 6),
+                _PracticeDecisionPrompt(
+                  challenge: challenge,
+                  selectedIndex: selectedPracticeAnswer,
+                  onSelected: (index) {
+                    setState(() {
+                      _practiceAnswers[_practiceIndex] = index;
+                    });
+                  },
+                ),
+              ],
+              SizedBox(height: compact ? 6 : 10),
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Anterior',
+                    onPressed: _previousPractice,
+                    icon: const Icon(Icons.chevron_left),
+                    color: ZapitiColors.darkBrown,
+                    constraints: BoxConstraints.tightFor(
+                      width: compact ? 30 : 44,
+                      height: compact ? 26 : 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (var index = 0;
+                            index < _practiceChallenges.length;
+                            index++)
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: index == _practiceIndex
+                                ? (compact ? 15 : 18)
+                                : (compact ? 6 : 8),
+                            height: compact ? 6 : 8,
+                            margin: EdgeInsets.symmetric(
+                              horizontal: compact ? 2 : 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: index == _practiceIndex
+                                  ? (selectedPracticeAnswer == null
+                                      ? ZapitiColors.wineRed
+                                      : answerIsCorrect
+                                          ? ZapitiColors.tableGreenDark
+                                          : ZapitiColors.wineRed)
+                                  : ZapitiColors.darkBrown
+                                      .withValues(alpha: 0.24),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Siguiente',
+                    onPressed: _nextPractice,
+                    icon: const Icon(Icons.chevron_right),
+                    color: ZapitiColors.darkBrown,
+                    constraints: BoxConstraints.tightFor(
+                      width: compact ? 30 : 44,
+                      height: compact ? 26 : 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
 
         return Column(
           mainAxisSize: MainAxisSize.max,
           children: [
+            _modeSelector(compact),
+            SizedBox(height: compact ? 4 : 8),
             DecoratedBox(
               decoration: BoxDecoration(
                 color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
@@ -638,7 +962,7 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    step.title,
+                    context.tr(step.title),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: titleStyle,
@@ -649,7 +973,7 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
             SizedBox(height: compact ? 1 : 5),
             Expanded(
               child: Text(
-                step.body,
+                context.tr(step.body),
                 maxLines: bodyMaxLines,
                 overflow: TextOverflow.ellipsis,
                 style: bodyStyle,
@@ -746,6 +1070,122 @@ class _TutorialStep {
   });
 }
 
+enum _TutorialMode { lessons, practice }
+
+class _PracticeChallenge {
+  final String title;
+  final String situation;
+  final IconData icon;
+  final List<SpanishCard> tableCards;
+  final List<SpanishCard> handCards;
+  final List<String> options;
+  final int correctIndex;
+  final String feedback;
+
+  const _PracticeChallenge({
+    required this.title,
+    required this.situation,
+    required this.icon,
+    required this.tableCards,
+    required this.handCards,
+    required this.options,
+    required this.correctIndex,
+    required this.feedback,
+  });
+}
+
+class _PracticeDecisionPrompt extends StatelessWidget {
+  final _PracticeChallenge challenge;
+  final int? selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _PracticeDecisionPrompt({
+    required this.challenge,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final answerIsCorrect = selectedIndex == challenge.correctIndex;
+    final bodyStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              context.tr('chooseBestMove'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: bodyStyle,
+            ),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (var index = 0; index < challenge.options.length; index++)
+                  ChoiceChip(
+                    label: Text(context.tr(challenge.options[index])),
+                    selected: selectedIndex == index,
+                    onSelected: (_) => onSelected(index),
+                    selectedColor:
+                        answerIsCorrect ? ZapitiColors.oldGold : Colors.white,
+                    backgroundColor: ZapitiColors.cardCream,
+                    labelStyle: TextStyle(
+                      color: selectedIndex == index
+                          ? ZapitiColors.darkBrown
+                          : ZapitiColors.darkBrown.withValues(alpha: 0.72),
+                      fontWeight: FontWeight.w900,
+                    ),
+                    side: BorderSide(
+                      color: selectedIndex == index
+                          ? ZapitiColors.wineRed
+                          : ZapitiColors.darkBrown.withValues(alpha: 0.12),
+                    ),
+                  ),
+              ],
+            ),
+            if (selectedIndex != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                answerIsCorrect
+                    ? context.tr(challenge.feedback)
+                    : context.tr(
+                        'guidedAlmost',
+                        params: {'message': context.tr(challenge.feedback)},
+                      ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: bodyStyle?.copyWith(
+                  color: answerIsCorrect
+                      ? ZapitiColors.tableGreenDark
+                      : ZapitiColors.wineRed,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TutorialDecisionPrompt extends StatelessWidget {
   final _TutorialStep step;
   final int? selectedIndex;
@@ -781,8 +1221,8 @@ class _TutorialDecisionPrompt extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              step.prompt!,
-              maxLines: 1,
+              context.tr(step.prompt!),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: bodyStyle,
             ),
@@ -793,7 +1233,7 @@ class _TutorialDecisionPrompt extends StatelessWidget {
               children: [
                 for (var index = 0; index < step.options.length; index++)
                   ChoiceChip(
-                    label: Text(step.options[index]),
+                    label: Text(context.tr(step.options[index])),
                     selected: selectedIndex == index,
                     onSelected: (_) => onSelected(index),
                     selectedColor:
@@ -816,7 +1256,12 @@ class _TutorialDecisionPrompt extends StatelessWidget {
             if (selectedIndex != null && step.answer != null) ...[
               const SizedBox(height: 4),
               Text(
-                answerIsCorrect ? step.answer! : 'Casi: ${step.answer!}',
+                answerIsCorrect
+                    ? context.tr(step.answer!)
+                    : context.tr(
+                        'guidedAlmost',
+                        params: {'message': context.tr(step.answer!)},
+                      ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: bodyStyle?.copyWith(
@@ -826,6 +1271,97 @@ class _TutorialDecisionPrompt extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PracticeVisual extends StatelessWidget {
+  final _PracticeChallenge challenge;
+  final double cardWidth;
+
+  const _PracticeVisual({
+    super.key,
+    required this.challenge,
+    required this.cardWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.cardCream,
+          fontWeight: FontWeight.w900,
+        );
+    final tableCards = challenge.tableCards;
+    final handCards = challenge.handCards;
+
+    Widget cardRow(List<SpanishCard> cards, String emptyLabel) {
+      if (cards.isEmpty) {
+        return Container(
+          width: cardWidth * 1.45,
+          height: cardWidth * 1.25,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: ZapitiColors.darkBrown.withValues(alpha: 0.20),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: ZapitiColors.oldGold.withValues(alpha: 0.38),
+            ),
+          ),
+          child: Text(
+            emptyLabel,
+            textAlign: TextAlign.center,
+            style: labelStyle,
+          ),
+        );
+      }
+
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var index = 0; index < cards.length; index++) ...[
+            ZapitiCardWidget(
+              card: cards[index],
+              width: cardWidth * (cards.length > 2 ? 0.82 : 0.92),
+            ),
+            if (index != cards.length - 1) SizedBox(width: cardWidth * 0.08),
+          ],
+        ],
+      );
+    }
+
+    return Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(context.tr('table'), style: labelStyle),
+                const SizedBox(height: 5),
+                cardRow(tableCards, context.tr('noCards')),
+              ],
+            ),
+            SizedBox(width: cardWidth * 0.34),
+            Icon(
+              challenge.icon,
+              color: ZapitiColors.oldGold,
+              size: cardWidth * 0.72,
+            ),
+            SizedBox(width: cardWidth * 0.34),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(context.tr('yourHand'), style: labelStyle),
+                const SizedBox(height: 5),
+                cardRow(handCards, context.tr('decide')),
+              ],
+            ),
           ],
         ),
       ),
@@ -852,8 +1388,11 @@ class _TutorialVisual extends StatelessWidget {
           0 => _TutorialTeamsVisual(cardWidth: cardWidth),
           1 => _TutorialRoundsVisual(cardWidth: cardWidth),
           2 => _TutorialCardValueVisual(cardWidth: cardWidth),
-          3 => _TutorialTrucoVisual(cardWidth: cardWidth),
-          _ => _TutorialSignalsVisual(cardWidth: cardWidth),
+          3 => _TutorialSmartPlayVisual(cardWidth: cardWidth),
+          4 => _TutorialTrucoVisual(cardWidth: cardWidth),
+          5 => _TutorialSignalsVisual(cardWidth: cardWidth),
+          6 => _TutorialCommandVisual(cardWidth: cardWidth),
+          _ => _TutorialAlVerVisual(cardWidth: cardWidth),
         },
       ),
     );
@@ -948,7 +1487,7 @@ class _TutorialTrucoVisual extends StatelessWidget {
             border: Border.all(color: ZapitiColors.oldGold, width: 2),
           ),
           child: Text(
-            'TRUCO',
+            context.tr('trucoUpper'),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: ZapitiColors.cardCream,
                   fontWeight: FontWeight.w900,
@@ -958,6 +1497,55 @@ class _TutorialTrucoVisual extends StatelessWidget {
         SizedBox(width: cardWidth * 0.25),
         Icon(Icons.arrow_upward,
             color: ZapitiColors.oldGold, size: cardWidth * 0.72),
+      ],
+    );
+  }
+}
+
+class _TutorialSmartPlayVisual extends StatelessWidget {
+  final double cardWidth;
+
+  const _TutorialSmartPlayVisual({required this.cardWidth});
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.cardCream,
+          fontWeight: FontWeight.w900,
+        );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.tr('partnerWins'), style: labelStyle),
+            const SizedBox(height: 4),
+            ZapitiCardWidget(
+              card: const SpanishCard(value: 7, suit: Suit.oros),
+              width: cardWidth,
+            ),
+          ],
+        ),
+        SizedBox(width: cardWidth * 0.28),
+        Icon(
+          Icons.keyboard_double_arrow_right,
+          color: ZapitiColors.oldGold,
+          size: cardWidth * 0.72,
+        ),
+        SizedBox(width: cardWidth * 0.28),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.tr('playLow'), style: labelStyle),
+            const SizedBox(height: 4),
+            ZapitiCardWidget(
+              card: const SpanishCard(value: 4, suit: Suit.copas),
+              width: cardWidth,
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -1011,7 +1599,7 @@ class _TutorialCardValueVisual extends StatelessWidget {
           ),
         ),
         SizedBox(height: cardWidth * 0.18),
-        Text('Orden principal', style: labelStyle),
+        Text(context.tr('mainOrder'), style: labelStyle),
         SizedBox(height: cardWidth * 0.12),
         Container(
           padding: EdgeInsets.symmetric(
@@ -1026,11 +1614,102 @@ class _TutorialCardValueVisual extends StatelessWidget {
             ),
           ),
           child: Text(
-            'Luego: 12 > 11 > 10 > 6 > 5 > 4',
+            context.tr('thenCardOrder'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: labelStyle,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TutorialCommandVisual extends StatelessWidget {
+  final double cardWidth;
+
+  const _TutorialCommandVisual({required this.cardWidth});
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: ZapitiColors.cardCream,
+          fontWeight: FontWeight.w900,
+        );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _TutorialAvatar(
+          path: CharacterAssets.neutral('p1'),
+          size: cardWidth * 1.45,
+        ),
+        SizedBox(width: cardWidth * 0.22),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: cardWidth * 0.22,
+            vertical: cardWidth * 0.14,
+          ),
+          decoration: BoxDecoration(
+            color: ZapitiColors.wineRed,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: ZapitiColors.oldGold, width: 2),
+          ),
+          child: Text(context.tr('voyATiUpper'), style: labelStyle),
+        ),
+        SizedBox(width: cardWidth * 0.22),
+        _TutorialAvatar(
+          path: CharacterAssets.neutral('p3'),
+          size: cardWidth * 1.45,
+        ),
+      ],
+    );
+  }
+}
+
+class _TutorialAlVerVisual extends StatelessWidget {
+  final double cardWidth;
+
+  const _TutorialAlVerVisual({required this.cardWidth});
+
+  @override
+  Widget build(BuildContext context) {
+    final scoreStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: ZapitiColors.cardCream,
+          fontWeight: FontWeight.w900,
+        );
+    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.oldGold,
+          fontWeight: FontWeight.w900,
+        );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('29', style: scoreStyle),
+            Text(context.tr('alVerShort'), style: labelStyle),
+          ],
+        ),
+        SizedBox(width: cardWidth * 0.25),
+        Icon(
+          Icons.visibility_outlined,
+          color: ZapitiColors.oldGold,
+          size: cardWidth * 0.76,
+        ),
+        SizedBox(width: cardWidth * 0.25),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ZapitiCardWidget(
+              card: const SpanishCard(value: 5, suit: Suit.copas),
+              width: cardWidth * 0.86,
+            ),
+            const SizedBox(height: 4),
+            Text(context.tr('playOrHome'), style: labelStyle),
+          ],
         ),
       ],
     );
@@ -1109,11 +1788,13 @@ class _MainMenuMultiplayerContent extends StatefulWidget {
   final VoidCallback onEnterGame;
   final String selectedCharacterId;
   final ValueChanged<String> onSelectedCharacterChanged;
+  final AppVersionCheckResult versionCheck;
 
   const _MainMenuMultiplayerContent({
     required this.onEnterGame,
     required this.selectedCharacterId,
     required this.onSelectedCharacterChanged,
+    required this.versionCheck,
   });
 
   @override
@@ -1127,10 +1808,7 @@ class _MainMenuMultiplayerContentState
   static const _maxUsernameLength = 24;
   static const _maxTeamNameLength = 22;
 
-  final TextEditingController _serverController =
-      TextEditingController(text: ServerConfig.websocketUrl);
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Jugador');
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _teamNameController = TextEditingController();
@@ -1148,7 +1826,7 @@ class _MainMenuMultiplayerContentState
   bool _sessionStarted = false;
   bool _autoEnterQueued = false;
   _ServerConnectionState _connectionState = _ServerConnectionState.idle;
-  String _status = 'Prepara una sala para conectar a amigos.';
+  String _status = '';
   bool _ready = false;
   bool _profileReady = false;
   bool _showCreateAccount = false;
@@ -1160,7 +1838,7 @@ class _MainMenuMultiplayerContentState
   String? _pendingRoomAction;
   bool _roomActionRetriedWithoutCharacter = false;
   bool _roomActionRetriedWithoutSession = false;
-  String _profileStatus = 'Configura tu perfil multijugador.';
+  String _profileStatus = '';
   late String _selectedCharacterId;
   String? _confirmedCharacterId;
   bool _characterSelectionReleased = false;
@@ -1174,6 +1852,11 @@ class _MainMenuMultiplayerContentState
   String? _selectedPairId;
   bool _teamsLoaded = false;
   bool _rankingRequested = false;
+  bool _didInitializeLocalizedTexts = false;
+
+  String _tr(String key, {Map<String, Object?> params = const {}}) {
+    return context.tr(key, params: params);
+  }
 
   @override
   void initState() {
@@ -1192,7 +1875,7 @@ class _MainMenuMultiplayerContentState
       }
       _sessionStarted = session.roomSnapshot?.phase != 'lobby';
       _connectionState = _ServerConnectionState.connected;
-      _status = 'Conectado a la sala.';
+      _status = _tr('multiplayerConnectedToRoom');
 
       final mySeat = session.roomSnapshot?.seats.firstWhere(
         (seat) => seat.playerId == session.localGamePlayerId,
@@ -1211,14 +1894,24 @@ class _MainMenuMultiplayerContentState
 
       _socket!.onMessage = _handleSocketMessage;
       _socket!.onError = (error) {
-        _clearSessionAfterConnectionLoss('Error de conexiÃ³n: $error');
+        _clearSessionAfterConnectionLoss(_tr('multiplayerConnectionLost'));
       };
       _socket!.onDone = () {
-        _clearSessionAfterConnectionLoss('Servidor desconectado.');
+        _clearSessionAfterConnectionLoss(_tr('multiplayerConnectionLost'));
       };
     } else {
       unawaited(_loadSavedPlayerProfile());
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didInitializeLocalizedTexts) return;
+    _didInitializeLocalizedTexts = true;
+    _nameController.text = _tr('defaultPlayerName');
+    _status = _tr('multiplayerReadyToConnect');
+    _profileStatus = _tr('multiplayerProfileSetup');
   }
 
   @override
@@ -1236,7 +1929,6 @@ class _MainMenuMultiplayerContentState
     if (!_keepSocketAliveOnDispose) {
       _closeSocketIntentionally();
     }
-    _serverController.dispose();
     _nameController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -1353,8 +2045,8 @@ class _MainMenuMultiplayerContentState
       setState(() {
         _profileReady = _sessionToken != null && _sessionToken!.isNotEmpty;
         _profileStatus = _profileReady
-            ? 'Sesion activa. Puedes entrar a salas.'
-            : 'Inicia sesion para recuperar tus datos.';
+            ? _tr('multiplayerProfileActive')
+            : _tr('multiplayerProfileRecover');
       });
     }
   }
@@ -1419,14 +2111,7 @@ class _MainMenuMultiplayerContentState
     return 'player_${DateTime.now().microsecondsSinceEpoch}_$randomValue';
   }
 
-  bool get _serverUrlIsEditable => ServerConfig.useLocalServer;
-
-  String get _serverUrl {
-    if (_serverUrlIsEditable) {
-      return _serverController.text.trim();
-    }
-    return ServerConfig.websocketUrl;
-  }
+  String get _serverUrl => ServerConfig.websocketUrl;
 
   String get _localPlayerId =>
       _playerId ??= _createPersistentPlayerId();
@@ -1503,6 +2188,15 @@ class _MainMenuMultiplayerContentState
     };
   }
 
+  String _phaseLabel(String phase) {
+    return switch (phase) {
+      'starting' => _tr('multiplayerPhaseStarting'),
+      'playing' => _tr('multiplayerPhasePlaying'),
+      'finished' => _tr('multiplayerPhaseFinished'),
+      _ => _tr('multiplayerPhaseOpen'),
+    };
+  }
+
   void _syncSelectedCharacterFromRoom() {
     final snapshot = _roomSnapshot;
     if (snapshot == null) return;
@@ -1547,8 +2241,12 @@ class _MainMenuMultiplayerContentState
   void _selectCharacter(String characterId) {
     if (_occupiedCharacterIdsByOtherPlayers().contains(characterId)) {
       setState(() {
-        _status =
-            '${CharacterAssets.displayNames[characterId] ?? characterId} ya esta ocupado.';
+        _status = _tr(
+          'multiplayerCharacterOccupied',
+          params: {
+            'name': CharacterAssets.displayNames[characterId] ?? characterId,
+          },
+        );
       });
       return;
     }
@@ -1575,7 +2273,7 @@ class _MainMenuMultiplayerContentState
         _confirmedCharacterId = null;
         _teamPromptConfirmedCharacterId = null;
         _teamPromptDismissedCharacterId = null;
-        _status = 'Personaje liberado para la proxima sala.';
+        _status = _tr('multiplayerCharacterReleasedNextRoom');
       });
       return;
     }
@@ -1587,11 +2285,11 @@ class _MainMenuMultiplayerContentState
         _confirmedCharacterId = null;
         _teamPromptConfirmedCharacterId = null;
         _teamPromptDismissedCharacterId = null;
-        _status = 'Personaje liberado. Esperando sincronizacion...';
+        _status = _tr('multiplayerCharacterReleasedWaitingSync');
       });
     } catch (error) {
       setState(() {
-        _status = 'No se pudo liberar el personaje: $error';
+        _status = _tr('multiplayerCharacterReleaseFailed');
       });
     }
   }
@@ -1614,12 +2312,16 @@ class _MainMenuMultiplayerContentState
         characterId: characterId,
       );
       setState(() {
-        _status =
-            'Personaje enviado: ${CharacterAssets.displayNames[characterId] ?? characterId}.';
+        _status = _tr(
+          'multiplayerCharacterSent',
+          params: {
+            'name': CharacterAssets.displayNames[characterId] ?? characterId,
+          },
+        );
       });
     } catch (error) {
       setState(() {
-        _status = 'No se pudo enviar el personaje: $error';
+        _status = _tr('multiplayerCharacterSendFailed');
       });
     }
   }
@@ -1653,7 +2355,7 @@ class _MainMenuMultiplayerContentState
     if (serverUrl.isEmpty) {
       _setConnectionState(
         _ServerConnectionState.error,
-        status: 'Escribe la direcciÃ³n del servidor.',
+        status: _tr('multiplayerConnectionPrepareFailed'),
       );
       return false;
     }
@@ -1668,13 +2370,13 @@ class _MainMenuMultiplayerContentState
       _ServerConnectionState.reconnecting,
     ];
     final attemptStatuses = [
-      'Conectando al servidor...',
+      _tr('multiplayerConnectingToMatch'),
       if (ServerConfig.useLocalServer)
-        'Reconectando...'
+        _tr('multiplayerRecoveringConnection')
       else
-        'El servidor gratuito estÃ¡ arrancando. Esto puede tardar unos segundos...',
-      'Reconectando...',
-      'Reconectando...',
+        _tr('multiplayerPreparingService'),
+      _tr('multiplayerRecoveringConnection'),
+      _tr('multiplayerRecoveringConnection'),
     ];
     const attemptDelays = [
       Duration.zero,
@@ -1689,7 +2391,6 @@ class _MainMenuMultiplayerContentState
     _socket = null;
     previousSocket?.close();
 
-    Object? lastError;
     for (var attempt = 0; attempt < attemptDelays.length; attempt++) {
       if (!mounted || generation != _connectionGeneration) {
         return false;
@@ -1712,11 +2413,11 @@ class _MainMenuMultiplayerContentState
       nextSocket.onMessage = _handleSocketMessage;
       nextSocket.onError = (error) {
         if (!mounted || generation != _connectionGeneration) return;
-        _handleSocketDropped('Error de conexiÃ³n: $error');
+        _handleSocketDropped(_tr('multiplayerConnectionLost'));
       };
       nextSocket.onDone = () {
         if (!mounted || generation != _connectionGeneration) return;
-        _handleSocketDropped('ConexiÃ³n cerrada.');
+        _handleSocketDropped(_tr('multiplayerConnectionLost'));
       };
 
       try {
@@ -1730,12 +2431,11 @@ class _MainMenuMultiplayerContentState
         _setConnectionState(
           _ServerConnectionState.connected,
           status: fromConnectionLoss
-              ? 'Conectado al servidor.'
-              : 'Conectado al servidor. Esperando respuesta de la sala...',
+              ? _tr('multiplayerConnectedToMatch')
+              : _tr('multiplayerConnectedWaitingRoom'),
         );
         return true;
-      } catch (error) {
-        lastError = error;
+      } catch (_) {
         nextSocket.close();
         if (attempt == attemptDelays.length - 1) {
           break;
@@ -1749,9 +2449,7 @@ class _MainMenuMultiplayerContentState
 
     _setConnectionState(
       _ServerConnectionState.error,
-      status: lastError == null
-          ? 'No se pudo conectar al servidor.'
-          : 'No se pudo conectar al servidor: $lastError',
+      status: _tr('multiplayerCouldNotConnect'),
     );
     return false;
   }
@@ -1761,7 +2459,7 @@ class _MainMenuMultiplayerContentState
     if (hadSession) {
       _setConnectionState(
         _ServerConnectionState.reconnecting,
-        status: 'La conexiÃ³n se ha cerrado. Reintentando...',
+        status: _tr('multiplayerConnectionLost'),
       );
       unawaited(_recoverAfterConnectionLoss());
       return;
@@ -1776,13 +2474,13 @@ class _MainMenuMultiplayerContentState
 
     if (!reconnected) {
       _clearSessionAfterConnectionLoss(
-        'No se pudo reconectar al servidor. La partida anterior no se puede recuperar.',
+        _tr('multiplayerCouldNotRecoverConnection'),
       );
       return;
     }
 
     _clearSessionAfterConnectionLoss(
-      'ConexiÃ³n restablecida. La partida anterior no se puede recuperar. Vuelve a crear o unirte de nuevo.',
+      _tr('multiplayerConnectionRestored'),
       preserveSocket: true,
       connectionState: _ServerConnectionState.connected,
     );
@@ -1818,9 +2516,9 @@ class _MainMenuMultiplayerContentState
           _sessionStarted = snapshot.phase != 'lobby';
           _connectionState = _ServerConnectionState.connected;
           _status = switch (snapshot.phase) {
-            'starting' => 'Todos listos. La partida estÃ¡ arrancando.',
-            'playing' => 'Partida en curso.',
-            _ => 'Sala ${snapshot.roomId} sincronizada.',
+            'starting' => _tr('multiplayerReadyToStart'),
+            'playing' => _tr('multiplayerPhasePlaying'),
+            _ => _tr('roomWithPhase', params: {'room': snapshot.roomId, 'phase': _phaseLabel(snapshot.phase)}),
           };
         });
         MultiplayerSessionStore.instance.roomSnapshot = snapshot;
@@ -1836,10 +2534,9 @@ class _MainMenuMultiplayerContentState
         var shouldRetryRoomActionWithoutSession = false;
         setState(() {
           final code = message.payload['code']?.toString() ?? 'error';
-          final text =
-              message.payload['message']?.toString() ?? 'Error del servidor';
+          final text = message.payload['message']?.toString() ?? _tr('multiplayerConnectionError');
           if (code == 'profile_not_found') {
-            _profileStatus = 'No hay cuenta con ese usuario y contrasena.';
+            _profileStatus = _tr('multiplayerProfileRecover');
             _showCreateAccount = true;
           } else if (code == 'auth_failed') {
             _sessionToken = null;
@@ -1851,34 +2548,26 @@ class _MainMenuMultiplayerContentState
             if (shouldRetryRoomActionWithoutSession) {
               _profileReady = true;
               _showCreateAccount = false;
-              _profileStatus =
-                  'Sesion caducada. Reintentando con tu contrasena...';
+              _profileStatus = _tr('multiplayerRetrySessionJoin');
             } else {
               _profileReady = false;
               _showCreateAccount = false;
               _teamsLoaded = false;
               _playerTeams = const [];
               _selectedPairId = null;
-              _profileStatus =
-                  'Sesion caducada. Inicia sesion con tu contrasena.';
+              _profileStatus = _tr('multiplayerRemoteErrorExpired');
             }
           } else if (code == 'invalid_payload' && !_profileReady) {
-            _profileStatus = 'Revisa usuario, nombre y contrasena.';
+            _profileStatus = _tr('multiplayerProfileReviewCredentials');
           }
           _status = switch (code) {
-            'room_not_found' =>
-              'La sala ya no existe. El servidor pudo haberse reiniciado.',
-            'team_required' =>
-              'Crea o selecciona el equipo antes de marcar listo.',
-            'invalid_team_for_room' =>
-              'Ese equipo no corresponde con tu companero en esta sala.',
-            'auth_failed' =>
-              'Sesion caducada. Vuelve a iniciar sesion con tu contrasena.',
-            'character_taken' =>
-              'Ese personaje ya esta ocupado en esta sala. Elige otro.',
-            'player_already_in_room' =>
-              'Ese jugador ya esta conectado a esta sala. Cierra la otra conexion o espera unos segundos.',
-            _ => 'Servidor: $code - $text',
+            'room_not_found' => _tr('multiplayerJoinFailed'),
+            'team_required' => _tr('multiplayerTeamSelectionFailed'),
+            'invalid_team_for_room' => _tr('multiplayerRemoteErrorTeamUpdate'),
+            'auth_failed' => _tr('multiplayerRemoteErrorExpired'),
+            'character_taken' => _tr('multiplayerCharacterOccupied', params: {'name': _selectedCharacterId}),
+            'player_already_in_room' => _tr('multiplayerJoinFailed'),
+            _ => _friendlyRemoteError(code, text),
           };
         });
         final errorCode = message.payload['code']?.toString();
@@ -1917,7 +2606,7 @@ class _MainMenuMultiplayerContentState
         setState(() {
           _sessionStarted = true;
           _connectionState = _ServerConnectionState.connected;
-          _status = 'La partida va a empezar. Abriendo la mesa...';
+          _status = _tr('multiplayerOpeningTable');
         });
         _maybeAutoEnterGame();
         break;
@@ -1951,8 +2640,8 @@ class _MainMenuMultiplayerContentState
           }
           _rankingRequested = true;
           _status = _rankingPairs.isEmpty && _rankingMatches.isEmpty
-              ? 'Aun no hay partidas registradas.'
-              : 'Ranking actualizado.';
+              ? _tr('noMatchesRegistered')
+              : _tr('pairsRanking');
         });
         break;
       case MultiplayerMessageType.teams:
@@ -1982,8 +2671,8 @@ class _MainMenuMultiplayerContentState
             unawaited(_saveTeamName(selectedName));
           }
           _status = teams.isEmpty
-              ? 'Aun no tienes equipos. Crea uno con el usuario de tu pareja.'
-              : 'Equipos actualizados.';
+              ? _tr('multiplayerTeamsLoadingFailed')
+              : _tr('multiplayerTeamSynced');
         });
         final snapshot = _roomSnapshot;
         if (snapshot != null) {
@@ -2000,7 +2689,7 @@ class _MainMenuMultiplayerContentState
             message.payload['sessionToken']?.toString();
         if (profilePlayerId == null || profileName == null) {
           setState(() {
-            _profileStatus = 'El servidor devolvio un perfil incompleto.';
+            _profileStatus = _tr('multiplayerProfileRecoverFailed');
           });
           break;
         }
@@ -2027,20 +2716,51 @@ class _MainMenuMultiplayerContentState
           _profileReady = _hasUsableSessionOrCredentials();
           _showCreateAccount = false;
           _profileStatus = _profileReady
-              ? 'Sesion iniciada.'
-              : 'Sesion iniciada, pero falta confirmar credenciales.';
+              ? _tr('multiplayerProfileSessionStarted')
+              : _tr('multiplayerProfileSessionStartedCredentials');
           _status = _profileReady
-              ? 'Perfil ${_cleanPlayerName(profileName)} sincronizado.'
-              : 'Perfil sincronizado. Vuelve a iniciar sesion para crear salas.';
+              ? _tr('multiplayerProfileSynced', params: {'name': _cleanPlayerName(profileName)})
+              : _tr('multiplayerProfileSyncedNeedsLogin');
         });
         _requestTeamsIfReady();
         break;
       default:
         setState(() {
-          _status = 'Mensaje recibido: ${message.type.wireName}';
+          _status = _tr('multiplayerRoomUpdated');
         });
         break;
     }
+  }
+
+  String _friendlyRemoteError(String code, String text) {
+    if (code.contains('auth')) {
+      return _tr('multiplayerRemoteErrorExpired');
+    }
+    if (code.contains('room')) {
+      return _tr('multiplayerRemoteErrorRoomUpdate');
+    }
+    if (code.contains('team')) {
+      return _tr('multiplayerRemoteErrorTeamUpdate');
+    }
+    if (text.trim().isNotEmpty && text.length < 72 && !_looksTechnical(text)) {
+      return text;
+    }
+    return _tr('multiplayerRemoteErrorServiceUnavailable');
+  }
+
+  bool _looksTechnical(String text) {
+    final lower = text.toLowerCase();
+    return lower.contains('websocket') ||
+        lower.contains('socket') ||
+        lower.contains('http') ||
+        lower.contains('api') ||
+        lower.contains('backend') ||
+        lower.contains('endpoint') ||
+        lower.contains('exception') ||
+        lower.contains('stack') ||
+        lower.contains('localhost') ||
+        lower.contains('10.0.2.2') ||
+        lower.contains('://');
   }
 
   Future<void> _createRoom() async {
@@ -2048,14 +2768,14 @@ class _MainMenuMultiplayerContentState
     final username = _username;
     if (playerName.isEmpty) {
       setState(() {
-        _status = 'Escribe tu nombre antes de crear la sala.';
+        _status = _tr('multiplayerProfileNameRequired');
       });
       return;
     }
     if (!_hasUsableSessionOrCredentials()) {
       setState(() {
         _profileReady = false;
-        _profileStatus = 'Inicia sesion antes de crear una sala.';
+        _profileStatus = _tr('multiplayerProfileLoginRequiredCreate');
       });
       return;
     }
@@ -2068,9 +2788,8 @@ class _MainMenuMultiplayerContentState
 
     if (!await _ensureConnected()) {
       setState(() {
-        _profileStatus =
-            'Servidor sin respuesta. Intenta crear la sala de nuevo.';
-        _status = 'Servidor sin respuesta. No se ha creado la sala.';
+        _profileStatus = _tr('multiplayerProfileServiceUnavailableCreate');
+        _status = _tr('multiplayerCreateRoomFailed');
       });
       return;
     }
@@ -2083,7 +2802,7 @@ class _MainMenuMultiplayerContentState
       _ready = false;
       _teamModalShownForCurrentRoom = false;
       _teamDialogTeammatePlayerId = null;
-      _status = 'Solicitando creacion de sala...';
+      _status = _tr('multiplayerCreateRoomPending');
     });
 
     try {
@@ -2105,11 +2824,11 @@ class _MainMenuMultiplayerContentState
         allowPassHand: _allowPassHandForRoom,
       );
       setState(() {
-        _status = 'Solicitud enviada. Esperando sala...';
+        _status = _tr('multiplayerCreateRoomRequested');
       });
     } catch (error) {
       setState(() {
-        _status = 'No se pudo crear la sala: $error';
+        _status = _tr('multiplayerCreateRoomFailed');
       });
     }
   }
@@ -2121,21 +2840,21 @@ class _MainMenuMultiplayerContentState
 
     if (roomCode.isEmpty) {
       setState(() {
-        _status = 'Escribe un cÃ³digo de sala para unirte.';
+        _status = _tr('multiplayerJoinRoomPrompt');
       });
       return;
     }
 
     if (playerName.isEmpty) {
       setState(() {
-        _status = 'Escribe tu nombre antes de unirte.';
+        _status = _tr('multiplayerJoinNameRequired');
       });
       return;
     }
     if (!_hasUsableSessionOrCredentials()) {
       setState(() {
         _profileReady = false;
-        _profileStatus = 'Inicia sesion antes de unirte a una sala.';
+        _profileStatus = _tr('multiplayerProfileLoginRequiredJoin');
       });
       return;
     }
@@ -2148,9 +2867,8 @@ class _MainMenuMultiplayerContentState
 
     if (!await _ensureConnected()) {
       setState(() {
-        _profileStatus =
-            'Servidor sin respuesta. Intenta unirte de nuevo.';
-        _status = 'Servidor sin respuesta. No se ha unido a la sala.';
+        _profileStatus = _tr('multiplayerJoinServiceUnavailable');
+        _status = _tr('multiplayerJoinFailed');
       });
       return;
     }
@@ -2163,7 +2881,7 @@ class _MainMenuMultiplayerContentState
       _ready = false;
       _teamModalShownForCurrentRoom = false;
       _teamDialogTeammatePlayerId = null;
-      _status = 'Intentando unirme a $roomCode...';
+      _status = _tr('multiplayerJoinPending', params: {'room': roomCode});
     });
 
     try {
@@ -2184,11 +2902,11 @@ class _MainMenuMultiplayerContentState
             _characterSelectionReleased ? null : _selectedCharacterId,
       );
       setState(() {
-        _status = 'Solicitud enviada a $roomCode.';
+        _status = _tr('multiplayerJoinRequested', params: {'room': roomCode});
       });
     } catch (error) {
       setState(() {
-        _status = 'No se pudo unir a la sala: $error';
+        _status = _tr('multiplayerJoinFailed');
       });
     }
   }
@@ -2216,8 +2934,7 @@ class _MainMenuMultiplayerContentState
           allowPassHand: _allowPassHandForRoom,
         );
         setState(() {
-          _status =
-              'Personaje ocupado. Reintentando sala con personaje libre...';
+          _status = _tr('multiplayerRetryOccupiedCreate');
         });
         return true;
       }
@@ -2235,14 +2952,13 @@ class _MainMenuMultiplayerContentState
           sessionToken: _sessionToken,
         );
         setState(() {
-          _status =
-              'Personaje ocupado. Reintentando union con personaje libre...';
+          _status = _tr('multiplayerRetryOccupiedJoin');
         });
         return true;
       }
     } catch (error) {
       setState(() {
-        _status = 'No se pudo reintentar sin personaje: $error';
+        _status = _tr('multiplayerRetryFailed');
       });
     }
     return false;
@@ -2278,8 +2994,7 @@ class _MainMenuMultiplayerContentState
           allowPassHand: _allowPassHandForRoom,
         );
         setState(() {
-          _status =
-              'Sesion caducada. Reintentando creacion con contrasena...';
+          _status = _tr('multiplayerRetrySessionCreate');
         });
         return true;
       }
@@ -2298,14 +3013,13 @@ class _MainMenuMultiplayerContentState
               _characterSelectionReleased ? null : _selectedCharacterId,
         );
         setState(() {
-          _status =
-              'Sesion caducada. Reintentando union con contrasena...';
+          _status = _tr('multiplayerRetrySessionJoin');
         });
         return true;
       }
     } catch (error) {
       setState(() {
-        _status = 'No se pudo reintentar con contrasena: $error';
+        _status = _tr('multiplayerRemoteErrorExpired');
       });
     }
     return false;
@@ -2316,7 +3030,7 @@ class _MainMenuMultiplayerContentState
     final roomId = _connectedRoomId ?? _roomController.text.trim();
     if (socket == null || !socket.isConnected || roomId.isEmpty) {
       setState(() {
-        _status = 'Conecta o entra en una sala antes de marcar listo.';
+        _status = _tr('multiplayerProfileLoginRequiredJoin');
       });
       return;
     }
@@ -2326,7 +3040,7 @@ class _MainMenuMultiplayerContentState
         _teammateSeatFor(snapshot)?.playerId.isNotEmpty == true &&
         (_selectedPairId == null || _selectedPairId!.isEmpty)) {
       setState(() {
-        _status = 'Crea o selecciona el equipo antes de marcar listo.';
+        _status = _tr('multiplayerTeamSelectionFailed');
       });
       _resolveTeamForRoomSnapshot(snapshot);
       return;
@@ -2337,8 +3051,8 @@ class _MainMenuMultiplayerContentState
     setState(() {
       _ready = nextReady;
       _status = nextReady
-          ? 'Marcado como listo. Esperando al resto de jugadores.'
-          : 'Listo cancelado.';
+          ? _tr('multiplayerReadyToStart')
+          : _tr('multiplayerReadyCanceled');
     });
 
     try {
@@ -2349,7 +3063,7 @@ class _MainMenuMultiplayerContentState
       );
     } catch (error) {
       setState(() {
-        _status = 'No se pudo actualizar el estado listo: $error';
+        _status = _tr('multiplayerReadyToggleFailed');
       });
     }
   }
@@ -2362,13 +3076,13 @@ class _MainMenuMultiplayerContentState
     if (socket == null) return;
     setState(() {
       _rankingRequested = true;
-      _status = 'Pidiendo ranking al servidor...';
+      _status = _tr('multiplayerRankingUpdating');
     });
     try {
       socket.requestRanking();
     } catch (error) {
       setState(() {
-        _status = 'No se pudo pedir el ranking: $error';
+        _status = _tr('multiplayerRankingUpdateFailed');
       });
     }
   }
@@ -2388,7 +3102,7 @@ class _MainMenuMultiplayerContentState
       socket.requestTeams(playerId: playerId, sessionToken: sessionToken);
     } catch (error) {
       setState(() {
-        _status = 'No se pudieron pedir los equipos: $error';
+        _status = _tr('multiplayerTeamsLoadingFailed');
       });
     }
   }
@@ -2427,8 +3141,8 @@ class _MainMenuMultiplayerContentState
             unawaited(_saveTeamName(teammateTeamName));
           }
           _status = teammateTeamName.isEmpty
-              ? 'Equipo sincronizado con tu companero.'
-              : 'Equipo $teammateTeamName sincronizado.';
+              ? _tr('multiplayerTeamSynced')
+              : _tr('multiplayerTeamNamedSynced', params: {'name': teammateTeamName});
         });
         _closeCreateTeamDialog();
         _requestTeamsIfReady();
@@ -2570,7 +3284,7 @@ class _MainMenuMultiplayerContentState
       );
     } catch (error) {
       setState(() {
-        _status = 'No se pudo seleccionar el equipo: $error';
+        _status = _tr('multiplayerTeamSelectionFailed');
       });
     }
   }
@@ -2593,16 +3307,16 @@ class _MainMenuMultiplayerContentState
       builder: (context) {
         _characterConfirmDialogContext = context;
         return AlertDialog(
-          title: const Text('Confirmar personaje'),
-          content: Text('Quieres jugar con $characterName?'),
+          title: Text(_tr('confirmCharacterTitle')),
+          content: Text(_tr('confirmCharacterBody', params: {'name': characterName})),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Seguir eligiendo'),
+              child: Text(_tr('keepChoosing')),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Confirmar'),
+              child: Text(_tr('confirmUpper')),
             ),
           ],
         );
@@ -2614,7 +3328,7 @@ class _MainMenuMultiplayerContentState
       setState(() {
         _teamPromptConfirmedCharacterId = characterId;
         _teamPromptDismissedCharacterId = null;
-        _status = 'Personaje confirmado: $characterName.';
+        _status = _tr('multiplayerCharacterConfirmed', params: {'name': characterName});
       });
       final snapshot = _roomSnapshot;
       if (snapshot != null) {
@@ -2625,7 +3339,7 @@ class _MainMenuMultiplayerContentState
 
     setState(() {
       _teamPromptDismissedCharacterId = characterId;
-      _status = 'Puedes seguir cambiando personaje antes de crear equipo.';
+      _status = _tr('multiplayerCharacterChangeAllowed');
     });
   }
 
@@ -2639,7 +3353,7 @@ class _MainMenuMultiplayerContentState
       builder: (context) {
         _teamDialogContext = context;
         return AlertDialog(
-          title: const Text('Crear equipo'),
+          title: Text(_tr('createTeamTitle')),
           content: TextField(
             controller: teamNameController,
             inputFormatters: [
@@ -2647,18 +3361,18 @@ class _MainMenuMultiplayerContentState
             ],
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
-              labelText: 'Nombre del equipo',
-              helperText: 'Companero: ${teammate.name}',
+              labelText: _tr('teamNameLabel'),
+              helperText: _tr('teammateNameHelper', params: {'name': teammate.name}),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Ahora no'),
+              child: Text(_tr('notNow')),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Crear'),
+              child: Text(_tr('createUpper')),
             ),
           ],
         );
@@ -2690,7 +3404,7 @@ class _MainMenuMultiplayerContentState
     if (socket == null || playerId == null || sessionToken == null) return;
     if (teamName.isEmpty) {
       setState(() {
-        _status = 'Escribe un nombre para el equipo.';
+        _status = _tr('multiplayerTeamNameRequired');
       });
       return;
     }
@@ -2704,11 +3418,11 @@ class _MainMenuMultiplayerContentState
       );
       setState(() {
         _setTeamNameField(teamName);
-        _status = 'Creando equipo con $teammateUsername...';
+        _status = _tr('multiplayerCreateTeamInProgress', params: {'username': teammateUsername});
       });
     } catch (error) {
       setState(() {
-        _status = 'No se pudo crear el equipo: $error';
+        _status = _tr('multiplayerCreateTeamFailed');
       });
     }
   }
@@ -2719,20 +3433,19 @@ class _MainMenuMultiplayerContentState
     final password = _profilePassword;
     if (playerName.isEmpty) {
       setState(() {
-        _profileStatus = 'Escribe tu nombre para continuar.';
+        _profileStatus = _tr('multiplayerProfileNameRequiredCreate');
       });
       return;
     }
     if (!RegExp(r'^[a-z0-9_.-]{3,24}$').hasMatch(username)) {
       setState(() {
-        _profileStatus =
-            'El usuario debe tener 3-24 letras, numeros, punto o guion.';
+        _profileStatus = _tr('multiplayerProfileUsernameInvalid');
       });
       return;
     }
     if (password.length < 6 || password.length > 72) {
       setState(() {
-        _profileStatus = 'La contrasena debe tener entre 6 y 72 caracteres.';
+        _profileStatus = _tr('multiplayerProfilePasswordInvalid');
       });
       return;
     }
@@ -2746,13 +3459,13 @@ class _MainMenuMultiplayerContentState
     ]);
 
     setState(() {
-      _profileStatus = 'Creando usuario...';
-      _status = 'Sincronizando usuario con el servidor...';
+      _profileStatus = _tr('multiplayerProfileCreatingUser');
+      _status = _tr('multiplayerProfileSyncingUser');
     });
 
     if (!await _ensureConnected()) {
       setState(() {
-        _profileStatus = 'No se pudo conectar para crear el usuario.';
+        _profileStatus = _tr('multiplayerProfileCreateFailed');
       });
       return;
     }
@@ -2770,7 +3483,7 @@ class _MainMenuMultiplayerContentState
       );
     } catch (error) {
       setState(() {
-        _profileStatus = 'No se pudo crear el usuario: $error';
+        _profileStatus = _tr('multiplayerProfileCreateFailed');
       });
     }
   }
@@ -2782,14 +3495,13 @@ class _MainMenuMultiplayerContentState
         password.length < 6 ||
         password.length > 72) {
       setState(() {
-        _profileStatus = 'Escribe usuario y contrasena validos.';
+        _profileStatus = _tr('multiplayerProfileUsernameInvalid');
       });
       return;
     }
     if (!await _ensureConnected()) {
       setState(() {
-        _profileStatus =
-            'Servidor sin respuesta. Intenta iniciar sesion de nuevo.';
+        _profileStatus = _tr('multiplayerJoinServiceUnavailable');
       });
       return;
     }
@@ -2797,7 +3509,7 @@ class _MainMenuMultiplayerContentState
     if (socket == null) return;
     _profilePasswordFallback = password;
     setState(() {
-      _profileStatus = 'Iniciando sesion...';
+      _profileStatus = _tr('multiplayerProfileLoginInProgress');
     });
     try {
       socket.recoverProfile(
@@ -2806,7 +3518,7 @@ class _MainMenuMultiplayerContentState
       );
     } catch (error) {
       setState(() {
-        _profileStatus = 'No se pudo iniciar sesion: $error';
+        _profileStatus = _tr('multiplayerProfileLoginFailed');
       });
     }
   }
@@ -2824,7 +3536,7 @@ class _MainMenuMultiplayerContentState
     final roomId = _connectedRoomId ?? _roomController.text.trim();
     if (roomId.isEmpty) {
       setState(() {
-        _status = 'Crea o escribe una sala antes de copiar invitacion.';
+        _status = _tr('multiplayerCopyInvitationPrompt');
       });
       return;
     }
@@ -2834,7 +3546,7 @@ class _MainMenuMultiplayerContentState
     );
     if (!mounted) return;
     setState(() {
-      _status = 'Invitacion copiada: $roomId.';
+      _status = _tr('multiplayerInvitationCopied', params: {'room': roomId});
     });
   }
 
@@ -2852,7 +3564,7 @@ class _MainMenuMultiplayerContentState
         socket.leaveRoom(roomId: roomId, playerId: playerId);
       }
     } catch (_) {
-      // Si el leave falla, cerramos igualmente la conexiÃ³n local.
+      // Si el leave falla, cerramos igualmente la conexión local.
     }
 
     _closeSocketIntentionally();
@@ -2867,7 +3579,7 @@ class _MainMenuMultiplayerContentState
       _teamModalShownForCurrentRoom = false;
       _connectionState = _ServerConnectionState.disconnected;
       _connecting = false;
-      _status = 'Has salido de la sala.';
+      _status = _tr('multiplayerLeftRoom');
     });
     _autoEnterQueued = false;
     MultiplayerSessionStore.instance.clearAll();
@@ -2906,7 +3618,7 @@ class _MainMenuMultiplayerContentState
         _socket == null ||
         !_multiplayerSessionReadyForGame()) {
       setState(() {
-        _status = 'Esperando los datos de la partida...';
+        _status = _tr('multiplayerAwaitingMatchData');
       });
       return;
     }
@@ -2916,7 +3628,7 @@ class _MainMenuMultiplayerContentState
       _autoEnterQueued = false;
       MultiplayerSessionStore.instance.socket = _socket;
       MultiplayerSessionStore.instance.roomSnapshot = _roomSnapshot;
-      _status = 'Abriendo la mesa...';
+      _status = _tr('multiplayerOpeningTable');
     });
 
     widget.onEnterGame();
@@ -2989,6 +3701,13 @@ class _MainMenuMultiplayerContentState
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.versionCheck.multiplayerEnabled) {
+      return _MultiplayerVersionBlockedView(
+        status: widget.versionCheck.status,
+        message: widget.versionCheck.multiplayerStatusMessage,
+      );
+    }
+
     final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
           color: ZapitiColors.darkBrown,
           fontWeight: FontWeight.w900,
@@ -3011,7 +3730,7 @@ class _MainMenuMultiplayerContentState
           onBackToLogin: () {
             setState(() {
               _showCreateAccount = false;
-              _profileStatus = 'Inicia sesion para recuperar tus datos.';
+              _profileStatus = _tr('multiplayerProfileRecover');
             });
           },
         );
@@ -3024,7 +3743,7 @@ class _MainMenuMultiplayerContentState
         onCreateAccount: () {
           setState(() {
             _showCreateAccount = true;
-            _profileStatus = 'Crea tu usuario para guardar estadisticas.';
+            _profileStatus = _tr('multiplayerCreateAccountPrompt');
           });
         },
       );
@@ -3053,10 +3772,10 @@ class _MainMenuMultiplayerContentState
               key: const ValueKey('multiplayer-lobby'),
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Lobby multijugador', style: titleStyle),
+                Text(context.tr('multiplayerLobbyTitle'), style: titleStyle),
                 const SizedBox(height: 8),
                 Text(
-                  'Crea una sala, comparte el cÃ³digo y jugad en la misma mesa por WebSocket.',
+                  context.tr('multiplayerLobbyBody'),
                   style: bodyStyle,
                 ),
                 const SizedBox(height: 10),
@@ -3082,7 +3801,7 @@ class _MainMenuMultiplayerContentState
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          _connectionState.label,
+                          _connectionState.label(context),
                           style: bodyStyle.copyWith(
                             color: ZapitiColors.darkBrown,
                             fontWeight: FontWeight.w900,
@@ -3108,56 +3827,6 @@ class _MainMenuMultiplayerContentState
                   ),
                 ),
                 const SizedBox(height: 10),
-                if (_serverUrlIsEditable)
-                  TextField(
-                    controller: _serverController,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      labelText: 'Servidor',
-                      prefixIcon: Icon(Icons.dns_outlined),
-                      border: OutlineInputBorder(),
-                    ),
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('Servidor', style: bodyStyle),
-                      const SizedBox(height: 4),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color:
-                                ZapitiColors.darkBrown.withValues(alpha: 0.12),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.cloud_outlined,
-                                  color: ZapitiColors.wineRed),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  ServerConfig.websocketUrl,
-                                  style: bodyStyle.copyWith(
-                                    color: ZapitiColors.darkBrown,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
@@ -3192,7 +3861,7 @@ class _MainMenuMultiplayerContentState
                               ),
                               if (_selectedTeamName.isNotEmpty)
                                 Text(
-                                  'Equipo: $_selectedTeamName',
+                                  _tr('multiplayerTeamDisplay', params: {'name': _selectedTeamName}),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: bodyStyle.copyWith(
@@ -3207,13 +3876,13 @@ class _MainMenuMultiplayerContentState
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Editar usuario',
+                          tooltip: context.tr('editUser'),
                           onPressed: () {
                             setState(() {
                               _profileReady = false;
                               _showCreateAccount = true;
                               _profileStatus =
-                                  'Actualiza nombre o contrasena.';
+                                  context.tr('multiplayerEditUserPrompt');
                             });
                           },
                           icon: const Icon(Icons.manage_accounts_outlined),
@@ -3232,18 +3901,18 @@ class _MainMenuMultiplayerContentState
                 TextField(
                   controller: _roomController,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     isDense: true,
-                    labelText: 'CÃ³digo de sala',
-                    prefixIcon: Icon(Icons.tag_outlined),
-                    border: OutlineInputBorder(),
+                    labelText: context.tr('roomCodeLabel'),
+                    prefixIcon: const Icon(Icons.tag_outlined),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _characterSelectionReleased
-                      ? 'Personaje: sin seleccionar'
-                      : 'Personaje: ${CharacterAssets.displayNames[_selectedCharacterId] ?? _selectedCharacterId}',
+                      ? context.tr('characterSelectionUnset')
+                      : context.tr('characterSelectionValue', params: {'name': CharacterAssets.displayNames[_selectedCharacterId] ?? _selectedCharacterId}),
                   style: bodyStyle.copyWith(
                     color: ZapitiColors.darkBrown,
                     fontWeight: FontWeight.w900,
@@ -3271,7 +3940,7 @@ class _MainMenuMultiplayerContentState
                 SizedBox(
                   height: 42,
                   child: ZapitiActionButton(
-                    label: 'LIBERAR PERSONAJE',
+                    label: context.tr('releaseCharacterUpper'),
                     icon: Icons.lock_open_outlined,
                     onPressed: _connecting || _characterSelectionReleased
                         ? null
@@ -3281,7 +3950,7 @@ class _MainMenuMultiplayerContentState
                 const SizedBox(height: 8),
                 if (_roomSnapshot == null)
                   _MainMenuSwitchOption(
-                    title: 'Permitir pasar mano',
+                    title: context.tr('allowPassHand'),
                     icon: Icons.swap_horiz_outlined,
                     value: _allowPassHandForRoom,
                     onChanged: _connecting
@@ -3299,7 +3968,7 @@ class _MainMenuMultiplayerContentState
                       child: SizedBox(
                         height: 42,
                         child: ZapitiActionButton(
-                          label: 'CREAR',
+                          label: context.tr('createUpper'),
                           icon: Icons.add,
                           onPressed: _connecting ? null : _createRoom,
                           primary: true,
@@ -3311,7 +3980,7 @@ class _MainMenuMultiplayerContentState
                       child: SizedBox(
                         height: 42,
                         child: ZapitiActionButton(
-                          label: 'UNIRSE',
+                          label: context.tr('joinUpper'),
                           icon: Icons.login,
                           onPressed: _connecting ? null : _joinRoom,
                         ),
@@ -3326,7 +3995,7 @@ class _MainMenuMultiplayerContentState
                       child: SizedBox(
                         height: 42,
                         child: ZapitiActionButton(
-                          label: 'RANKING',
+                          label: context.tr('rankingUpper'),
                           icon: Icons.leaderboard_outlined,
                           onPressed: _connecting ? null : _requestRanking,
                         ),
@@ -3337,7 +4006,7 @@ class _MainMenuMultiplayerContentState
                       child: SizedBox(
                         height: 42,
                         child: ZapitiActionButton(
-                          label: 'COPIAR INV.',
+                          label: context.tr('copyInviteUpper'),
                           icon: Icons.ios_share_outlined,
                           onPressed: _copyRoomInvitation,
                         ),
@@ -3362,7 +4031,7 @@ class _MainMenuMultiplayerContentState
                 SizedBox(
                   height: 42,
                   child: ZapitiActionButton(
-                    label: _ready ? 'LISTO' : 'MARCAR LISTO',
+                    label: _ready ? context.tr('readyUpper') : context.tr('markReadyUpper'),
                     icon: _ready
                         ? Icons.check_circle
                         : Icons.radio_button_unchecked,
@@ -3421,10 +4090,10 @@ class _MultiplayerLoginView extends StatelessWidget {
       key: const ValueKey('multiplayer-login'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Iniciar sesion', style: titleStyle),
+        Text(context.tr('loginTitle'), style: titleStyle),
         const SizedBox(height: 8),
         Text(
-          'Entra con tu usuario para recuperar tu ficha, equipos y ranking.',
+          context.tr('multiplayerLoginHelp'),
           style: bodyStyle,
         ),
         const SizedBox(height: 12),
@@ -3438,11 +4107,11 @@ class _MultiplayerLoginView extends StatelessWidget {
           ],
           textCapitalization: TextCapitalization.none,
           autocorrect: false,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            labelText: 'Usuario',
-            prefixIcon: Icon(Icons.alternate_email),
-            border: OutlineInputBorder(),
+            labelText: context.tr('usernameLabel'),
+            prefixIcon: const Icon(Icons.alternate_email),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 8),
@@ -3452,18 +4121,18 @@ class _MultiplayerLoginView extends StatelessWidget {
           enableSuggestions: false,
           autocorrect: false,
           inputFormatters: [LengthLimitingTextInputFormatter(72)],
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            labelText: 'Contrasena',
-            prefixIcon: Icon(Icons.lock_outline),
-            border: OutlineInputBorder(),
+            labelText: context.tr('passwordLabel'),
+            prefixIcon: const Icon(Icons.lock_outline),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 8),
         SizedBox(
           height: 42,
           child: ZapitiActionButton(
-            label: 'ENTRAR',
+            label: context.tr('enterUpper'),
             icon: Icons.login,
             onPressed: onLogin,
             primary: true,
@@ -3473,7 +4142,7 @@ class _MultiplayerLoginView extends StatelessWidget {
         SizedBox(
           height: 42,
           child: ZapitiActionButton(
-            label: 'CREAR USUARIO',
+            label: context.tr('createUserUpper'),
             icon: Icons.person_add_alt_1_outlined,
             onPressed: onCreateAccount,
           ),
@@ -3530,10 +4199,10 @@ class _MultiplayerCreateAccountView extends StatelessWidget {
       key: const ValueKey('multiplayer-create-account'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Crear usuario', style: titleStyle),
+        Text(context.tr('createUserTitle'), style: titleStyle),
         const SizedBox(height: 8),
         Text(
-          'Crea tu ficha para guardar partidas y formar equipos.',
+          context.tr('multiplayerCreateAccountHelp'),
           style: bodyStyle,
         ),
         const SizedBox(height: 12),
@@ -3547,11 +4216,11 @@ class _MultiplayerCreateAccountView extends StatelessWidget {
           ],
           textCapitalization: TextCapitalization.none,
           autocorrect: false,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            labelText: 'Usuario',
-            prefixIcon: Icon(Icons.alternate_email),
-            border: OutlineInputBorder(),
+            labelText: context.tr('usernameLabel'),
+            prefixIcon: const Icon(Icons.alternate_email),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 8),
@@ -3563,11 +4232,11 @@ class _MultiplayerCreateAccountView extends StatelessWidget {
             ),
           ],
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            labelText: 'Nombre de jugador',
-            prefixIcon: Icon(Icons.person_outline),
-            border: OutlineInputBorder(),
+            labelText: context.tr('playerNameLabel'),
+            prefixIcon: const Icon(Icons.person_outline),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 8),
@@ -3577,11 +4246,11 @@ class _MultiplayerCreateAccountView extends StatelessWidget {
           enableSuggestions: false,
           autocorrect: false,
           inputFormatters: [LengthLimitingTextInputFormatter(72)],
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
-            labelText: 'Contrasena',
-            prefixIcon: Icon(Icons.lock_outline),
-            border: OutlineInputBorder(),
+            labelText: context.tr('passwordLabel'),
+            prefixIcon: const Icon(Icons.lock_outline),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 8),
@@ -3591,7 +4260,7 @@ class _MultiplayerCreateAccountView extends StatelessWidget {
               child: SizedBox(
                 height: 42,
                 child: ZapitiActionButton(
-                  label: 'CREAR',
+                  label: context.tr('createUpper'),
                   icon: Icons.check,
                   onPressed: onCreate,
                   primary: true,
@@ -3603,7 +4272,7 @@ class _MultiplayerCreateAccountView extends StatelessWidget {
               child: SizedBox(
                 height: 42,
                 child: ZapitiActionButton(
-                  label: 'VOLVER',
+                  label: context.tr('back'),
                   icon: Icons.arrow_back,
                   onPressed: onBackToLogin,
                 ),
@@ -3674,10 +4343,10 @@ class _MultiplayerSessionView extends StatelessWidget {
           fontWeight: FontWeight.w700,
         );
     final phaseLabel = switch (snapshot.phase) {
-      'starting' => 'Arrancando',
-      'playing' => 'En partida',
-      'finished' => 'Finalizada',
-      _ => 'Sala abierta',
+      'starting' => context.tr('multiplayerPhaseStarting'),
+      'playing' => context.tr('multiplayerPhasePlaying'),
+      'finished' => context.tr('multiplayerPhaseFinished'),
+      _ => context.tr('multiplayerPhaseOpen'),
     };
     final createdAt = DateTime.fromMillisecondsSinceEpoch(snapshot.createdAt)
         .toLocal()
@@ -3694,12 +4363,18 @@ class _MultiplayerSessionView extends StatelessWidget {
             const Icon(Icons.groups_outlined, color: ZapitiColors.wineRed),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('Partida multijugador', style: titleStyle),
+              child: Text(context.tr('multiplayerMatchTitle'), style: titleStyle),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        Text('Sala ${snapshot.roomId} - $phaseLabel', style: bodyStyle),
+        Text(
+          context.tr(
+            'roomWithPhase',
+            params: {'room': snapshot.roomId, 'phase': phaseLabel},
+          ),
+          style: bodyStyle,
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -3707,7 +4382,7 @@ class _MultiplayerSessionView extends StatelessWidget {
               child: SizedBox(
                 height: 42,
                 child: ZapitiActionButton(
-                  label: 'COPIAR INV.',
+                  label: context.tr('copyInviteUpper'),
                   icon: Icons.ios_share_outlined,
                   onPressed: onCopyInvitation,
                 ),
@@ -3718,7 +4393,7 @@ class _MultiplayerSessionView extends StatelessWidget {
               child: SizedBox(
                 height: 42,
                 child: ZapitiActionButton(
-                  label: 'RANKING',
+                  label: context.tr('rankingUpper'),
                   icon: Icons.leaderboard_outlined,
                   onPressed: onRequestRanking,
                 ),
@@ -3727,10 +4402,13 @@ class _MultiplayerSessionView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Text('Creada: $createdAt', style: bodyStyle),
+        Text(
+          context.tr('createdAt', params: {'date': createdAt}),
+          style: bodyStyle,
+        ),
         const SizedBox(height: 4),
         Text(
-          'Parejas fijas: asientos 1 y 3 juntos, asientos 2 y 4 juntos.',
+          context.tr('fixedPairsHint'),
           style: bodyStyle.copyWith(
             fontSize: ((bodyStyle.fontSize ?? 12) * 0.9),
             color: ZapitiColors.darkBrown.withValues(alpha: 0.72),
@@ -3797,7 +4475,7 @@ class _MultiplayerSessionView extends StatelessWidget {
                               Text(
                                 CharacterAssets
                                         .displayNames[seat.characterId] ??
-                                    'Sin personaje',
+                                    context.tr('noCharacter'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: bodyStyle.copyWith(
@@ -3809,7 +4487,7 @@ class _MultiplayerSessionView extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Equipo $teamId',
+                                context.tr('teamLabel', params: {'team': teamId}),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: bodyStyle.copyWith(
@@ -3872,7 +4550,7 @@ class _MultiplayerSessionView extends StatelessWidget {
           SizedBox(
             height: 42,
             child: ZapitiActionButton(
-              label: 'ENTRAR A JUGAR',
+              label: context.tr('enterToPlayUpper'),
               icon: Icons.play_arrow,
               onPressed: onEnterGame,
               primary: true,
@@ -3882,7 +4560,7 @@ class _MultiplayerSessionView extends StatelessWidget {
         SizedBox(
           height: 42,
           child: ZapitiActionButton(
-            label: 'SALIR DE LA SALA',
+            label: context.tr('leaveRoomUpper'),
             icon: Icons.logout,
             onPressed: onLeaveRoom,
             primary: true,
@@ -3970,11 +4648,20 @@ class _PlayerStatsCard extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: [
-                _PlayerStatPill(label: 'Partidas', value: '$played'),
-                _PlayerStatPill(label: 'V/D', value: '$wins/$losses'),
-                _PlayerStatPill(label: 'Victorias', value: '$winRate%'),
                 _PlayerStatPill(
-                  label: 'Chinos',
+                  label: context.tr('playerStatsMatches'),
+                  value: '$played',
+                ),
+                _PlayerStatPill(
+                  label: context.tr('playerStatsWinsLosses'),
+                  value: '$wins/$losses',
+                ),
+                _PlayerStatPill(
+                  label: context.tr('playerStatsVictories'),
+                  value: '$winRate%',
+                ),
+                _PlayerStatPill(
+                  label: context.tr('playerStatsChinos'),
                   value: diff >= 0 ? '+$diff' : '$diff',
                 ),
               ],
@@ -4098,7 +4785,7 @@ class _RankingPanel extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if (visiblePairs.isEmpty)
-              Text('Aun no hay partidas registradas.', style: bodyStyle)
+              Text(context.tr('noMatchesRegistered'), style: bodyStyle)
             else ...[
               _RankingHeader(style: bodyStyle),
               const SizedBox(height: 4),
@@ -4130,7 +4817,7 @@ class _RankingPanel extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if (visibleMatches.isEmpty)
-              Text('Todavia no hay historial.', style: bodyStyle)
+              Text(context.tr('noHistory'), style: bodyStyle)
             else
               for (var index = 0; index < visibleMatches.length; index++)
                 Padding(
@@ -4161,7 +4848,7 @@ class _RankingHeader extends StatelessWidget {
     return Row(
       children: [
         const SizedBox(width: 24),
-        Expanded(child: Text('Pareja', style: headerStyle)),
+        Expanded(child: Text(context.tr('pair'), style: headerStyle)),
         SizedBox(
           width: 48,
           child: Text('V/P', textAlign: TextAlign.right, style: headerStyle),
@@ -4172,7 +4859,11 @@ class _RankingHeader extends StatelessWidget {
         ),
         SizedBox(
           width: 62,
-          child: Text('Chinos', textAlign: TextAlign.right, style: headerStyle),
+          child: Text(
+            context.tr('playerStatsChinos'),
+            textAlign: TextAlign.right,
+            style: headerStyle,
+          ),
         ),
       ],
     );
@@ -4250,6 +4941,72 @@ class _RankingRow extends StatelessWidget {
   }
 }
 
+class _MultiplayerVersionBlockedView extends StatelessWidget {
+  final AppVersionCheckStatus status;
+  final String message;
+
+  const _MultiplayerVersionBlockedView({
+    required this.status,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final checking = status == AppVersionCheckStatus.checking ||
+        status == AppVersionCheckStatus.notChecked;
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w900,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.78),
+          fontWeight: FontWeight.w800,
+          height: 1.22,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ZapitiColors.darkBrown.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              checking
+                  ? Icons.sync_outlined
+                  : Icons.system_update_alt_outlined,
+              color: ZapitiColors.wineRed,
+              size: 30,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              checking
+                  ? context.tr('checkingMultiplayer')
+                  : context.tr('multiplayerUnavailable'),
+              textAlign: TextAlign.center,
+              style: titleStyle,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message.isEmpty
+                  ? context.tr('preparingVersionCheck')
+                  : message,
+              textAlign: TextAlign.center,
+              style: bodyStyle,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MatchHistoryRow extends StatelessWidget {
   final Map<String, dynamic> match;
 
@@ -4301,7 +5058,10 @@ class _MatchHistoryRow extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Gana equipo $winnerTeamId - $date',
+              context.tr(
+                'winnerTeamDate',
+                params: {'team': winnerTeamId, 'date': date},
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textStyle.copyWith(
@@ -4353,6 +5113,9 @@ class _MainMenuOptionsContent extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
+  final ZapitiLanguage language;
+  final ValueChanged<ZapitiLanguage> onLanguageChanged;
+  final VoidCallback onBack;
 
   const _MainMenuOptionsContent({
     required this.audioEnabled,
@@ -4363,6 +5126,9 @@ class _MainMenuOptionsContent extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
+    required this.language,
+    required this.onLanguageChanged,
+    required this.onBack,
   });
 
   @override
@@ -4373,7 +5139,7 @@ class _MainMenuOptionsContent extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _MainMenuSwitchOption(
-            title: 'Audio',
+            title: context.tr('audio'),
             icon: audioEnabled
                 ? Icons.volume_up_outlined
                 : Icons.volume_off_outlined,
@@ -4416,7 +5182,7 @@ class _MainMenuOptionsContent extends StatelessWidget {
             ),
           ),
           _MainMenuSwitchOption(
-            title: 'Confirmar jugada',
+            title: context.tr('confirmMove'),
             icon: Icons.touch_app_outlined,
             value: confirmCardPlay,
             onChanged: onConfirmCardPlayChanged,
@@ -4424,7 +5190,7 @@ class _MainMenuOptionsContent extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Velocidad de bots',
+              context.tr('botSpeed'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: ZapitiColors.darkBrown,
                     fontWeight: FontWeight.w900,
@@ -4438,7 +5204,7 @@ class _MainMenuOptionsContent extends StatelessWidget {
             children: [
               for (final speed in _BotSpeed.values)
                 ChoiceChip(
-                  label: Text(speed.label),
+                  label: Text(speed.label(context)),
                   selected: botSpeed == speed,
                   onSelected: (_) => onBotSpeedChanged(speed),
                   selectedColor: ZapitiColors.oldGold,
@@ -4451,6 +5217,47 @@ class _MainMenuOptionsContent extends StatelessWidget {
                   ),
                   side: BorderSide(
                     color: botSpeed == speed
+                        ? ZapitiColors.wineRed
+                        : ZapitiColors.darkBrown.withValues(alpha: 0.18),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              context.tr('language'),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: ZapitiColors.darkBrown,
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final option in ZapitiLanguage.values)
+                ChoiceChip(
+                  avatar: const Icon(Icons.language, size: 16),
+                  label: Text(option.nativeName),
+                  selected: language == option,
+                  onSelected: (_) {
+                    onLanguageChanged(option);
+                    onBack();
+                  },
+                  selectedColor: ZapitiColors.oldGold,
+                  backgroundColor: Colors.white.withValues(alpha: 0.72),
+                  labelStyle: TextStyle(
+                    color: language == option
+                        ? ZapitiColors.darkBrown
+                        : ZapitiColors.darkBrown.withValues(alpha: 0.78),
+                    fontWeight: FontWeight.w900,
+                  ),
+                  side: BorderSide(
+                    color: language == option
                         ? ZapitiColors.wineRed
                         : ZapitiColors.darkBrown.withValues(alpha: 0.18),
                   ),

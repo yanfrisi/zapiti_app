@@ -52,7 +52,7 @@ class GameSocket {
 
   void send(MultiplayerMessage message) {
     if (_channel == null) {
-      throw StateError('WebSocket no está conectado.');
+      throw StateError('No hay conexión con la partida.');
     }
     _channel!.sink.add(jsonEncode(message.toJson()));
   }

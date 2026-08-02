@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'l10n/zapiti_localizations.dart';
 import 'screens/game_screen.dart';
 import 'theme/zapiti_theme.dart';
 
@@ -10,6 +11,7 @@ Future<void> main() async {
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
+  await ZapitiI18n.load();
   runApp(const ZapitiApp());
 }
 

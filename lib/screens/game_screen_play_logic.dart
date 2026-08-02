@@ -26,11 +26,23 @@ extension _GameScreenPlayLogic on _GameScreenState {
       }
       return;
     }
+    if (_isGuidedTutorialMatch) {
+      await _handleGuidedTutorialCard(card);
+      return;
+    }
     if (roundCompleted) {
       _resolveRoundWithPause();
     } else {
       _advanceBots();
     }
+  }
+
+  Future<void> _handleGuidedTutorialCard(SpanishCard card) async {
+    final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+    final correct =
+        scenario.expectedAction == _TutorialScenarioAction.playCard &&
+            card == scenario.expectedCard;
+    await _advanceGuidedTutorialAfterSuccess(correct: correct);
   }
 
   Future<bool> _confirmCardPlayDialog(SpanishCard card) async {
@@ -39,16 +51,18 @@ extension _GameScreenPlayLogic on _GameScreenState {
       builder: (context) {
         return AlertDialog(
           backgroundColor: ZapitiColors.cardCream,
-          title: const Text('Confirmar jugada'),
-          content: Text('Quieres jugar ${card.toString()}?'),
+          title: Text(context.tr('confirmPlayTitle')),
+          content: Text(
+            context.tr('confirmPlayBody', params: {'card': card.toString()}),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
+              child: Text(context.tr('cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Jugar'),
+              child: Text(context.tr('playCard')),
             ),
           ],
         );
@@ -150,8 +164,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse =
               _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
           _status = _isWaitingHumanTrucoResponse
-              ? '${bot.name} canta truco. Responde tu equipo.'
-              : '${bot.name} canta truco.';
+              ? context.tr('playerCallsTruco', params: {'name': bot.name})
+              : context.tr(
+                  'playerCallsTrucoShort',
+                  params: {'name': bot.name},
+                );
         });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
           _resolveBotResponseToTruco();
@@ -166,7 +183,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
       }
 
       _updateState(() {
-        _status = '${bot.name} está pensando.';
+        _status = context.tr('botThinking', params: {'name': bot.name});
       });
 
       await _botDelay(1150);
@@ -182,7 +199,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
       if (roundCompleted) {
         if (_isMultiplayerMatch) {
           _updateState(() {
-            _status = 'Esperando resolución del servidor.';
+            _status = context.tr('waitingMatchResolution');
             _isAutoPlaying = false;
           });
         } else {
@@ -200,12 +217,18 @@ extension _GameScreenPlayLogic on _GameScreenState {
       _isAutoPlaying = false;
       if (!_handFinished) {
         if (_currentPlayer.id == _humanPlayer.id) {
-          _status = 'Te toca jugar.';
+          _status = context.tr('yourTurn');
         } else if (_isMultiplayerMatch &&
             !_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
-          _status = 'Esperando a ${_currentPlayer.name}.';
+          _status = context.tr(
+            'waitingForPlayer',
+            params: {'name': _currentPlayer.name},
+          );
         } else if (_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
-          _status = 'Turno de ${_currentPlayer.name}.';
+          _status = context.tr(
+            'turnOfPlayer',
+            params: {'name': _currentPlayer.name},
+          );
         }
       }
     });
@@ -290,7 +313,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
         '¡Voy a ti!',
         duration: const Duration(milliseconds: 1300),
       );
-      _status = '${bot.name} te manda: ¡Voy a ti!';
+      _status = context.tr('botSendsVoyATi', params: {'name': bot.name});
     });
     _sendMultiplayerVoyATiIfNeeded(bot);
     return true;
@@ -415,7 +438,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
       _forceWinRequestedPlayerIds.clear();
       _isAutoPlaying = false;
       if (_currentPlayer.id == _humanPlayer.id) {
-        _status = 'Te toca jugar.';
+        _status = context.tr('yourTurn');
       }
     });
 
@@ -449,12 +472,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
         if (!applied) return;
         if (roundCompleted) {
           _updateState(() {
-            _status = 'Esperando resolución del servidor.';
+            _status = context.tr('waitingMatchResolution');
             _isAutoPlaying = false;
           });
         } else if (_currentPlayer.id == _humanPlayer.id) {
           _updateState(() {
-            _status = 'Te toca jugar.';
+            _status = context.tr('yourTurn');
             _isAutoPlaying = false;
           });
         } else if (_isLocalBotPlayer(_currentPlayer)) {
@@ -481,7 +504,8 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse =
               _teamNeedsLocalHumanTrucoResponse(respondingTeamId);
           if (_isWaitingHumanTrucoResponse) {
-            _status = '${player.name} canta truco. Responde tu equipo.';
+            _status =
+                context.tr('playerCallsTruco', params: {'name': player.name});
           }
         });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
@@ -504,7 +528,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse =
               _teamNeedsLocalHumanTrucoResponse(respondingTeamId);
           if (_isWaitingHumanTrucoResponse) {
-            _status = '${player.name} sube a $rawValue. Responde tu equipo.';
+            _status = context.tr(
+              'playerRaisesTo',
+              params: {'name': player.name, 'value': rawValue},
+            );
           }
         });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
@@ -585,7 +612,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _forceWinRequestedPlayerIds.clear();
           _isAutoPlaying = false;
           if (_currentPlayer.id == _humanPlayer.id) {
-            _status = 'Te toca jugar.';
+            _status = context.tr('yourTurn');
           } else if (_isLocalBotPlayer(_currentPlayer)) {
             _status = 'Turno de ${_currentPlayer.name}.';
           }
@@ -597,13 +624,13 @@ extension _GameScreenPlayLogic on _GameScreenState {
       case MultiplayerMessageType.newHand:
         _updateState(() {
           _resetMultiplayerHandState(clearSummary: false);
-          _status = 'Nuevo reparto sincronizado.';
+          _status = context.tr('newHandSynced');
         });
         break;
       case MultiplayerMessageType.restartGame:
         _updateState(() {
           _resetMultiplayerHandState(clearSummary: true);
-          _status = 'Nueva partida sincronizada.';
+          _status = context.tr('newMatchSynced');
         });
         break;
       case MultiplayerMessageType.signal:
@@ -662,7 +689,8 @@ extension _GameScreenPlayLogic on _GameScreenState {
                 player.id != _humanPlayer.id) {
               _isRequestingCompanionSignal = false;
               _companionPrivateSignalStatus = 'Compa: $rawLabel';
-              _status = 'Seña recibida de ${player.name}.';
+              _status =
+                  context.tr('signalReceivedFrom', params: {'name': player.name});
             }
           } else if (_playerMessages[player.id] == 'Seña: $rawLabel') {
             _playersSignaledThisHand.remove(player.id);
@@ -698,8 +726,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         _updateState(() {
           _isRequestingCompanionSignal = false;
-          _companionPrivateSignalStatus = '${requester.name} te pide seña';
-          _status = '${requester.name} te pide seña.';
+          _companionPrivateSignalStatus = context.tr(
+            'playerAsksSignalShort',
+            params: {'name': requester.name},
+          );
+          _status =
+              context.tr('playerAsksSignal', params: {'name': requester.name});
         });
         break;
       case MultiplayerMessageType.roomSnapshot:
@@ -710,7 +742,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
             _applyMultiplayerMatchSnapshot(snapshot.match!);
           }
           _status = snapshot.phase == 'playing'
-              ? 'Partida sincronizada.'
+              ? context.tr('matchSynced')
               : 'Sala ${snapshot.roomId} actualizada.';
         });
         if (snapshot.phase == 'lobby') {
@@ -724,9 +756,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
         break;
       case MultiplayerMessageType.error:
         _updateState(() {
-          final code = message.payload['code']?.toString() ?? 'error';
-          final text = message.payload['message']?.toString() ?? 'Error';
-          _status = 'Servidor: $code - $text';
+          _status = context.tr('onlineMatchSyncError');
         });
         break;
       default:

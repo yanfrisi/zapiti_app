@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,11 +9,21 @@ import 'package:zapiti_app/domain/spanish_card.dart';
 import 'package:zapiti_app/domain/suit.dart';
 import 'package:zapiti_app/domain/zapiti_game_controller.dart';
 import 'package:zapiti_app/domain/team_rules.dart';
+import 'package:zapiti_app/l10n/zapiti_localizations.dart';
 import 'package:zapiti_app/main.dart';
 import 'package:zapiti_app/screens/game_screen.dart';
+import 'package:zapiti_app/services/app_version_check_service.dart';
 
 void main() {
   const musicChannel = MethodChannel('zapiti/music');
+
+  setUp(() async {
+    await ZapitiI18n.load();
+    GameScreen.versionCheckService = AppVersionCheckService(
+      manifestUri: null,
+      installedVersionProvider: () async => '0.1.0',
+    );
+  });
 
   Future<void> startGame(WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -61,21 +73,106 @@ void main() {
     await tester.tap(find.text('TUTORIAL'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tutorial'), findsOneWidget);
+    expect(find.text('TUTORIAL'), findsOneWidget);
     expect(
-        find.text('1. Juegas en pareja contra dos rivales.'), findsOneWidget);
+      find.textContaining('Juegas con tu pareja contra dos rivales.'),
+      findsOneWidget,
+    );
     expect(find.text('VOLVER'), findsOneWidget);
 
+    await tester.tap(find.text('PRÁCTICA'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Guarda la fuerte'), findsOneWidget);
+    expect(find.text('Elige la mejor jugada'), findsOneWidget);
+    await tester.tap(find.text('Tirar 4 Copas'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('guardas el As de Espadas'), findsOneWidget);
+
+    await tester.tap(find.text('MESA'));
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    expect(find.text('Guarda la fuerte'), findsOneWidget);
+    expect(find.textContaining('conserva el As de Espadas'), findsOneWidget);
+    expect(gameState.gameController.playedCards.length, 3);
+    expect(gameState.gameController.currentPlayer.id, 'p1');
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(3);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Pide seña'), findsOneWidget);
+    expect(find.text('PEDIR SEÑA'), findsOneWidget);
+    await tester.tap(find.text('PEDIR SEÑA'));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pumpAndSettle();
+    expect(find.text('Da seña'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('4 Bastos'));
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pumpAndSettle();
+    expect(find.text('Canta truco'), findsOneWidget);
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(5);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Canta truco'), findsOneWidget);
+    expect(find.text('CANTAR TRUCO'), findsOneWidget);
+    await tester.tap(find.text('CANTAR TRUCO'));
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pumpAndSettle();
+    expect(find.text('Farol controlado'), findsOneWidget);
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(7);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Pasa truco malo'), findsOneWidget);
+    expect(find.text('Te cantan 3'), findsOneWidget);
+    await tester.tap(find.text('RECHAZAR'));
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Tutorial completado'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('OPCIONES').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Opciones'), findsNothing);
+    await tester.tap(find.text('AYUDA SEÑAS').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Orden y señas'), findsNothing);
+
     await tester.tap(find.text('VOLVER'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SALIR').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('OPCIONES'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Opciones'), findsOneWidget);
+    expect(find.text('OPCIONES'), findsOneWidget);
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Mostrar ayuda'), findsNothing);
     expect(find.text('Permitir pasar mano'), findsNothing);
+  });
+
+  testWidgets('opciones permite cambiar idioma', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Idioma'), findsOneWidget);
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PLAY'), findsOneWidget);
+    expect(find.text('MULTIPLAYER'), findsOneWidget);
+    expect(find.text('OPTIONS'), findsOneWidget);
   });
 
   testWidgets('menu principal abre la seccion acerca de desde portada',
@@ -105,16 +202,99 @@ void main() {
   testWidgets('menu principal muestra login multijugador', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
 
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Multijugador'), findsOneWidget);
-    expect(find.text('Iniciar sesion'), findsOneWidget);
+    expect(find.text('MULTIJUGADOR'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(find.text('Usuario'), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(find.text('ENTRAR'), findsOneWidget);
     expect(find.text('CREAR USUARIO'), findsOneWidget);
+  });
+
+  testWidgets('multijugador usa textos traducidos al cambiar idioma',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('MULTIPLAYER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('User'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+  });
+
+  testWidgets('menu principal bloquea multijugador si requiere actualizar',
+      (tester) async {
+    GameScreen.versionCheckService = AppVersionCheckService(
+      manifestUri: Uri.parse('https://example.test/version.json'),
+      installedVersionProvider: () async => '0.1.0',
+      fetchManifest: (_) async => '''
+{
+  "latestVersion": "0.2.0",
+  "minimumMultiplayerVersion": "0.2.0",
+  "message": "Actualiza Zapiti para jugar online."
+}
+''',
+    );
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
+
+    expect(find.text('MULTIJUGADOR'), findsOneWidget);
+    expect(find.text('Actualiza Zapiti para jugar online.'), findsNothing);
+
+    await tester.tap(find.text('MULTIJUGADOR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MULTIJUGADOR'), findsOneWidget);
+    expect(find.text('Multijugador no disponible'), findsOneWidget);
+    expect(find.text('Actualiza Zapiti para jugar online.'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsNothing);
+  });
+
+  testWidgets('multijugador muestra espera mientras comprueba version',
+      (tester) async {
+    final completer = Completer<String>();
+    GameScreen.versionCheckService = AppVersionCheckService(
+      manifestUri: Uri.parse('https://example.test/version.json'),
+      installedVersionProvider: () async => '0.1.0',
+      fetchManifest: (_) => completer.future,
+    );
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
+
+    await tester.tap(find.text('MULTIJUGADOR'));
+    await tester.pump();
+
+    expect(find.text('MULTIJUGADOR'), findsOneWidget);
+    expect(find.text('Comprobando multijugador'), findsOneWidget);
+    expect(
+      find.text(
+        'Comprobando versión. El servicio puede tardar unos segundos...',
+      ),
+      findsOneWidget,
+    );
+
+    completer.complete('''
+{
+  "latestVersion": "0.1.0",
+  "minimumMultiplayerVersion": "0.1.0"
+}
+''');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Iniciar sesión'), findsOneWidget);
   });
 
   testWidgets('multijugador recuerda el usuario', (tester) async {
@@ -122,6 +302,7 @@ void main() {
       'multiplayer_username': 'juan',
     });
     await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
 
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
@@ -137,11 +318,12 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
 
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesion'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -232,11 +414,11 @@ void main() {
     expect(find.text('Elige dificultad'), findsOneWidget);
     expect(find.text('Nivel 3/5'), findsOneWidget);
     expect(
-      find.text('Equilibrado para probar reglas, señas y ritmo.'),
+      find.text('IA equilibrada para partidas normales.'),
       findsOneWidget,
     );
     expect(
-      find.text('Truca con información de mesa o fuerza real.'),
+      find.text('Usa truco y subidas con riesgo razonable.'),
       findsOneWidget,
     );
     expect(find.text('Muy fácil'), findsOneWidget);
@@ -559,7 +741,7 @@ void main() {
     await tester.tap(find.text('OPCIONES'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Opciones'), findsOneWidget);
+    expect(find.text('OPCIONES'), findsWidgets);
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Mostrar ayuda'), findsNothing);
     expect(find.text('Permitir pasar mano'), findsNothing);

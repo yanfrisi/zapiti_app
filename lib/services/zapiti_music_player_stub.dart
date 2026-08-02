@@ -41,7 +41,9 @@ class ZapitiMusicPlayer {
       await _channel.invokeMethod<void>('setVolume', {'volume': _volume});
     } catch (error) {
       // Native audio is unavailable in tests and unsupported desktop shells.
-      debugPrint('Zapiti audio setVolume unavailable: $error');
+      if (kDebugMode) {
+        debugPrint('Zapiti audio setVolume unavailable.');
+      }
     }
   }
 
@@ -50,7 +52,9 @@ class ZapitiMusicPlayer {
       await _channel.invokeMethod<void>('stop');
     } catch (error) {
       // Native audio is unavailable in tests and unsupported desktop shells.
-      debugPrint('Zapiti audio stop unavailable: $error');
+      if (kDebugMode) {
+        debugPrint('Zapiti audio stop unavailable.');
+      }
     }
   }
 
@@ -68,7 +72,9 @@ class ZapitiMusicPlayer {
       });
     } catch (error) {
       // Keep gameplay independent from audio availability.
-      debugPrint('Zapiti audio play unavailable: $error');
+      if (kDebugMode) {
+        debugPrint('Zapiti audio play unavailable.');
+      }
     }
   }
 }

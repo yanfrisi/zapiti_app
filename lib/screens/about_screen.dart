@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_info.dart';
+import '../l10n/zapiti_localizations.dart';
 import '../theme/zapiti_theme.dart';
 import '../widgets/zapiti_action_button.dart';
 
@@ -19,7 +20,7 @@ class AboutScreen extends StatelessWidget {
     );
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir el enlace.')),
+        SnackBar(content: Text(context.tr('linkOpenError'))),
       );
     }
   }
@@ -90,7 +91,8 @@ class AboutScreen extends StatelessWidget {
                         child: FutureBuilder<String>(
                           future: AppInfo.versionLabel(),
                           builder: (context, snapshot) {
-                            final version = snapshot.data ?? 'Versión...';
+                            final version =
+                                snapshot.data ?? context.tr('versionLoading');
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -107,7 +109,7 @@ class AboutScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 18),
                                 AboutInfoSection(
-                                  title: 'Autor',
+                                  title: context.tr('aboutAuthor'),
                                   children: [
                                     Text(
                                       'Juan Francisco Gutiérrez Vázquez',
@@ -117,7 +119,7 @@ class AboutScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 12),
                                 AboutInfoSection(
-                                  title: 'Pruebas',
+                                  title: context.tr('aboutTesting'),
                                   children: [
                                     Text(
                                       'Juan Francisco Gutiérrez Vázquez',
@@ -132,17 +134,17 @@ class AboutScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 12),
                                 AboutInfoSection(
-                                  title: 'Agradecimientos',
+                                  title: context.tr('aboutThanks'),
                                   children: [
                                     Text(
-                                      'Agradecimientos especiales a la Peña el Trompazo.',
+                                      context.tr('aboutThanksText'),
                                       style: bodyStyle,
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
                                 AboutInfoSection(
-                                  title: 'Enlaces del autor',
+                                  title: context.tr('aboutAuthorLinks'),
                                   children: [
                                     Wrap(
                                       spacing: 10,
@@ -172,7 +174,7 @@ class AboutScreen extends StatelessWidget {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: ZapitiActionButton(
-                                    label: 'VOLVER',
+                                    label: context.tr('back'),
                                     icon: Icons.arrow_back,
                                     onPressed: () => Navigator.of(context).pop(),
                                   ),

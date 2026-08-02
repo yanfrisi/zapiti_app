@@ -1,5 +1,38 @@
 part of 'game_screen.dart';
 
+String _difficultySummary(BuildContext context, int level) {
+  return switch (level) {
+    1 => context.tr('difficultySummary1'),
+    2 => context.tr('difficultySummary2'),
+    3 => context.tr('difficultySummary3'),
+    4 => context.tr('difficultySummary4'),
+    5 => context.tr('difficultySummary5'),
+    _ => context.tr('difficultySummary3'),
+  };
+}
+
+String _difficultyCardPlay(BuildContext context, int level) {
+  return switch (level) {
+    1 => context.tr('difficultyCard1'),
+    2 => context.tr('difficultyCard2'),
+    3 => context.tr('difficultyCard3'),
+    4 => context.tr('difficultyCard4'),
+    5 => context.tr('difficultyCard5'),
+    _ => context.tr('difficultyCard3'),
+  };
+}
+
+String _difficultyTrucoPlay(BuildContext context, int level) {
+  return switch (level) {
+    1 => context.tr('difficultyTruco1'),
+    2 => context.tr('difficultyTruco2'),
+    3 => context.tr('difficultyTruco3'),
+    4 => context.tr('difficultyTruco4'),
+    5 => context.tr('difficultyTruco5'),
+    _ => context.tr('difficultyTruco3'),
+  };
+}
+
 class _CharacterSelectionScreen extends StatelessWidget {
   final String selectedCharacterId;
   final ValueChanged<String> onSelected;
@@ -24,8 +57,11 @@ class _CharacterSelectionScreen extends StatelessWidget {
             final gap = shortest * 0.026;
             final padding = EdgeInsets.all(shortest * 0.04);
             final title = _SelectionTitle(
-              title: 'Elige tu personaje',
-              subtitle: 'Seleccionado: $selectedName',
+              title: context.tr('chooseCharacter'),
+              subtitle: context.tr(
+                'selectedCharacter',
+                params: {'name': selectedName},
+              ),
             );
             final grid = _CharacterChoiceGrid(
               selectedCharacterId: selectedCharacterId,
@@ -39,7 +75,7 @@ class _CharacterSelectionScreen extends StatelessWidget {
             final button = FractionallySizedBox(
               widthFactor: orientation == Orientation.portrait ? 1 : 0.86,
               child: ZapitiActionButton(
-                label: 'EMPEZAR PARTIDA',
+                label: context.tr('startMatch'),
                 icon: Icons.play_arrow,
                 onPressed: onStart,
                 primary: true,
@@ -308,7 +344,7 @@ class _SelectedCharacterLabel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tu personaje',
+          context.tr('yourCharacter'),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: ZapitiColors.oldGold,
@@ -487,14 +523,6 @@ class _DifficultySelectionScreen extends StatelessWidget {
     required this.onStart,
   });
 
-  static const _labels = {
-    1: 'Muy fácil',
-    2: 'Fácil',
-    3: 'Normal',
-    4: 'Difícil',
-    5: 'Experto',
-  };
-
   @override
   Widget build(BuildContext context) {
     return OrientationBuilder(
@@ -506,8 +534,11 @@ class _DifficultySelectionScreen extends StatelessWidget {
             final gap = shortest * 0.028;
             final padding = EdgeInsets.all(shortest * 0.045);
             final title = _SelectionTitle(
-              title: 'Elige dificultad',
-              subtitle: 'Nivel $selectedDifficulty/5',
+              title: context.tr('chooseDifficulty'),
+              subtitle: context.tr(
+                'difficultyLevelShort',
+                params: {'level': selectedDifficulty},
+              ),
             );
             final columns = orientation == Orientation.portrait
                 ? (constraints.maxWidth > constraints.maxHeight * 0.72 ? 3 : 2)
@@ -516,12 +547,11 @@ class _DifficultySelectionScreen extends StatelessWidget {
               selectedDifficulty: selectedDifficulty,
               onSelected: onSelected,
               columns: columns,
-              labels: _labels,
             );
             final button = FractionallySizedBox(
               widthFactor: orientation == Orientation.portrait ? 1 : 0.72,
               child: ZapitiActionButton(
-                label: 'JUGAR',
+                label: context.tr('play'),
                 icon: Icons.play_arrow,
                 onPressed: onStart,
                 primary: true,
@@ -583,13 +613,10 @@ class _DifficultyChoiceGrid extends StatelessWidget {
   final int selectedDifficulty;
   final ValueChanged<int> onSelected;
   final int columns;
-  final Map<int, String> labels;
-
   const _DifficultyChoiceGrid({
     required this.selectedDifficulty,
     required this.onSelected,
     required this.columns,
-    required this.labels,
   });
 
   @override
@@ -597,7 +624,8 @@ class _DifficultyChoiceGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final gap = min(constraints.maxWidth, constraints.maxHeight) * 0.035;
-        final rows = (labels.length / columns).ceil();
+        const difficultyCount = 5;
+        final rows = (difficultyCount / columns).ceil();
         final tileWidth =
             (constraints.maxWidth - gap * (columns - 1)) / columns;
         final tileHeight = (constraints.maxHeight - gap * (rows - 1)) / rows;
@@ -610,11 +638,11 @@ class _DifficultyChoiceGrid extends StatelessWidget {
           crossAxisSpacing: gap,
           childAspectRatio: tileWidth / tileHeight,
           children: [
-            for (var difficulty = 1; difficulty <= labels.length; difficulty++)
+            for (var difficulty = 1; difficulty <= difficultyCount; difficulty++)
               _DifficultyChoice(
                 difficulty: difficulty,
                 selected: difficulty == selectedDifficulty,
-                label: labels[difficulty]!,
+                label: _difficultyLabel(context, difficulty),
                 onTap: () => onSelected(difficulty),
               ),
           ],
@@ -702,7 +730,7 @@ class _DifficultyChoice extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'Nivel $difficulty',
+                  context.tr('difficultyLevel', params: {'level': difficulty}),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: selected
                             ? ZapitiColors.wineRed
@@ -744,7 +772,7 @@ class _SelectedDifficultySummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.summary,
+                  _difficultySummary(context, profile.level),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -755,17 +783,17 @@ class _SelectedDifficultySummary extends StatelessWidget {
                 SizedBox(height: gap * 0.7),
                 _DifficultySummaryLine(
                   icon: Icons.style_outlined,
-                  text: profile.cardPlay,
+                  text: _difficultyCardPlay(context, profile.level),
                 ),
                 _DifficultySummaryLine(
                   icon: Icons.campaign_outlined,
-                  text: profile.trucoPlay,
+                  text: _difficultyTrucoPlay(context, profile.level),
                 ),
                 _DifficultySummaryLine(
                   icon: Icons.visibility_outlined,
                   text: profile.readsOpponentSignals
-                      ? 'Lee señas rivales vistas.'
-                      : 'No interpreta señas rivales.',
+                      ? context.tr('readsOpponentSignals')
+                      : context.tr('ignoresOpponentSignals'),
                 ),
               ],
             ),

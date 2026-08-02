@@ -17,8 +17,8 @@ extension _GameScreenSignalLogic on _GameScreenState {
       if (socket != null && socket.isConnected && roomId != null) {
         _updateState(() {
           _isRequestingCompanionSignal = true;
-          _companionPrivateSignalStatus = 'Compa mira...';
-          _status = 'Pides seña a tu compañero.';
+          _companionPrivateSignalStatus = context.tr('companionLooking');
+          _status = context.tr('askCompanionSignalStatus');
         });
         socket.requestSignal(roomId: roomId, playerId: playerId);
         return;
@@ -31,7 +31,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     _updateState(() {
       _isRequestingCompanionSignal = true;
-      _companionPrivateSignalStatus = 'Compa mira...';
+      _companionPrivateSignalStatus = context.tr('companionLooking');
     });
 
     await Future<void>.delayed(const Duration(milliseconds: 450));
@@ -45,13 +45,13 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     if (signal == null) {
       _updateState(() {
-        _companionPrivateSignalStatus = 'Compa: sin seña';
+        _companionPrivateSignalStatus = context.tr('companionNoSignal');
         _isRequestingCompanionSignal = false;
       });
       await Future<void>.delayed(_companionNoSignalStatusDuration);
       if (!mounted || version != _handVersion) return;
       _updateState(() {
-        if (_companionPrivateSignalStatus == 'Compa: sin seña') {
+        if (_companionPrivateSignalStatus == context.tr('companionNoSignal')) {
           _companionPrivateSignalStatus = null;
         }
       });
@@ -61,12 +61,22 @@ extension _GameScreenSignalLogic on _GameScreenState {
     _updateState(() {
       _playersSignaledThisHand.add(companion.id);
       _playerMessages[companion.id] = 'Seña: $signal';
-      _companionPrivateSignalStatus = 'Compa: $signal';
+      _companionPrivateSignalStatus =
+          context.tr('companionSignal', params: {'signal': signal});
       _teamSignalsByTeam[companion.teamId] = signal;
       _knownSignalsByTeam[companion.teamId] = signal;
       _maybeLetOpponentsSeeSignal(companion.teamId, signal);
       _isRequestingCompanionSignal = false;
     });
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      final correct =
+          scenario.expectedAction == _TutorialScenarioAction.requestSignal &&
+              (scenario.expectedSignal == null ||
+                  scenario.expectedSignal == signal);
+      await _advanceGuidedTutorialAfterSuccess(correct: correct);
+      return;
+    }
 
     await Future<void>.delayed(_companionSignalGestureDuration);
     if (!mounted || version != _handVersion) return;
@@ -74,7 +84,8 @@ extension _GameScreenSignalLogic on _GameScreenState {
       if (_playerMessages[companion.id] == 'Seña: $signal') {
         _playerMessages.remove(companion.id);
       }
-      if (_companionPrivateSignalStatus == 'Compa: $signal') {
+      if (_companionPrivateSignalStatus ==
+          context.tr('companionSignal', params: {'signal': signal})) {
         _companionPrivateSignalStatus = null;
       }
     });
@@ -91,6 +102,22 @@ extension _GameScreenSignalLogic on _GameScreenState {
       _teamSignalsByTeam[_humanPlayer.teamId] = label;
       _maybeLetRivalsSeeHumanSignal(label);
     });
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      final correct =
+          scenario.expectedAction == _TutorialScenarioAction.giveSignal &&
+              (scenario.expectedSignal == null ||
+                  scenario.expectedSignal == label);
+      unawaited(_advanceGuidedTutorialAfterSuccess(
+        correct: correct,
+        fallbackMessage: scenario.expectedSignal == null
+            ? null
+            : context.tr(
+                'expectedSignalWas',
+                params: {'signal': scenario.expectedSignal},
+              ),
+      ));
+    }
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;

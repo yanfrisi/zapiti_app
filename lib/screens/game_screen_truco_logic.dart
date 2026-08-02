@@ -22,6 +22,13 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       }
     });
     if (!didCall) return;
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      final correct =
+          scenario.expectedAction == _TutorialScenarioAction.callTruco;
+      unawaited(_advanceGuidedTutorialAfterSuccess(correct: correct));
+      return;
+    }
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
@@ -50,7 +57,10 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
     _updateState(() {
       _acceptTruco(teamId: respondingTeamId, actorPlayerId: _humanPlayer.id);
-      _showTemporaryPlayerMessage(_humanPlayer.id, 'Acepto truco.');
+      _showTemporaryPlayerMessage(
+        _humanPlayer.id,
+        context.tr('acceptTrucoSpeech'),
+      );
       if (_isMultiplayerMatch) {
         _isWaitingHumanTrucoResponse = false;
         _isAutoPlaying = false;
@@ -85,13 +95,20 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       return;
     }
     _updateState(() {
-      _showTemporaryPlayerMessage(_humanPlayer.id, 'Paso.');
+      _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('passSpeech'));
       _isWaitingHumanTrucoResponse = false;
       _passTruco(
         passingTeamId: passingTeamId,
         actorPlayerId: _humanPlayer.id,
       );
     });
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      final correct =
+          scenario.expectedAction == _TutorialScenarioAction.passTruco;
+      unawaited(_advanceGuidedTutorialAfterSuccess(correct: correct));
+      return;
+    }
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
@@ -212,8 +229,8 @@ extension _GameScreenTrucoLogic on _GameScreenState {
   }
 
   String _trucoSpeechFor(int value) {
-    if (value == TrucoRules.firstTrucoValue) return '¡Truco!';
-    return 'Subo a $value';
+    if (value == TrucoRules.firstTrucoValue) return context.tr('trucoSpeech');
+    return context.tr('raiseSpeech', params: {'value': value});
   }
 
   Player _teamLeadPlayer(int teamId) {
@@ -253,7 +270,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       _updateState(() {
         _isAutoPlaying = false;
         _isWaitingHumanTrucoResponse = true;
-        _status = 'Responde tu equipo.';
+        _status = context.tr('answerYourTeam');
       });
       return;
     }
@@ -279,15 +296,27 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _isWaitingHumanTrucoResponse =
             _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
         _status = _isWaitingHumanTrucoResponse
-            ? 'Equipo $respondingTeamId sube a $raiseValue. Responde tu equipo.'
-            : 'Equipo $respondingTeamId sube a $raiseValue.';
+            ? context.tr(
+                'teamRaisesAnswer',
+                params: {'team': respondingTeamId, 'value': raiseValue},
+              )
+            : context.tr(
+                'teamRaises',
+                params: {'team': respondingTeamId, 'value': raiseValue},
+              );
       } else if (accepts) {
         _acceptTruco(
             teamId: respondingTeamId, actorPlayerId: respondingPlayer.id);
         _sendMultiplayerTrucoAcceptIfNeeded(respondingPlayer);
-        _showTemporaryPlayerMessage(respondingPlayer.id, 'Aceptamos.');
+        _showTemporaryPlayerMessage(
+          respondingPlayer.id,
+          context.tr('weAcceptSpeech'),
+        );
       } else {
-        _showTemporaryPlayerMessage(respondingPlayer.id, 'Pasamos.');
+        _showTemporaryPlayerMessage(
+          respondingPlayer.id,
+          context.tr('wePassSpeech'),
+        );
         _passTruco(
           passingTeamId: respondingTeamId,
           actorPlayerId: respondingPlayer.id,
@@ -372,14 +401,16 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       isCompanion: false,
       needsPoints: pressuredByScoreOrRounds,
     );
-    debugPrint(
-      '[AI TRUCO] team=${bot.teamId} difficulty=$_selectedDifficulty '
-      'handStrength=${handStrength.toStringAsFixed(2)} '
-      'chance=${callChance.toStringAsFixed(3)} '
-      'roll=${callRoll.toStringAsFixed(3)} result=$shouldCall '
-      'pending=${_game.trucoState == TrucoNegotiationState.awaitingResponse} '
-      'alreadyConsidered=$alreadyConsidered',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[AI TRUCO] team=${bot.teamId} difficulty=$_selectedDifficulty '
+        'handStrength=${handStrength.toStringAsFixed(2)} '
+        'chance=${callChance.toStringAsFixed(3)} '
+        'roll=${callRoll.toStringAsFixed(3)} result=$shouldCall '
+        'pending=${_game.trucoState == TrucoNegotiationState.awaitingResponse} '
+        'alreadyConsidered=$alreadyConsidered',
+      );
+    }
     if (shouldCall) {
       return true;
     }
@@ -400,10 +431,13 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       teamSpentPower: memory.teamSpentPower,
       teamIsUnderRoundPressure: memory.teamIsUnderRoundPressure,
     );
-    debugPrint(
-      '[AI TRUCO] team=${bot.teamId} bluffRoll=${bluffRoll.toStringAsFixed(3)} '
-      'bluff=$shouldBluff alreadyConsidered=true',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[AI TRUCO] team=${bot.teamId} '
+        'bluffRoll=${bluffRoll.toStringAsFixed(3)} '
+        'bluff=$shouldBluff alreadyConsidered=true',
+      );
+    }
     return shouldBluff;
   }
 

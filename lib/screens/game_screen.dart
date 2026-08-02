@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -31,6 +31,8 @@ import '../domain/zapiti_game_controller.dart';
 import '../domain/zapiti_players.dart';
 import '../domain/zapiti_rules.dart';
 import '../config/server_config.dart';
+import '../l10n/zapiti_localizations.dart';
+import '../services/app_version_check_service.dart';
 import '../services/game_preferences_store.dart';
 import '../services/multiplayer_session_store.dart';
 import '../services/zapiti_game_socket.dart';
@@ -55,6 +57,10 @@ part 'game_screen_truco_logic.dart';
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
 
+  @visibleForTesting
+  static AppVersionCheckService versionCheckService =
+      AppVersionCheckService.production();
+
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -62,14 +68,21 @@ class GameScreen extends StatefulWidget {
 enum _MainMenuPanel { home, tutorial, options, multiplayer }
 
 enum _BotSpeed {
-  slow('Lenta', 1.35),
-  normal('Normal', 1),
-  fast('Rápida', 0.55);
+  slow(1.35),
+  normal(1),
+  fast(0.55);
 
-  final String label;
   final double delayFactor;
 
-  const _BotSpeed(this.label, this.delayFactor);
+  const _BotSpeed(this.delayFactor);
+
+  String label(BuildContext context) {
+    return switch (this) {
+      _BotSpeed.slow => context.tr('slow'),
+      _BotSpeed.normal => context.tr('normal'),
+      _BotSpeed.fast => context.tr('fast'),
+    };
+  }
 }
 
 enum _ServerConnectionState {
@@ -83,22 +96,22 @@ enum _ServerConnectionState {
 }
 
 extension on _ServerConnectionState {
-  String get label {
+  String label(BuildContext context) {
     switch (this) {
       case _ServerConnectionState.idle:
-        return 'En espera';
+        return context.tr('multiplayerStateIdle');
       case _ServerConnectionState.connecting:
-        return 'Conectando';
+        return context.tr('multiplayerStateConnecting');
       case _ServerConnectionState.wakingServer:
-        return 'Despertando servidor';
+        return context.tr('multiplayerStateWakingServer');
       case _ServerConnectionState.connected:
-        return 'Conectado';
+        return context.tr('multiplayerStateConnected');
       case _ServerConnectionState.reconnecting:
-        return 'Reconectando';
+        return context.tr('multiplayerStateReconnecting');
       case _ServerConnectionState.error:
-        return 'Error';
+        return context.tr('multiplayerStateError');
       case _ServerConnectionState.disconnected:
-        return 'Desconectado';
+        return context.tr('multiplayerStateDisconnected');
     }
   }
 
@@ -132,6 +145,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static const _botSpeedPrefsKey = 'bot_speed';
   static const _showGameplayHelpPrefsKey = 'show_gameplay_help';
   static const _confirmCardPlayPrefsKey = 'confirm_card_play';
+  static const _languagePrefsKey = 'language';
   static const _multiplayerPlayerNamePrefsKey = 'multiplayer_player_name';
   static const _multiplayerPlayerIdPrefsKey = 'multiplayer_player_id';
   static const _multiplayerUsernamePrefsKey = 'multiplayer_username';
@@ -176,6 +190,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   double _audioVolume = 0.65;
   bool _confirmCardPlay = false;
   bool _allowPassHand = false;
+  ZapitiLanguage _language = ZapitiLanguage.es;
+  bool _isGuidedTutorialMatch = false;
+  bool _guidedTutorialCompleted = false;
+  int _guidedTutorialScenarioIndex = 0;
+  AppVersionCheckResult _versionCheck = AppVersionCheckResult.notChecked;
+  int _versionCheckRequestId = 0;
   bool _isAlVerDecisionDialogOpen = false;
   String? _alVerDecisionPromptedKey;
   _MainMenuPanel _mainMenuPanel = _MainMenuPanel.home;
@@ -248,6 +268,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
+  @visibleForTesting
+  void loadGuidedTutorialScenarioForTesting(int index) {
+    _isGuidedTutorialMatch = true;
+    _guidedTutorialCompleted = false;
+    _loadGuidedTutorialScenario(index);
+  }
+
   bool get _canHumanCallTruco {
     if (_isRoundAwaitingContinue ||
         _isWaitingHumanTrucoResponse ||
@@ -300,6 +327,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _advanceBots();
       }
     });
+  }
+
+  Future<AppVersionCheckResult> _checkAppVersion() async {
+    final requestId = ++_versionCheckRequestId;
+    _updateState(() {
+      _versionCheck = AppVersionCheckResult.checking;
+    });
+    final result = await GameScreen.versionCheckService.check();
+    if (!mounted || requestId != _versionCheckRequestId) return result;
+    _updateState(() {
+      _versionCheck = result;
+    });
+    return result;
   }
 
   @override
@@ -358,7 +398,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _humanVoyATi() {
     if (_handFinished || _isGameFinished) return;
     _updateState(() {
-      _showTemporaryPlayerMessage(_humanPlayer.id, '¡Voy a ti!');
+      _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('voyATi'));
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceWinRequestedPlayerIds.add(_companionPlayer.id);
@@ -373,7 +413,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         socket.signal(
           roomId: roomId,
           playerId: playerId,
-          label: '¡Voy a ti!',
+          label: context.tr('voyATi'),
           kind: 'voy_a_ti',
         );
       }
@@ -383,12 +423,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _humanMata() {
     if (_handFinished || _isGameFinished) return;
     _updateState(() {
-      _showTemporaryPlayerMessage(_humanPlayer.id, 'Mata');
+      _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('kill'));
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceHighestRequestedPlayerIds.add(_companionPlayer.id);
       }
-      _status = 'Le pides a ${_companionPlayer.name}: Mata.';
+      _status = context.tr(
+        'askCompanionKill',
+        params: {'name': _companionPlayer.name},
+      );
     });
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
@@ -399,7 +442,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         socket.signal(
           roomId: roomId,
           playerId: playerId,
-          label: 'Mata',
+          label: context.tr('kill'),
           kind: 'mata',
         );
       }
@@ -440,13 +483,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final cardsRemaining = {
-      for (final player in _players) player.id: _hands[player.id]?.length ?? 0,
-    };
-    _maybeHandleAlVerDecision();
+    return ZapitiLocalizations(
+      language: _language,
+      child: Builder(
+        builder: (context) {
+          final cardsRemaining = {
+            for (final player in _players)
+              player.id: _hands[player.id]?.length ?? 0,
+          };
+          _maybeHandleAlVerDecision();
 
-    if (_showMainMenu) {
-      return Scaffold(
+          if (_showMainMenu) {
+            return Scaffold(
         resizeToAvoidBottomInset: false,
         body: _MainMenuScreen(
           onPlay: _startFromMainMenu,
@@ -455,6 +503,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           onMultiplayer: _openMainMenuMultiplayer,
           onAbout: _openAboutScreen,
           onExit: () => unawaited(SystemNavigator.pop()),
+          onStartTableTutorial: _startGuidedTutorialMatch,
           onEnterGame: _enterMultiplayerMatch,
           selectedCharacterId: _selectedHumanCharacterId,
           onSelectedCharacterChanged: _selectHumanCharacter,
@@ -468,12 +517,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           onBotSpeedChanged: _setBotSpeed,
           confirmCardPlay: _confirmCardPlay,
           onConfirmCardPlayChanged: _setConfirmCardPlay,
+          language: _language,
+          onLanguageChanged: _setLanguage,
+          versionCheck: _versionCheck,
         ),
-      );
-    }
+            );
+          }
 
-    if (_showCharacterSelection) {
-      return Scaffold(
+          if (_showCharacterSelection) {
+            return Scaffold(
         body: SafeArea(
           child: _CharacterSelectionScreen(
             selectedCharacterId: _selectedHumanCharacterId,
@@ -481,11 +533,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             onStart: _continueToDifficultySelection,
           ),
         ),
-      );
-    }
+            );
+          }
 
-    if (_showDifficultySelection) {
-      return Scaffold(
+          if (_showDifficultySelection) {
+            return Scaffold(
         body: SafeArea(
           child: _DifficultySelectionScreen(
             selectedDifficulty: _selectedDifficulty,
@@ -493,10 +545,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             onStart: _startWithSelectedSettings,
           ),
         ),
-      );
-    }
+            );
+          }
 
-    return Scaffold(
+          return Scaffold(
       backgroundColor: ZapitiColors.woodDark,
       body: SafeArea(
         child: _WoodBackground(
@@ -512,6 +564,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       final gap = shortest * (isPortrait ? 0.018 : 0.008);
                       final padding = EdgeInsets.all(
                           shortest * (isPortrait ? 0.018 : 0.006));
+                      final canUseGameControls = !_guidedTutorialCompleted;
                       final header = _CompactGameHeader(
                         roundNumber: _displayedRoundNumber,
                         handValue: _handValue,
@@ -530,14 +583,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       );
                       final controls = _VisibleGameControls(
                         compact: isPortrait,
-                        signalsEnabled: !_handFinished && !_isGameFinished,
+                        signalsEnabled: canUseGameControls &&
+                            !_handFinished &&
+                            !_isGameFinished,
                         isGameFinished: _isGameFinished,
-                        isHandFinished: _handFinished,
-                        isRoundAwaitingContinue: _isRoundAwaitingContinue,
-                        isWaitingHumanResponse: _isWaitingHumanTrucoResponse,
-                        isHumanTurn: _isHumanTurn,
-                        canPassHand: _canHumanPassHand,
-                        canCallTruco: _canHumanCallTruco,
+                        isHandFinished: canUseGameControls && _handFinished,
+                        isRoundAwaitingContinue:
+                            canUseGameControls && _isRoundAwaitingContinue,
+                        isWaitingHumanResponse:
+                            canUseGameControls && _isWaitingHumanTrucoResponse,
+                        isHumanTurn: canUseGameControls && _isHumanTurn,
+                        canPassHand: canUseGameControls && _canHumanPassHand,
+                        canCallTruco: canUseGameControls && _canHumanCallTruco,
                         handValue: _handValue,
                         pendingTrucoValue: _pendingTrucoValue,
                         trucoCallerTeamId: _trucoCallerTeamId,
@@ -545,7 +602,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         raiseOptions: _humanRaiseOptions,
                         onSignalStart: _startSignal,
                         onSignalEnd: _endSignal,
-                        onShowSignalHelp: _showSignalHelpDialog,
+                        onShowSignalHelp:
+                            canUseGameControls ? _showSignalHelpDialog : null,
                         onAskCompanionSignal: _requestCompanionSignal,
                         onPassHand: _humanPassHand,
                         onVoyATi: _humanCompanionCommand,
@@ -556,7 +614,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         onContinueRound: _continueAfterRound,
                         onNewHand: _newHand,
                         onRestart: _restartGame,
-                        onOptions: _openGameOptions,
+                        onOptions: canUseGameControls ? _openGameOptions : null,
                         onBack: _confirmReturnToMainMenu,
                       );
                       Widget table() {
@@ -572,7 +630,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               characterIdsByPlayer: _characterIdsByPlayer,
                               cardsRemaining: cardsRemaining,
                               turnSecondsRemaining: _turnSecondsRemaining,
-                              isHumanTurn: _isHumanTurn,
+                              isHumanTurn: canUseGameControls && _isHumanTurn,
                               showHumanSeat: isPortrait,
                               onPlayCard: _playHumanCard,
                             );
@@ -584,7 +642,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         return Stack(
                           children: [
                             Positioned.fill(child: table()),
-                            if (_isAlVerDecisionDialogOpen &&
+                            if (canUseGameControls &&
+                                _isAlVerDecisionDialogOpen &&
                                 _game.alVerState ==
                                     AlVerState.awaitingDecision &&
                                 _game.alVerTeamId != null &&
@@ -731,7 +790,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 scale: scale,
                                 playerName: _humanPlayer.name,
                                 cards: _humanHand,
-                                enabled: _isHumanTurn,
+                                enabled: canUseGameControls && _isHumanTurn,
                                 isCurrent: _humanPlayer.id == _currentPlayer.id,
                                 message: _playerMessages[_humanPlayer.id],
                                 turnSecondsRemaining:
@@ -742,21 +801,27 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 characterId:
                                     _characterIdsByPlayer[_humanPlayer.id] ??
                                         _humanPlayer.id,
-                                signalsEnabled:
-                                    !_handFinished && !_isGameFinished,
+                                signalsEnabled: canUseGameControls &&
+                                    !_handFinished &&
+                                    !_isGameFinished,
                                 isGameFinished: _isGameFinished,
-                                isHandFinished: _handFinished,
-                                isRoundAwaitingContinue:
+                                isHandFinished:
+                                    canUseGameControls && _handFinished,
+                                isRoundAwaitingContinue: canUseGameControls &&
                                     _isRoundAwaitingContinue,
-                                isWaitingHumanResponse:
+                                isWaitingHumanResponse: canUseGameControls &&
                                     _isWaitingHumanTrucoResponse,
-                                isHumanTurn: _isHumanTurn,
-                                canPassHand: _canHumanPassHand,
-                                canCallTruco: _canHumanCallTruco,
+                                isHumanTurn: canUseGameControls && _isHumanTurn,
+                                canPassHand:
+                                    canUseGameControls && _canHumanPassHand,
+                                canCallTruco:
+                                    canUseGameControls && _canHumanCallTruco,
                                 onPlayCard: _playHumanCard,
                                 onSignalStart: _startSignal,
                                 onSignalEnd: _endSignal,
-                                onShowSignalHelp: _showSignalHelpDialog,
+                                onShowSignalHelp: canUseGameControls
+                                    ? _showSignalHelpDialog
+                                    : null,
                                 onAskCompanionSignal: _requestCompanionSignal,
                                 onPassHand: _humanPassHand,
                                 onVoyATi: _humanCompanionCommand,
@@ -764,7 +829,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 onContinueRound: _continueAfterRound,
                                 onNewHand: _newHand,
                                 onRestart: _restartGame,
-                                onOptions: _openGameOptions,
+                                onOptions: canUseGameControls
+                                    ? _openGameOptions
+                                    : null,
                                 onBack: _confirmReturnToMainMenu,
                               ),
                             ),
@@ -775,7 +842,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   );
                 },
               ),
-              if (_isWaitingHumanTrucoResponse && _pendingTrucoValue != null)
+              if (!_guidedTutorialCompleted &&
+                  _isWaitingHumanTrucoResponse &&
+                  _pendingTrucoValue != null)
                 _TrucoResponseOverlay(
                   pendingTrucoValue: _pendingTrucoValue!,
                   raiseOptions: _humanRaiseOptions,
@@ -783,6 +852,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   onAccept: _humanAcceptsTruco,
                   onPass: _humanPassesTruco,
                   onRaise: _humanRaisesTruco,
+                ),
+              if (_isGuidedTutorialMatch || _guidedTutorialCompleted)
+                _GuidedTutorialOverlay(
+                  scenario:
+                      _guidedTutorialScenarios[_guidedTutorialScenarioIndex],
+                  index: _guidedTutorialScenarioIndex,
+                  total: _guidedTutorialScenarios.length,
+                  completed: _guidedTutorialCompleted,
                 ),
               if (_isGameFinished && _winningTeamId != null)
                 _GameFinishedOverlay(
@@ -804,11 +881,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   onBotSpeedChanged: _setBotSpeed,
                   confirmCardPlay: _confirmCardPlay,
                   onConfirmCardPlayChanged: _setConfirmCardPlay,
+                  language: _language,
+                  onLanguageChanged: _setLanguage,
                   onClose: _closeGameOptions,
                 ),
             ],
           ),
         ),
+      ),
+          );
+        },
       ),
     );
   }

@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.6.0
   package_info_plus: ^10.2.0
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.0
@@ -29,6 +30,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/app_icon.png
+    - assets/i18n/
     - assets/cards/
     - assets/menu/
     - assets/audio/

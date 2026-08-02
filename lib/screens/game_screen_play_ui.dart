@@ -1,5 +1,132 @@
 part of 'game_screen.dart';
 
+String _difficultyLabel(BuildContext context, int level) {
+  return switch (level) {
+    1 => context.tr('difficultyVeryEasy'),
+    2 => context.tr('difficultyEasy'),
+    3 => context.tr('difficultyNormal'),
+    4 => context.tr('difficultyHard'),
+    5 => context.tr('difficultyExpert'),
+    _ => context.tr('difficultyNormal'),
+  };
+}
+
+class _GuidedTutorialOverlay extends StatelessWidget {
+  final _TutorialTableScenario scenario;
+  final int index;
+  final int total;
+  final bool completed;
+
+  const _GuidedTutorialOverlay({
+    required this.scenario,
+    required this.index,
+    required this.total,
+    this.completed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isCompact = size.height < 520 || size.width < 420;
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: ZapitiColors.cardCream,
+          fontWeight: FontWeight.w900,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ZapitiColors.cardCream.withValues(alpha: 0.92),
+          fontWeight: FontWeight.w800,
+          height: 1.12,
+        );
+    final badge = completed ? 'OK' : '${index + 1}/$total';
+    final title = completed
+        ? context.tr('guidedCompleteTitle')
+        : context.tr(scenario.titleKey);
+    final instruction = completed
+        ? context.tr('guidedCompleteInstruction')
+        : context.tr(scenario.instructionKey);
+
+    return Positioned(
+      left: 10,
+      right: 10,
+      top: 8,
+      child: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isCompact ? 420 : 560,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: ZapitiColors.darkBrown.withValues(alpha: 0.90),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: ZapitiColors.oldGold.withValues(alpha: 0.78),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? 8 : 12,
+                  vertical: isCompact ? 6 : 8,
+                ),
+                child: Row(
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZapitiColors.wineRed,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        child: Text(
+                          badge,
+                          style: titleStyle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: titleStyle,
+                          ),
+                          Text(
+                            instruction,
+                            maxLines: isCompact ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyStyle,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CompactGameHeader extends StatelessWidget {
   final int roundNumber;
   final int handValue;
@@ -21,12 +148,18 @@ class _CompactGameHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chinoText = handValue == 1 ? 'chino' : 'chinos';
+    final chinoText = handValue == 1 ? context.tr('chino') : context.tr('chinos');
     final trucoText = isTrucoAccepted
         ? '$handValue $chinoText'
         : trucoCallerTeamId == null
             ? '$handValue $chinoText'
-            : 'Equipo $trucoCallerTeamId sube a $pendingTrucoValue';
+            : context.tr(
+                'teamRaises',
+                params: {
+                  'team': trucoCallerTeamId,
+                  'value': pendingTrucoValue,
+                },
+              );
 
     return Container(
       width: double.infinity,
@@ -72,7 +205,7 @@ class _CompactGameHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Ronda $roundNumber/3',
+                        context.tr('roundHeader', params: {'round': roundNumber}),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -105,7 +238,16 @@ class _CompactGameHeader extends StatelessWidget {
                           SizedBox(width: 4 * visualScale),
                           Flexible(
                             child: Text(
-                              'IA ${difficultyProfile.level}: ${difficultyProfile.label}',
+                              context.tr(
+                                'aiDifficulty',
+                                params: {
+                                  'level': difficultyProfile.level,
+                                  'label': _difficultyLabel(
+                                    context,
+                                    difficultyProfile.level,
+                                  ),
+                                },
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -196,7 +338,7 @@ class _GameScorePanel extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _ScoreLine(
-                    label: 'Eq1',
+                    label: context.tr('teamShort', params: {'team': 1}),
                     value: '$scoreTeamOne / $targetScore',
                     labelStyle: labelStyle,
                     valueStyle: valueStyle,
@@ -206,14 +348,14 @@ class _GameScorePanel extends StatelessWidget {
                     color: ZapitiColors.oldGold.withValues(alpha: 0.16),
                   ),
                   _ScoreLine(
-                    label: 'Eq2',
+                    label: context.tr('teamShort', params: {'team': 2}),
                     value: '$scoreTeamTwo / $targetScore',
                     labelStyle: labelStyle,
                     valueStyle: valueStyle,
                   ),
                   SizedBox(height: gap * 0.7),
                   _ScoreLine(
-                    label: 'Rondas',
+                    label: context.tr('rounds'),
                     value: '$roundWinsTeamOne - $roundWinsTeamTwo',
                     labelStyle: labelStyle,
                     valueStyle: valueStyle,
@@ -358,7 +500,10 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    'Te cantan ${widget.pendingTrucoValue}',
+                                    context.tr(
+                                      'calledValue',
+                                      params: {'value': widget.pendingTrucoValue},
+                                    ),
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleMedium
@@ -372,7 +517,7 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                                 SizedBox(
                                   width: panelWidth * 0.30,
                                   child: ZapitiActionButton(
-                                    label: 'PEDIR SEÑA',
+                                    label: context.tr('askSignalUpper'),
                                     icon: Icons.visibility_outlined,
                                     onPressed: widget.onAskCompanionSignal,
                                   ),
@@ -384,7 +529,7 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                               children: [
                                 Expanded(
                                   child: ZapitiActionButton(
-                                    label: 'RECHAZAR',
+                                    label: context.tr('rejectUpper'),
                                     icon: Icons.block,
                                     onPressed: widget.onPass,
                                   ),
@@ -392,7 +537,7 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                                 SizedBox(width: gap),
                                 Expanded(
                                   child: ZapitiActionButton(
-                                    label: 'ACEPTAR',
+                                    label: context.tr('acceptUpper'),
                                     icon: Icons.check,
                                     onPressed: widget.onAccept,
                                     primary: true,
@@ -402,8 +547,11 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                                 Expanded(
                                   child: ZapitiActionButton(
                                     label: selectedRaise == null
-                                        ? 'SUBIR'
-                                        : 'SUBIR A $selectedRaise',
+                                        ? context.tr('raiseUpper')
+                                        : context.tr(
+                                            'raiseToUpper',
+                                            params: {'value': selectedRaise},
+                                          ),
                                     icon: Icons.trending_up,
                                     onPressed: selectedRaise == null
                                         ? null
@@ -416,8 +564,11 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                             SizedBox(height: gap * 0.8),
                             Text(
                               selectedRaise == null
-                                  ? 'No hay subida legal disponible'
-                                  : 'Subida: $selectedRaise',
+                                  ? context.tr('noLegalRaise')
+                                  : context.tr(
+                                      'raiseValue',
+                                      params: {'value': selectedRaise},
+                                    ),
                               textAlign: TextAlign.center,
                               style: Theme.of(context)
                                   .textTheme
@@ -479,7 +630,7 @@ class _VisibleGameControls extends StatelessWidget {
   final List<int> raiseOptions;
   final ValueChanged<String> onSignalStart;
   final ValueChanged<String> onSignalEnd;
-  final VoidCallback onShowSignalHelp;
+  final VoidCallback? onShowSignalHelp;
   final VoidCallback onAskCompanionSignal;
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
@@ -490,7 +641,7 @@ class _VisibleGameControls extends StatelessWidget {
   final VoidCallback onContinueRound;
   final VoidCallback onNewHand;
   final VoidCallback onRestart;
-  final VoidCallback onOptions;
+  final VoidCallback? onOptions;
   final VoidCallback onBack;
 
   const _VisibleGameControls({
@@ -537,33 +688,33 @@ class _VisibleGameControls extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final gap = min(constraints.maxWidth, constraints.maxHeight) * 0.035;
-        final primaryAction = _primaryAction();
+        final primaryAction = _primaryAction(context);
         final passHand = ZapitiActionButton(
-          label: 'PASAR MANO',
+          label: context.tr('passHandUpper'),
           icon: Icons.swap_horiz_outlined,
           onPressed: canPassHand ? onPassHand : null,
           primary: true,
         );
         final askSignal = ZapitiActionButton(
-          label: 'PEDIR SEÑA',
+          label: context.tr('askSignalUpper'),
           icon: Icons.visibility_outlined,
           onPressed: signalsEnabled ? onAskCompanionSignal : null,
         );
         final companionCommand = ZapitiActionButton(
-          label: isHumanTurn ? '¡VOY A TI!' : 'MATA',
+          label: isHumanTurn ? context.tr('voyATiUpper') : context.tr('killUpper'),
           icon: isHumanTurn
               ? Icons.record_voice_over_outlined
               : Icons.local_fire_department_outlined,
           onPressed: signalsEnabled ? onVoyATi : null,
         );
         final options = ZapitiActionButton(
-          label: 'OPCIONES',
+          label: context.tr('options'),
           icon: Icons.settings_outlined,
           onPressed: onOptions,
           primary: false,
         );
         final signalHelp = ZapitiActionButton(
-          label: 'AYUDA SEÑAS',
+          label: context.tr('signalHelpUpper'),
           icon: Icons.help_outline,
           onPressed: onShowSignalHelp,
         );
@@ -586,7 +737,7 @@ class _VisibleGameControls extends StatelessWidget {
                     SizedBox(height: gap),
                     Expanded(child: options),
                     SizedBox(height: gap),
-                    Expanded(child: _backButton()),
+                    Expanded(child: _backButton(context)),
                   ],
                 ),
               ),
@@ -638,14 +789,16 @@ class _VisibleGameControls extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        height: min(constraints.maxHeight, constraints.maxWidth) *
-                            0.11,
+                        height:
+                            min(constraints.maxHeight, constraints.maxWidth) *
+                                0.11,
                         child: signalHelp,
                       ),
                       SizedBox(height: gap * 0.6),
                       SizedBox(
-                        height: min(constraints.maxHeight, constraints.maxWidth) *
-                            0.12,
+                        height:
+                            min(constraints.maxHeight, constraints.maxWidth) *
+                                0.12,
                         child: signals,
                       ),
                     ],
@@ -658,7 +811,7 @@ class _VisibleGameControls extends StatelessWidget {
               child: SizedBox(
                 width: constraints.maxWidth * 0.48,
                 height: min(constraints.maxHeight, constraints.maxWidth) * 0.12,
-                child: _backButton(),
+                child: _backButton(context),
               ),
             ),
           ],
@@ -667,27 +820,27 @@ class _VisibleGameControls extends StatelessWidget {
     );
   }
 
-  Widget _backButton() {
+  Widget _backButton(BuildContext context) {
     return ZapitiActionButton(
-      label: 'VOLVER',
+      label: context.tr('back'),
       icon: Icons.arrow_back,
       onPressed: onBack,
       primary: false,
     );
   }
 
-  Widget _primaryAction() {
+  Widget _primaryAction(BuildContext context) {
     if (isGameFinished) {
-      return _button('OTRA PARTIDA', Icons.restart_alt, onRestart, true);
+      return _button(context.tr('newMatchUpper'), Icons.restart_alt, onRestart, true);
     }
     if (isHandFinished) {
-      return _button('REPARTIR', Icons.add, onNewHand, true);
+      return _button(context.tr('newHandUpper'), Icons.add, onNewHand, true);
     }
     if (isRoundAwaitingContinue) {
       return _button(
-          'SIGUIENTE RONDA', Icons.arrow_forward, onContinueRound, true);
+          context.tr('nextRoundUpper'), Icons.arrow_forward, onContinueRound, true);
     }
-    return _button('CANTAR TRUCO', Icons.campaign,
+    return _button(context.tr('callTrucoUpper'), Icons.campaign,
         canCallTruco && !isWaitingHumanResponse ? onCallTruco : null, true);
   }
 
@@ -715,6 +868,8 @@ class _GameOptionsOverlay extends StatelessWidget {
   final ValueChanged<_BotSpeed> onBotSpeedChanged;
   final bool confirmCardPlay;
   final ValueChanged<bool> onConfirmCardPlayChanged;
+  final ZapitiLanguage language;
+  final ValueChanged<ZapitiLanguage> onLanguageChanged;
   final VoidCallback onClose;
 
   const _GameOptionsOverlay({
@@ -726,6 +881,8 @@ class _GameOptionsOverlay extends StatelessWidget {
     required this.onBotSpeedChanged,
     required this.confirmCardPlay,
     required this.onConfirmCardPlayChanged,
+    required this.language,
+    required this.onLanguageChanged,
     required this.onClose,
   });
 
@@ -773,7 +930,7 @@ class _GameOptionsOverlay extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Opciones',
+                              context.tr('options'),
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium
@@ -784,7 +941,7 @@ class _GameOptionsOverlay extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Cerrar',
+                            tooltip: context.tr('close'),
                             onPressed: onClose,
                             icon: const Icon(Icons.close),
                             color: ZapitiColors.darkBrown,
@@ -808,13 +965,16 @@ class _GameOptionsOverlay extends StatelessWidget {
                               confirmCardPlay: confirmCardPlay,
                               onConfirmCardPlayChanged:
                                   onConfirmCardPlayChanged,
+                              language: language,
+                              onLanguageChanged: onLanguageChanged,
+                              onBack: onClose,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 8),
                       ZapitiActionButton(
-                        label: 'VOLVER',
+                        label: context.tr('back'),
                         icon: Icons.arrow_back,
                         onPressed: onClose,
                       ),
@@ -926,15 +1086,15 @@ class _AlVerDecisionOverlayState extends State<_AlVerDecisionOverlay> {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text('Estás al ver', style: titleStyle),
+                                Text(context.tr('alVerTitle'), style: titleStyle),
                                 SizedBox(height: gap * 0.75),
                                 Text(
-                                  'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
+                                  context.tr('alVerBody'),
                                   style: bodyStyle,
                                 ),
                                 SizedBox(height: gap),
                                 ZapitiActionButton(
-                                  label: 'PEDIR SEÑA',
+                                  label: context.tr('askSignalUpper'),
                                   icon: Icons.visibility_outlined,
                                   onPressed: widget.onAskCompanionSignal,
                                 ),
@@ -954,7 +1114,7 @@ class _AlVerDecisionOverlayState extends State<_AlVerDecisionOverlay> {
                                   children: [
                                     Expanded(
                                       child: ZapitiActionButton(
-                                        label: 'JUGAR',
+                                        label: context.tr('play'),
                                         icon: Icons.check,
                                         onPressed: () =>
                                             widget.onPlay(widget.teamId),
@@ -964,7 +1124,7 @@ class _AlVerDecisionOverlayState extends State<_AlVerDecisionOverlay> {
                                     SizedBox(width: gap),
                                     Expanded(
                                       child: ZapitiActionButton(
-                                        label: 'IRSE A CASA',
+                                        label: context.tr('goHomeUpper'),
                                         icon: Icons.block,
                                         onPressed: () =>
                                             widget.onGoHome(widget.teamId),
@@ -984,7 +1144,7 @@ class _AlVerDecisionOverlayState extends State<_AlVerDecisionOverlay> {
                             onTapUp: (_) => _setPeekThroughOverlay(false),
                             onTapCancel: () => _setPeekThroughOverlay(false),
                             child: Tooltip(
-                              message: 'Mantener para ver cartas',
+                              message: context.tr('holdToViewCards'),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   color: ZapitiColors.cardCream
@@ -1094,7 +1254,10 @@ class _GameFinishedOverlay extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              'Ganó el Equipo $winningTeamId',
+                              context.tr(
+                                'winningTeamTitle',
+                                params: {'team': winningTeamId},
+                              ),
                               textAlign: TextAlign.center,
                               style: titleStyle,
                             ),
@@ -1106,13 +1269,19 @@ class _GameFinishedOverlay extends StatelessWidget {
                             ),
                             SizedBox(height: gap * 0.75),
                             Text(
-                              'Puntuación final: $scoreTeamOne - $scoreTeamTwo',
+                              context.tr(
+                                'finalScore',
+                                params: {
+                                  'teamOne': scoreTeamOne,
+                                  'teamTwo': scoreTeamTwo,
+                                },
+                              ),
                               textAlign: TextAlign.center,
                               style: bodyStyle,
                             ),
                             SizedBox(height: gap),
                             ZapitiActionButton(
-                              label: 'OTRA PARTIDA',
+                              label: context.tr('newMatchUpper'),
                               icon: Icons.restart_alt,
                               onPressed: onRestart,
                               primary: true,
@@ -1153,7 +1322,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final ValueChanged<SpanishCard> onPlayCard;
   final ValueChanged<String> onSignalStart;
   final ValueChanged<String> onSignalEnd;
-  final VoidCallback onShowSignalHelp;
+  final VoidCallback? onShowSignalHelp;
   final VoidCallback onAskCompanionSignal;
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
@@ -1161,7 +1330,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final VoidCallback onContinueRound;
   final VoidCallback onNewHand;
   final VoidCallback onRestart;
-  final VoidCallback onOptions;
+  final VoidCallback? onOptions;
   final VoidCallback onBack;
 
   const _LandscapeBottomBoard({
@@ -1261,7 +1430,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
                   SizedBox(
                     height: (30 * scale).clamp(26.0, 38.0),
                     child: ZapitiActionButton(
-                      label: 'AYUDA SEÑAS',
+                      label: context.tr('signalHelpUpper'),
                       icon: Icons.help_outline,
                       onPressed: onShowSignalHelp,
                     ),
@@ -1305,7 +1474,7 @@ class _LandscapeActionPanel extends StatelessWidget {
   final VoidCallback onContinueRound;
   final VoidCallback onNewHand;
   final VoidCallback onRestart;
-  final VoidCallback onOptions;
+  final VoidCallback? onOptions;
   final VoidCallback onBack;
 
   const _LandscapeActionPanel({
@@ -1348,7 +1517,7 @@ class _LandscapeActionPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(height: primaryHeight, child: _primaryAction()),
+          SizedBox(height: primaryHeight, child: _primaryAction(context)),
           SizedBox(height: gap),
           SizedBox(
             height: secondaryHeight,
@@ -1357,7 +1526,7 @@ class _LandscapeActionPanel extends StatelessWidget {
                 if (canPassHand) ...[
                   Expanded(
                     child: ZapitiActionButton(
-                      label: 'PASAR MANO',
+                      label: context.tr('passHandUpper'),
                       icon: Icons.swap_horiz_outlined,
                       onPressed: onPassHand,
                       primary: true,
@@ -1367,7 +1536,7 @@ class _LandscapeActionPanel extends StatelessWidget {
                 ],
                 Expanded(
                   child: ZapitiActionButton(
-                    label: 'PEDIR SEÑA',
+                    label: context.tr('askSignalUpper'),
                     icon: Icons.visibility_outlined,
                     onPressed: signalsEnabled ? onAskCompanionSignal : null,
                   ),
@@ -1375,7 +1544,9 @@ class _LandscapeActionPanel extends StatelessWidget {
                 SizedBox(width: gap),
                 Expanded(
                   child: ZapitiActionButton(
-                    label: isHumanTurn ? '¡VOY A TI!' : 'MATA',
+                    label: isHumanTurn
+                        ? context.tr('voyATiUpper')
+                        : context.tr('killUpper'),
                     icon: isHumanTurn
                         ? Icons.record_voice_over_outlined
                         : Icons.local_fire_department_outlined,
@@ -1392,7 +1563,7 @@ class _LandscapeActionPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: _DarkUtilityButton(
-                    label: 'OPCIONES',
+                    label: context.tr('options'),
                     icon: Icons.settings_outlined,
                     onPressed: onOptions,
                     scale: scale,
@@ -1401,7 +1572,7 @@ class _LandscapeActionPanel extends StatelessWidget {
                 SizedBox(width: gap),
                 Expanded(
                   child: _DarkUtilityButton(
-                    label: 'VOLVER',
+                    label: context.tr('back'),
                     icon: Icons.arrow_back,
                     onPressed: onBack,
                     scale: scale,
@@ -1416,18 +1587,18 @@ class _LandscapeActionPanel extends StatelessWidget {
     );
   }
 
-  Widget _primaryAction() {
+  Widget _primaryAction(BuildContext context) {
     if (isGameFinished) {
-      return _button('OTRA PARTIDA', Icons.restart_alt, onRestart, true);
+      return _button(context.tr('newMatchUpper'), Icons.restart_alt, onRestart, true);
     }
     if (isHandFinished) {
-      return _button('REPARTIR', Icons.add, onNewHand, true);
+      return _button(context.tr('newHandUpper'), Icons.add, onNewHand, true);
     }
     if (isRoundAwaitingContinue) {
       return _button(
-          'SIGUIENTE RONDA', Icons.arrow_forward, onContinueRound, true);
+          context.tr('nextRoundUpper'), Icons.arrow_forward, onContinueRound, true);
     }
-    return _button('CANTAR TRUCO', Icons.campaign,
+    return _button(context.tr('callTrucoUpper'), Icons.campaign,
         canCallTruco && !isWaitingHumanResponse ? onCallTruco : null, true);
   }
 
@@ -1563,7 +1734,7 @@ class _LandscapeHumanPanel extends StatelessWidget {
         final cardOffset = cardWidth * overlapFactor;
         final handWidth = cardWidth + cardOffset * (slots - 1);
         final rowWidth = avatarWidth + gap * 1.6 + handWidth;
-        final signalText = _signalStatusText(companionMessage);
+        final signalText = _signalStatusText(context, companionMessage);
 
         return Padding(
           padding: padding,
@@ -1645,17 +1816,19 @@ class _LandscapeHumanPanel extends StatelessWidget {
     );
   }
 
-  String? _signalStatusText(String? value) {
+  String? _signalStatusText(BuildContext context, String? value) {
     if (value == null || value.isEmpty) return null;
     if (value.startsWith('Compa')) return value;
-    if (value == 'Mirando...') return 'Compa mira...';
-    if (value == 'No llevo seña.') return 'Compa: sin seña';
+    if (value == 'Mirando...') return context.tr('companionLooking');
+    if (value == 'No llevo seña.') return context.tr('companionNoSignal');
     const signalPrefix = 'Seña: ';
     if (value.startsWith(signalPrefix)) {
-      return 'Compa: ${value.substring(signalPrefix.length)}';
+      return context.tr('companionSignal', params: {'signal': value.substring(signalPrefix.length)});
     }
     const carriesPrefix = 'Lleva ';
-    if (value.startsWith(carriesPrefix)) return 'Compa: ${value.substring(6)}';
+    if (value.startsWith(carriesPrefix)) {
+      return context.tr('companionSignal', params: {'signal': value.substring(6)});
+    }
     return value;
   }
 }
@@ -1965,42 +2138,42 @@ class _SignalHelpDialog extends StatelessWidget {
   static const _rows = [
     _SignalHelpRowData(
       card: SpanishCard(value: 4, suit: Suit.bastos),
-      label: '4 de Bastos',
+      labelKey: 'signalCard4Bastos',
       signal: '4 Bastos',
     ),
     _SignalHelpRowData(
       card: SpanishCard(value: 7, suit: Suit.copas),
-      label: '7 de Copas',
+      labelKey: 'signalCard7Copas',
       signal: '7 Copas',
     ),
     _SignalHelpRowData(
       card: SpanishCard(value: 7, suit: Suit.oros),
-      label: '7 de Oros',
+      labelKey: 'signalCard7Oros',
       signal: '7 Oros',
     ),
     _SignalHelpRowData(
       card: SpanishCard(value: 1, suit: Suit.espadas),
-      label: 'As de Espadas',
+      labelKey: 'signalCardAsEspadas',
       signal: 'As Espadas',
     ),
     _SignalHelpRowData(
       card: SpanishCard(value: 3, suit: Suit.oros),
-      label: 'Treses',
+      labelKey: 'signalCardTreses',
       signal: 'Treses',
     ),
     _SignalHelpRowData(
       card: SpanishCard(value: 2, suit: Suit.oros),
-      label: 'Doses',
+      labelKey: 'signalCardDoses',
       signal: 'Doses',
     ),
     _SignalHelpRowData(
       card: SpanishCard(value: 1, suit: Suit.oros),
-      label: 'Ases',
+      labelKey: 'signalCardAses',
       signal: 'Ases',
     ),
     _SignalHelpRowData(
       card: null,
-      label: 'Mala',
+      labelKey: 'badHand',
       signal: 'Mala',
     ),
   ];
@@ -2045,9 +2218,9 @@ class _SignalHelpDialog extends StatelessWidget {
                   color: ZapitiColors.wineRed,
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: Text('Orden y señas', style: titleStyle)),
+                Expanded(child: Text(context.tr('signalHelpTitle'), style: titleStyle)),
                 IconButton(
-                  tooltip: 'Cerrar',
+                  tooltip: context.tr('close'),
                   onPressed: onClose,
                   icon: const Icon(Icons.close),
                   color: ZapitiColors.darkBrown,
@@ -2069,7 +2242,7 @@ class _SignalHelpDialog extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ZapitiActionButton(
-              label: 'CERRAR',
+              label: context.tr('closeUpper'),
               icon: Icons.check,
               onPressed: onClose,
               primary: true,
@@ -2083,12 +2256,12 @@ class _SignalHelpDialog extends StatelessWidget {
 
 class _SignalHelpRowData {
   final SpanishCard? card;
-  final String label;
+  final String labelKey;
   final String? signal;
 
   const _SignalHelpRowData({
     required this.card,
-    required this.label,
+    required this.labelKey,
     required this.signal,
   });
 }
@@ -2129,7 +2302,7 @@ class _SignalHelpRow extends StatelessWidget {
           Expanded(
             flex: 5,
             child: Text(
-              row.label,
+              context.tr(row.labelKey),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: bodyStyle,
@@ -2142,7 +2315,7 @@ class _SignalHelpRow extends StatelessWidget {
             child: row.signal == null
                 ? Center(
                     child: Text(
-                      'Del 12 al 4',
+                      context.tr('from12To4'),
                       textAlign: TextAlign.center,
                       style: bodyStyle?.copyWith(
                         color: ZapitiColors.darkBrown.withValues(alpha: 0.62),
@@ -2166,6 +2339,7 @@ class _SignalHelpRow extends StatelessWidget {
                         ),
                         width: 138,
                         height: 86,
+                        mirror: row.signal == '7 Oros',
                         alignment: Alignment.topCenter,
                         errorBuilder: (_, __, ___) => const Icon(
                           Icons.person,
@@ -2406,7 +2580,7 @@ class _SignalsBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
-              'Señas',
+              context.tr('signals'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: ZapitiColors.darkBrown,
                     fontWeight: FontWeight.w900,

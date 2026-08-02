@@ -9,6 +9,7 @@ class GamePreferencesData {
     this.botSpeedName,
     this.showGameplayHelp,
     this.confirmCardPlay,
+    this.languageCode,
   });
 
   final String? selectedCharacterId;
@@ -18,6 +19,7 @@ class GamePreferencesData {
   final String? botSpeedName;
   final bool? showGameplayHelp;
   final bool? confirmCardPlay;
+  final String? languageCode;
 }
 
 class GamePreferencesStore {
@@ -31,6 +33,7 @@ class GamePreferencesStore {
     required String botSpeedKey,
     required String showGameplayHelpKey,
     required String confirmCardPlayKey,
+    required String languageKey,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     return GamePreferencesData(
@@ -41,6 +44,7 @@ class GamePreferencesStore {
       botSpeedName: prefs.getString(botSpeedKey),
       showGameplayHelp: prefs.getBool(showGameplayHelpKey),
       confirmCardPlay: prefs.getBool(confirmCardPlayKey),
+      languageCode: prefs.getString(languageKey),
     );
   }
 
@@ -66,6 +70,8 @@ class GamePreferencesStore {
     required bool showGameplayHelp,
     required String confirmCardPlayKey,
     required bool confirmCardPlay,
+    required String languageKey,
+    required String languageCode,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(audioEnabledKey, audioEnabled);
@@ -73,5 +79,6 @@ class GamePreferencesStore {
     await prefs.setString(botSpeedKey, botSpeedName);
     await prefs.setBool(showGameplayHelpKey, showGameplayHelp);
     await prefs.setBool(confirmCardPlayKey, confirmCardPlay);
+    await prefs.setString(languageKey, languageCode);
   }
 }

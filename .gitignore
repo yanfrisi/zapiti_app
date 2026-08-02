@@ -21,6 +21,11 @@ pubspec.lock
 .env.*
 *.iml
 
+# Android signing
+android/key.properties
+*.jks
+*.keystore
+
 # OS
 .DS_Store
 Thumbs.db

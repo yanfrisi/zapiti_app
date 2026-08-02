@@ -1,9 +1,9 @@
-package com.example.zapiti_app
+package es.juanfran.zapiti
 
 import android.media.MediaPlayer
 import io.flutter.FlutterInjector
-import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
@@ -75,7 +75,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun cachedAudioFile(asset: String): File {
-        val assetKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)
+        val assetKey =
+            FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)
         val fileName = asset.substringAfterLast('/')
         val cacheFile = File(cacheDir, "zapiti_$fileName")
         if (cacheFile.exists() && cacheFile.length() > 0) {
