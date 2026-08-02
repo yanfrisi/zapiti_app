@@ -1,4 +1,4 @@
-﻿part of 'game_screen.dart';
+part of 'game_screen.dart';
 
 class _WoodBackground extends StatelessWidget {
   final Widget child;
@@ -198,8 +198,8 @@ class _MainMenuScreen extends StatelessWidget {
                 ),
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color:
-                        Colors.black.withValues(alpha: showingPanel ? 0.34 : 0.06),
+                    color: Colors.black
+                        .withValues(alpha: showingPanel ? 0.34 : 0.06),
                   ),
                 ),
                 Padding(
@@ -268,15 +268,15 @@ class _MainMenuActions extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ZapitiColors.cardCream,
-                      fontWeight: FontWeight.w900,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black,
-                          blurRadius: 4,
-                        ),
-                      ],
+                  color: ZapitiColors.cardCream,
+                  fontWeight: FontWeight.w900,
+                  shadows: const [
+                    Shadow(
+                      color: Colors.black,
+                      blurRadius: 4,
                     ),
+                  ],
+                ),
               ),
             ),
           ZapitiActionButton(
@@ -340,6 +340,7 @@ class _MainMenuActions extends StatelessWidget {
     );
   }
 }
+
 class _MainMenuInfoPanel extends StatelessWidget {
   final _MainMenuPanel panel;
   final bool audioEnabled;
@@ -695,9 +696,8 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
 
   void _previousPractice() {
     setState(() {
-      _practiceIndex =
-          (_practiceIndex - 1 + _practiceChallenges.length) %
-              _practiceChallenges.length;
+      _practiceIndex = (_practiceIndex - 1 + _practiceChallenges.length) %
+          _practiceChallenges.length;
     });
   }
 
@@ -1853,9 +1853,15 @@ class _MainMenuMultiplayerContentState
   bool _teamsLoaded = false;
   bool _rankingRequested = false;
   bool _didInitializeLocalizedTexts = false;
+  static const bool _teamSelectionFlowEnabled = false;
 
   String _tr(String key, {Map<String, Object?> params = const {}}) {
     return context.tr(key, params: params);
+  }
+
+  void _logTeamFlow(String event, Map<String, Object?> fields) {
+    if (!kDebugMode) return;
+    debugPrint('[zapiti_app] team_flow $event $fields');
   }
 
   @override
@@ -1945,6 +1951,7 @@ class _MainMenuMultiplayerContentState
     if (password.isNotEmpty) return password;
     return _profilePasswordFallback;
   }
+
   String get _teamName => _cleanTeamName(_teamNameController.text);
   String get _selectedTeamName {
     final selected = _selectedTeam;
@@ -2016,10 +2023,9 @@ class _MainMenuMultiplayerContentState
       prefs.getString(_GameScreenState._multiplayerPlayerNamePrefsKey) ??
           _nameController.text,
     );
-    _setUsernameField(
-      prefs.getString(_GameScreenState._multiplayerUsernamePrefsKey) ??
-          _defaultUsernameFromName(_nameController.text),
-    );
+    final savedUsername =
+        prefs.getString(_GameScreenState._multiplayerUsernamePrefsKey) ?? '';
+    _setUsernameField(savedUsername);
     _playerId = prefs.getString(_GameScreenState._multiplayerPlayerIdPrefsKey);
     _sessionToken = prefs.getString(
       _GameScreenState._multiplayerSessionTokenPrefsKey,
@@ -2049,16 +2055,6 @@ class _MainMenuMultiplayerContentState
             : _tr('multiplayerProfileRecover');
       });
     }
-  }
-
-  String _defaultUsernameFromName(String name) {
-    final normalized = name
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), '.')
-        .replaceAll(RegExp(r'[^a-z0-9_.-]'), '');
-    if (normalized.length >= 3) return _cleanUsername(normalized);
-    return '';
   }
 
   Future<void> _savePlayerName(String playerName) async {
@@ -2113,8 +2109,7 @@ class _MainMenuMultiplayerContentState
 
   String get _serverUrl => ServerConfig.websocketUrl;
 
-  String get _localPlayerId =>
-      _playerId ??= _createPersistentPlayerId();
+  String get _localPlayerId => _playerId ??= _createPersistentPlayerId();
 
   void _setConnectionState(
     _ServerConnectionState state, {
@@ -2518,7 +2513,10 @@ class _MainMenuMultiplayerContentState
           _status = switch (snapshot.phase) {
             'starting' => _tr('multiplayerReadyToStart'),
             'playing' => _tr('multiplayerPhasePlaying'),
-            _ => _tr('roomWithPhase', params: {'room': snapshot.roomId, 'phase': _phaseLabel(snapshot.phase)}),
+            _ => _tr('roomWithPhase', params: {
+                'room': snapshot.roomId,
+                'phase': _phaseLabel(snapshot.phase)
+              }),
           };
         });
         MultiplayerSessionStore.instance.roomSnapshot = snapshot;
@@ -2527,24 +2525,26 @@ class _MainMenuMultiplayerContentState
           MultiplayerSessionStore.instance.allowPassHand = allowPassHand;
         }
         _syncSelectedCharacterFromRoom();
-        _resolveTeamForRoomSnapshot(snapshot);
+        if (_teamSelectionFlowEnabled) {
+          _resolveTeamForRoomSnapshot(snapshot);
+        }
         _maybeAutoEnterGame();
         break;
       case MultiplayerMessageType.error:
         var shouldRetryRoomActionWithoutSession = false;
         setState(() {
           final code = message.payload['code']?.toString() ?? 'error';
-          final text = message.payload['message']?.toString() ?? _tr('multiplayerConnectionError');
+          final text = message.payload['message']?.toString() ??
+              _tr('multiplayerConnectionError');
           if (code == 'profile_not_found') {
             _profileStatus = _tr('multiplayerProfileRecover');
             _showCreateAccount = true;
           } else if (code == 'auth_failed') {
             _sessionToken = null;
             unawaited(_clearSavedSessionToken());
-            shouldRetryRoomActionWithoutSession =
-                _pendingRoomAction != null &&
-                    !_roomActionRetriedWithoutSession &&
-                    _usableProfilePassword != null;
+            shouldRetryRoomActionWithoutSession = _pendingRoomAction != null &&
+                !_roomActionRetriedWithoutSession &&
+                _usableProfilePassword != null;
             if (shouldRetryRoomActionWithoutSession) {
               _profileReady = true;
               _showCreateAccount = false;
@@ -2565,14 +2565,14 @@ class _MainMenuMultiplayerContentState
             'team_required' => _tr('multiplayerTeamSelectionFailed'),
             'invalid_team_for_room' => _tr('multiplayerRemoteErrorTeamUpdate'),
             'auth_failed' => _tr('multiplayerRemoteErrorExpired'),
-            'character_taken' => _tr('multiplayerCharacterOccupied', params: {'name': _selectedCharacterId}),
+            'character_taken' => _tr('multiplayerCharacterOccupied',
+                params: {'name': _selectedCharacterId}),
             'player_already_in_room' => _tr('multiplayerJoinFailed'),
             _ => _friendlyRemoteError(code, text),
           };
         });
         final errorCode = message.payload['code']?.toString();
-        if (errorCode == 'auth_failed' &&
-            shouldRetryRoomActionWithoutSession) {
+        if (errorCode == 'auth_failed' && shouldRetryRoomActionWithoutSession) {
           if (_retryPendingRoomActionWithoutSession()) {
             break;
           }
@@ -2629,11 +2629,12 @@ class _MainMenuMultiplayerContentState
           ];
           final localPlayerId = _playerId;
           if (localPlayerId != null) {
-            final playerStats = rankingPlayers.cast<Map<String, dynamic>?>()
-                .firstWhere(
-                  (entry) => entry?['playerId']?.toString() == localPlayerId,
-                  orElse: () => null,
-                );
+            final playerStats =
+                rankingPlayers.cast<Map<String, dynamic>?>().firstWhere(
+                      (entry) =>
+                          entry?['playerId']?.toString() == localPlayerId,
+                      orElse: () => null,
+                    );
             if (playerStats != null) {
               _playerStats = playerStats;
             }
@@ -2650,6 +2651,21 @@ class _MainMenuMultiplayerContentState
               in (message.payload['teams'] as List<dynamic>? ?? const []))
             if (entry is Map) Map<String, dynamic>.from(entry),
         ];
+        _logTeamFlow('teams_message_received', {
+          'teamCount': teams.length,
+          'selectedPairId': _selectedPairId,
+          'roomId': _roomSnapshot?.roomId,
+          'localPlayerId': _playerId,
+          'pairs': [
+            for (final team in teams)
+              {
+                'pairId': team['pairId'],
+                'teamName': team['teamName'],
+                'teammateIds': team['teammateIds'],
+                'teammateUsernames': team['teammateUsernames'],
+              },
+          ],
+        });
         setState(() {
           _playerTeams = teams;
           _teamsLoaded = true;
@@ -2658,24 +2674,31 @@ class _MainMenuMultiplayerContentState
                 (team) => team['pairId']?.toString() == _selectedPairId,
               )) {
             final snapshot = _roomSnapshot;
-            final teammate = snapshot == null ? null : _teammateSeatFor(snapshot);
-            _selectedPairId = teammate == null
-                ? teams.isEmpty
-                    ? null
-                    : teams.first['pairId']?.toString()
+            final teammate =
+                snapshot == null ? null : _teammateSeatFor(snapshot);
+            final teammatePairId = teammate == null
+                ? null
                 : _teamForTeammate(teammate.playerId)?['pairId']?.toString();
+            _selectedPairId =
+                teammatePairId != null && teammatePairId.isNotEmpty
+                    ? teammatePairId
+                    : null;
           }
-          final selectedName = _selectedTeamName;
-          if (selectedName.isNotEmpty) {
-            _setTeamNameField(selectedName);
-            unawaited(_saveTeamName(selectedName));
+          final selectedTeam = _selectedTeam;
+          if (selectedTeam != null) {
+            final selectedName =
+                selectedTeam['teamName']?.toString().trim() ?? '';
+            if (selectedName.isNotEmpty) {
+              _setTeamNameField(selectedName);
+              unawaited(_saveTeamName(selectedName));
+            }
           }
           _status = teams.isEmpty
               ? _tr('multiplayerTeamsLoadingFailed')
               : _tr('multiplayerTeamSynced');
         });
         final snapshot = _roomSnapshot;
-        if (snapshot != null) {
+        if (_teamSelectionFlowEnabled && snapshot != null) {
           _resolveTeamForRoomSnapshot(snapshot);
         }
         break;
@@ -2685,8 +2708,7 @@ class _MainMenuMultiplayerContentState
         final profileUsername = message.payload['username']?.toString();
         final profileName = message.payload['name']?.toString();
         final profileTeamName = message.payload['teamName']?.toString() ?? '';
-        final profileSessionToken =
-            message.payload['sessionToken']?.toString();
+        final profileSessionToken = message.payload['sessionToken']?.toString();
         if (profilePlayerId == null || profileName == null) {
           setState(() {
             _profileStatus = _tr('multiplayerProfileRecoverFailed');
@@ -2719,10 +2741,13 @@ class _MainMenuMultiplayerContentState
               ? _tr('multiplayerProfileSessionStarted')
               : _tr('multiplayerProfileSessionStartedCredentials');
           _status = _profileReady
-              ? _tr('multiplayerProfileSynced', params: {'name': _cleanPlayerName(profileName)})
+              ? _tr('multiplayerProfileSynced',
+                  params: {'name': _cleanPlayerName(profileName)})
               : _tr('multiplayerProfileSyncedNeedsLogin');
         });
-        _requestTeamsIfReady();
+        if (_teamSelectionFlowEnabled) {
+          _requestTeamsIfReady();
+        }
         break;
       default:
         setState(() {
@@ -2742,25 +2767,7 @@ class _MainMenuMultiplayerContentState
     if (code.contains('team')) {
       return _tr('multiplayerRemoteErrorTeamUpdate');
     }
-    if (text.trim().isNotEmpty && text.length < 72 && !_looksTechnical(text)) {
-      return text;
-    }
     return _tr('multiplayerRemoteErrorServiceUnavailable');
-  }
-
-  bool _looksTechnical(String text) {
-    final lower = text.toLowerCase();
-    return lower.contains('websocket') ||
-        lower.contains('socket') ||
-        lower.contains('http') ||
-        lower.contains('api') ||
-        lower.contains('backend') ||
-        lower.contains('endpoint') ||
-        lower.contains('exception') ||
-        lower.contains('stack') ||
-        lower.contains('localhost') ||
-        lower.contains('10.0.2.2') ||
-        lower.contains('://');
   }
 
   Future<void> _createRoom() async {
@@ -2819,8 +2826,7 @@ class _MainMenuMultiplayerContentState
         password: _sessionToken == null ? _usableProfilePassword : null,
         teamName: _selectedTeamName,
         sessionToken: _sessionToken,
-        characterId:
-            _characterSelectionReleased ? null : _selectedCharacterId,
+        characterId: _characterSelectionReleased ? null : _selectedCharacterId,
         allowPassHand: _allowPassHandForRoom,
       );
       setState(() {
@@ -2898,8 +2904,7 @@ class _MainMenuMultiplayerContentState
         password: _sessionToken == null ? _usableProfilePassword : null,
         teamName: _selectedTeamName,
         sessionToken: _sessionToken,
-        characterId:
-            _characterSelectionReleased ? null : _selectedCharacterId,
+        characterId: _characterSelectionReleased ? null : _selectedCharacterId,
       );
       setState(() {
         _status = _tr('multiplayerJoinRequested', params: {'room': roomCode});
@@ -3035,7 +3040,11 @@ class _MainMenuMultiplayerContentState
       return;
     }
     final snapshot = _roomSnapshot;
-    if (snapshot != null &&
+    if (_teamSelectionFlowEnabled && snapshot != null) {
+      _resolveTeamForRoomSnapshot(snapshot);
+    }
+    if (_teamSelectionFlowEnabled &&
+        snapshot != null &&
         snapshot.seats.length >= 4 &&
         _teammateSeatFor(snapshot)?.playerId.isNotEmpty == true &&
         (_selectedPairId == null || _selectedPairId!.isEmpty)) {
@@ -3045,7 +3054,24 @@ class _MainMenuMultiplayerContentState
       _resolveTeamForRoomSnapshot(snapshot);
       return;
     }
-    _sendTeamSelectionIfReady(roomId: roomId);
+    final syncedPairId =
+        snapshot == null ? null : _localSeatFor(snapshot)?.pairId;
+    if (_teamSelectionFlowEnabled &&
+        (_selectedPairId ?? '').isNotEmpty &&
+        syncedPairId != _selectedPairId) {
+      _logTeamFlow('ready_requires_select_team_first', {
+        'roomId': roomId,
+        'selectedPairId': _selectedPairId,
+        'syncedPairId': syncedPairId,
+      });
+      _sendTeamSelectionIfReady(roomId: roomId);
+    } else {
+      _logTeamFlow('ready_select_team_not_needed', {
+        'roomId': roomId,
+        'selectedPairId': _selectedPairId,
+        'syncedPairId': syncedPairId,
+      });
+    }
 
     final nextReady = !_ready;
     setState(() {
@@ -3088,6 +3114,7 @@ class _MainMenuMultiplayerContentState
   }
 
   void _requestTeamsIfReady() {
+    if (!_teamSelectionFlowEnabled) return;
     final socket = _socket;
     final playerId = _playerId;
     final sessionToken = _sessionToken;
@@ -3096,9 +3123,18 @@ class _MainMenuMultiplayerContentState
         playerId == null ||
         sessionToken == null ||
         sessionToken.isEmpty) {
+      _logTeamFlow('request_teams_skipped', {
+        'socketConnected': socket?.isConnected,
+        'hasPlayerId': playerId != null,
+        'hasSessionToken': sessionToken != null && sessionToken.isNotEmpty,
+      });
       return;
     }
     try {
+      _logTeamFlow('request_teams_sent', {
+        'playerId': playerId,
+        'roomId': _connectedRoomId ?? _roomController.text.trim(),
+      });
       socket.requestTeams(playerId: playerId, sessionToken: sessionToken);
     } catch (error) {
       setState(() {
@@ -3108,57 +3144,120 @@ class _MainMenuMultiplayerContentState
   }
 
   void _resolveTeamForRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
+    if (!_teamSelectionFlowEnabled) {
+      _closeCreateTeamDialog();
+      return;
+    }
     if (snapshot.phase != 'lobby') return;
     if (snapshot.seats.length < 4) return;
     final localSeat = _localSeatFor(snapshot);
     final teammate = _teammateSeatFor(snapshot);
     final teammateUsername = teammate?.username?.trim() ?? '';
-    if (teammate == null || teammateUsername.isEmpty) return;
+    _logTeamFlow('resolve_team_start', {
+      'roomId': snapshot.roomId,
+      'localPlayerId': _playerId,
+      'localSeat': localSeat == null
+          ? null
+          : {
+              'seatIndex': localSeat.seatIndex,
+              'username': localSeat.username,
+              'pairId': localSeat.pairId,
+              'teamName': localSeat.teamName,
+              'teamId': localSeat.teamId,
+            },
+      'teammate': teammate == null
+          ? null
+          : {
+              'playerId': teammate.playerId,
+              'seatIndex': teammate.seatIndex,
+              'username': teammate.username,
+              'pairId': teammate.pairId,
+              'teamName': teammate.teamName,
+              'teamId': teammate.teamId,
+            },
+      'teamsLoaded': _teamsLoaded,
+      'teamCount': _playerTeams.length,
+      'selectedPairId': _selectedPairId,
+    });
+    if (teammate == null || teammateUsername.isEmpty) {
+      _logTeamFlow('resolve_team_stop', {
+        'reason':
+            teammate == null ? 'missing_teammate' : 'missing_teammate_username',
+      });
+      return;
+    }
     if (_teamDialogContext != null &&
         _teamDialogTeammatePlayerId != null &&
         _teamDialogTeammatePlayerId != teammate.playerId) {
       _closeCreateTeamDialog();
       _teamModalShownForCurrentRoom = false;
     }
-    final selectedTeam = _selectedTeam;
-    if (selectedTeam != null &&
-        _teamForTeammate(teammate.playerId)?['pairId']?.toString() !=
-            selectedTeam['pairId']?.toString()) {
-      setState(() {
-        _selectedPairId = null;
+    final localPairId = localSeat?.pairId?.trim() ?? '';
+    if (localPairId.isNotEmpty) {
+      final localTeamName = localSeat?.teamName?.trim() ?? '';
+      _logTeamFlow('resolve_team_room_pair', {
+        'pairId': localPairId,
+        'teamName': localTeamName,
+        'selectedPairId': _selectedPairId,
       });
-    }
-    final teammatePairId = teammate.pairId?.trim() ?? '';
-    if (teammatePairId.isNotEmpty) {
-      final teammateTeamName = teammate.teamName?.trim() ?? '';
-      final alreadySelected = _selectedPairId == teammatePairId;
-      final alreadySynced = localSeat?.pairId == teammatePairId;
-      if (!alreadySelected || !alreadySynced) {
+      if (_selectedPairId != localPairId) {
         setState(() {
-          _selectedPairId = teammatePairId;
-          if (teammateTeamName.isNotEmpty) {
-            _setTeamNameField(teammateTeamName);
-            unawaited(_saveTeamName(teammateTeamName));
+          _selectedPairId = localPairId;
+          if (localTeamName.isNotEmpty) {
+            _setTeamNameField(localTeamName);
+            unawaited(_saveTeamName(localTeamName));
           }
-          _status = teammateTeamName.isEmpty
+          _status = localTeamName.isEmpty
               ? _tr('multiplayerTeamSynced')
-              : _tr('multiplayerTeamNamedSynced', params: {'name': teammateTeamName});
+              : _tr('multiplayerTeamNamedSynced',
+                  params: {'name': localTeamName});
         });
-        _closeCreateTeamDialog();
-        _requestTeamsIfReady();
+      }
+      return;
+    }
+
+    final currentTeam = _teamForCurrentPair(snapshot);
+    if (currentTeam != null) {
+      final pairId = currentTeam['pairId']?.toString() ?? '';
+      final teamName = currentTeam['teamName']?.toString().trim() ?? '';
+      _logTeamFlow('resolve_team_existing_current_pair', {
+        'pairId': pairId,
+        'teamName': teamName,
+        'selectedPairId': _selectedPairId,
+      });
+      if (pairId.isNotEmpty && _selectedPairId != pairId) {
+        setState(() {
+          _selectedPairId = pairId;
+          if (teamName.isNotEmpty) {
+            _setTeamNameField(teamName);
+            unawaited(_saveTeamName(teamName));
+          }
+          _status = teamName.isEmpty
+              ? _tr('multiplayerTeamSynced')
+              : _tr('multiplayerTeamNamedSynced', params: {'name': teamName});
+        });
         _sendTeamSelectionIfReady(roomId: snapshot.roomId);
       }
       return;
     }
+
+    final teammateTeam = _teamForTeammate(teammate.playerId);
     if (!_teamsLoaded) {
+      _logTeamFlow('resolve_team_waiting_teams', {
+        'teammatePlayerId': teammate.playerId,
+      });
       _requestTeamsIfReady();
       return;
     }
 
-    final existingTeam = _teamForTeammate(teammate.playerId);
-    if (existingTeam != null) {
-      final pairId = existingTeam['pairId']?.toString();
-      final teamName = existingTeam['teamName']?.toString().trim() ?? '';
+    if (teammateTeam != null) {
+      final pairId = teammateTeam['pairId']?.toString();
+      final teamName = teammateTeam['teamName']?.toString().trim() ?? '';
+      _logTeamFlow('resolve_team_existing_teammate', {
+        'pairId': pairId,
+        'teamName': teamName,
+        'teammatePlayerId': teammate.playerId,
+      });
       if (pairId != null && pairId.isNotEmpty) {
         setState(() {
           _selectedPairId = pairId;
@@ -3175,6 +3274,7 @@ class _MainMenuMultiplayerContentState
 
     final localCharacterId = localSeat?.characterId;
     if (localCharacterId == null || localCharacterId.isEmpty) {
+      _logTeamFlow('resolve_team_stop', {'reason': 'missing_character'});
       setState(() {
         _status =
             'Elige y confirma personaje antes de crear equipo con tu companero.';
@@ -3182,6 +3282,11 @@ class _MainMenuMultiplayerContentState
       return;
     }
     if (_teamPromptConfirmedCharacterId != localCharacterId) {
+      _logTeamFlow('resolve_team_confirm_character_first', {
+        'characterId': localCharacterId,
+        'confirmedCharacterId': _teamPromptConfirmedCharacterId,
+        'dismissedCharacterId': _teamPromptDismissedCharacterId,
+      });
       if (_teamPromptDismissedCharacterId != localCharacterId &&
           _characterConfirmDialogContext == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3192,9 +3297,27 @@ class _MainMenuMultiplayerContentState
       return;
     }
 
-    if (_teamModalShownForCurrentRoom) return;
+    if (_teamModalShownForCurrentRoom &&
+        _teamDialogTeammatePlayerId == teammate.playerId) {
+      _logTeamFlow('create_team_modal_skip', {
+        'reason': 'already_shown_for_teammate',
+        'teammatePlayerId': teammate.playerId,
+      });
+      return;
+    }
+    if (_teamModalShownForCurrentRoom &&
+        _teamDialogTeammatePlayerId != teammate.playerId) {
+      _teamModalShownForCurrentRoom = false;
+      _teamDialogTeammatePlayerId = null;
+    }
     _teamModalShownForCurrentRoom = true;
     _teamDialogTeammatePlayerId = teammate.playerId;
+    _logTeamFlow('create_team_modal_schedule', {
+      'roomId': snapshot.roomId,
+      'teammatePlayerId': teammate.playerId,
+      'teammateUsername': teammate.username,
+      'teammateName': teammate.name,
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
       _showCreateTeamDialog(teammate);
@@ -3252,7 +3375,28 @@ class _MainMenuMultiplayerContentState
     for (final team in _playerTeams) {
       final playerIds = team['playerIds'];
       if (playerIds is List &&
-          playerIds.map((entry) => entry.toString()).contains(teammatePlayerId)) {
+          playerIds
+              .map((entry) => entry.toString())
+              .contains(teammatePlayerId)) {
+        return team;
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _teamForCurrentPair(MultiplayerRoomSnapshot snapshot) {
+    final localSeat = _localSeatFor(snapshot);
+    final teammateSeat = _teammateSeatFor(snapshot);
+    final localUsername = localSeat?.username?.trim() ?? '';
+    final teammateUsername = teammateSeat?.username?.trim() ?? '';
+    if (localUsername.isEmpty || teammateUsername.isEmpty) return null;
+    for (final team in _playerTeams) {
+      final teammateUsernames = team['teammateUsernames'];
+      if (teammateUsernames is! List) continue;
+      final usernames =
+          teammateUsernames.map((entry) => entry.toString()).toSet();
+      if (usernames.contains(teammateUsername) &&
+          usernames.contains(localUsername)) {
         return team;
       }
     }
@@ -3260,6 +3404,7 @@ class _MainMenuMultiplayerContentState
   }
 
   void _sendTeamSelectionIfReady({String? roomId}) {
+    if (!_teamSelectionFlowEnabled) return;
     final socket = _socket;
     final playerId = _playerId;
     final sessionToken = _sessionToken;
@@ -3272,10 +3417,22 @@ class _MainMenuMultiplayerContentState
         sessionToken == null ||
         pairId == null ||
         targetRoomId.isEmpty) {
+      _logTeamFlow('select_team_skipped', {
+        'socketConnected': socket?.isConnected,
+        'hasPlayerId': playerId != null,
+        'hasSessionToken': sessionToken != null,
+        'pairId': pairId,
+        'roomId': targetRoomId,
+      });
       return;
     }
 
     try {
+      _logTeamFlow('select_team_sent', {
+        'roomId': targetRoomId,
+        'playerId': playerId,
+        'pairId': pairId,
+      });
       socket.selectTeam(
         roomId: targetRoomId,
         playerId: playerId,
@@ -3308,7 +3465,8 @@ class _MainMenuMultiplayerContentState
         _characterConfirmDialogContext = context;
         return AlertDialog(
           title: Text(_tr('confirmCharacterTitle')),
-          content: Text(_tr('confirmCharacterBody', params: {'name': characterName})),
+          content: Text(
+              _tr('confirmCharacterBody', params: {'name': characterName})),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -3328,7 +3486,8 @@ class _MainMenuMultiplayerContentState
       setState(() {
         _teamPromptConfirmedCharacterId = characterId;
         _teamPromptDismissedCharacterId = null;
-        _status = _tr('multiplayerCharacterConfirmed', params: {'name': characterName});
+        _status = _tr('multiplayerCharacterConfirmed',
+            params: {'name': characterName});
       });
       final snapshot = _roomSnapshot;
       if (snapshot != null) {
@@ -3362,7 +3521,8 @@ class _MainMenuMultiplayerContentState
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
               labelText: _tr('teamNameLabel'),
-              helperText: _tr('teammateNameHelper', params: {'name': teammate.name}),
+              helperText:
+                  _tr('teammateNameHelper', params: {'name': teammate.name}),
             ),
           ),
           actions: [
@@ -3410,6 +3570,11 @@ class _MainMenuMultiplayerContentState
     }
 
     try {
+      _logTeamFlow('create_team_sent', {
+        'playerId': playerId,
+        'teammateUsername': teammateUsername,
+        'teamName': teamName,
+      });
       socket.createTeam(
         playerId: playerId,
         sessionToken: sessionToken,
@@ -3418,8 +3583,17 @@ class _MainMenuMultiplayerContentState
       );
       setState(() {
         _setTeamNameField(teamName);
-        _status = _tr('multiplayerCreateTeamInProgress', params: {'username': teammateUsername});
+        _status = _tr('multiplayerCreateTeamInProgress',
+            params: {'username': teammateUsername});
       });
+      _requestTeamsIfReady();
+      final snapshot = _roomSnapshot;
+      if (snapshot != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
+          _resolveTeamForRoomSnapshot(snapshot);
+        });
+      }
     } catch (error) {
       setState(() {
         _status = _tr('multiplayerCreateTeamFailed');
@@ -3861,7 +4035,8 @@ class _MainMenuMultiplayerContentState
                               ),
                               if (_selectedTeamName.isNotEmpty)
                                 Text(
-                                  _tr('multiplayerTeamDisplay', params: {'name': _selectedTeamName}),
+                                  _tr('multiplayerTeamDisplay',
+                                      params: {'name': _selectedTeamName}),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: bodyStyle.copyWith(
@@ -3912,7 +4087,11 @@ class _MainMenuMultiplayerContentState
                 Text(
                   _characterSelectionReleased
                       ? context.tr('characterSelectionUnset')
-                      : context.tr('characterSelectionValue', params: {'name': CharacterAssets.displayNames[_selectedCharacterId] ?? _selectedCharacterId}),
+                      : context.tr('characterSelectionValue', params: {
+                          'name': CharacterAssets
+                                  .displayNames[_selectedCharacterId] ??
+                              _selectedCharacterId
+                        }),
                   style: bodyStyle.copyWith(
                     color: ZapitiColors.darkBrown,
                     fontWeight: FontWeight.w900,
@@ -4031,7 +4210,9 @@ class _MainMenuMultiplayerContentState
                 SizedBox(
                   height: 42,
                   child: ZapitiActionButton(
-                    label: _ready ? context.tr('readyUpper') : context.tr('markReadyUpper'),
+                    label: _ready
+                        ? context.tr('readyUpper')
+                        : context.tr('markReadyUpper'),
                     icon: _ready
                         ? Icons.check_circle
                         : Icons.radio_button_unchecked,
@@ -4363,7 +4544,8 @@ class _MultiplayerSessionView extends StatelessWidget {
             const Icon(Icons.groups_outlined, color: ZapitiColors.wineRed),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(context.tr('multiplayerMatchTitle'), style: titleStyle),
+              child:
+                  Text(context.tr('multiplayerMatchTitle'), style: titleStyle),
             ),
           ],
         ),
@@ -4487,7 +4669,8 @@ class _MultiplayerSessionView extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                context.tr('teamLabel', params: {'team': teamId}),
+                                context
+                                    .tr('teamLabel', params: {'team': teamId}),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: bodyStyle.copyWith(
@@ -4767,63 +4950,63 @@ class _RankingPanel extends StatelessWidget {
           height: panelHeight,
           child: ListView(
             children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.leaderboard_outlined,
-                  size: 16,
-                  color: ZapitiColors.wineRed,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Ranking de parejas',
-                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.leaderboard_outlined,
+                    size: 16,
+                    color: ZapitiColors.wineRed,
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ranking de parejas',
+                      style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (visiblePairs.isEmpty)
+                Text(context.tr('noMatchesRegistered'), style: bodyStyle)
+              else ...[
+                _RankingHeader(style: bodyStyle),
+                const SizedBox(height: 4),
+                for (var index = 0; index < visiblePairs.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+                    child: _RankingRow(
+                      position: index + 1,
+                      pair: visiblePairs[index],
+                    ),
+                  ),
               ],
-            ),
-            const SizedBox(height: 6),
-            if (visiblePairs.isEmpty)
-              Text(context.tr('noMatchesRegistered'), style: bodyStyle)
-            else ...[
-              _RankingHeader(style: bodyStyle),
-              const SizedBox(height: 4),
-              for (var index = 0; index < visiblePairs.length; index++)
-                Padding(
-                  padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
-                  child: _RankingRow(
-                    position: index + 1,
-                    pair: visiblePairs[index],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.history_outlined,
+                    size: 16,
+                    color: ZapitiColors.wineRed,
                   ),
-                ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(
-                  Icons.history_outlined,
-                  size: 16,
-                  color: ZapitiColors.wineRed,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Ultimas partidas',
-                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ultimas partidas',
+                      style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (visibleMatches.isEmpty)
-              Text(context.tr('noHistory'), style: bodyStyle)
-            else
-              for (var index = 0; index < visibleMatches.length; index++)
-                Padding(
-                  padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
-                  child: _MatchHistoryRow(match: visibleMatches[index]),
-                ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (visibleMatches.isEmpty)
+                Text(context.tr('noHistory'), style: bodyStyle)
+              else
+                for (var index = 0; index < visibleMatches.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+                    child: _MatchHistoryRow(match: visibleMatches[index]),
+                  ),
             ],
           ),
         ),
@@ -4978,9 +5161,7 @@ class _MultiplayerVersionBlockedView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              checking
-                  ? Icons.sync_outlined
-                  : Icons.system_update_alt_outlined,
+              checking ? Icons.sync_outlined : Icons.system_update_alt_outlined,
               color: ZapitiColors.wineRed,
               size: 30,
             ),
@@ -4994,9 +5175,7 @@ class _MultiplayerVersionBlockedView extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              message.isEmpty
-                  ? context.tr('preparingVersionCheck')
-                  : message,
+              message.isEmpty ? context.tr('preparingVersionCheck') : message,
               textAlign: TextAlign.center,
               style: bodyStyle,
             ),
