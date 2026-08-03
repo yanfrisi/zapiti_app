@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_info.dart';
 import '../l10n/zapiti_localizations.dart';
+import '../services/account_privacy_service.dart';
 import '../theme/zapiti_theme.dart';
 import '../widgets/zapiti_action_button.dart';
 
@@ -23,6 +24,28 @@ class AboutScreen extends StatelessWidget {
         SnackBar(content: Text(context.tr('linkOpenError'))),
       );
     }
+  }
+
+  void _openPrivacyPolicy(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _LegalTextScreen(
+          title: context.tr('privacyPolicyTitle'),
+          body: [
+            for (var index = 1; index <= 6; index++)
+              context.tr('privacyPolicyBody$index'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openAccountDeletion(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _AccountDeletionScreen(onOpenLink: _openLink),
+      ),
+    );
   }
 
   @override
@@ -107,6 +130,15 @@ class AboutScreen extends StatelessWidget {
                                   textAlign: TextAlign.center,
                                   style: subtitleStyle,
                                 ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: ZapitiActionButton(
+                                    label: context.tr('back'),
+                                    icon: Icons.arrow_back,
+                                    onPressed: () => Navigator.of(context).pop(),
+                                  ),
+                                ),
                                 const SizedBox(height: 18),
                                 AboutInfoSection(
                                   title: context.tr('aboutAuthor'),
@@ -170,14 +202,40 @@ class AboutScreen extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 18),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: ZapitiActionButton(
-                                    label: context.tr('back'),
-                                    icon: Icons.arrow_back,
-                                    onPressed: () => Navigator.of(context).pop(),
-                                  ),
+                                const SizedBox(height: 12),
+                                AboutInfoSection(
+                                  title: context.tr('privacyAccountSection'),
+                                  children: [
+                                    Wrap(
+                                      spacing: 10,
+                                      runSpacing: 10,
+                                      children: [
+                                        _AboutLinkButton(
+                                          label:
+                                              context.tr('privacyPolicyTitle'),
+                                          icon: Icons.privacy_tip_outlined,
+                                          onPressed: () =>
+                                              _openPrivacyPolicy(context),
+                                        ),
+                                        _AboutLinkButton(
+                                          label:
+                                              context.tr('deleteAccountTitle'),
+                                          icon: Icons.delete_outline,
+                                          onPressed: () =>
+                                              _openAccountDeletion(context),
+                                        ),
+                                        _AboutLinkButton(
+                                          label:
+                                              context.tr('webPrivacyButton'),
+                                          icon: Icons.open_in_new,
+                                          onPressed: () => _openLink(
+                                            context,
+                                            AppLinks.privacyPolicy,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ],
                             );
@@ -191,6 +249,155 @@ class AboutScreen extends StatelessWidget {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LegalTextScreen extends StatelessWidget {
+  final String title;
+  final List<String> body;
+  final Widget? footer;
+
+  const _LegalTextScreen({
+    required this.title,
+    required this.body,
+    this.footer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ZapitiColors.cardCream.withValues(alpha: 0.9),
+          height: 1.32,
+          fontWeight: FontWeight.w700,
+        );
+
+    return Scaffold(
+      backgroundColor: ZapitiColors.woodDark,
+      body: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                ZapitiColors.woodDark,
+                ZapitiColors.wood,
+                ZapitiColors.woodDark,
+              ],
+              stops: [0, 0.55, 1],
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final inset = min(18.0, constraints.maxWidth * 0.04);
+              return SingleChildScrollView(
+                padding: EdgeInsets.all(inset),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: AboutInfoSection(
+                      title: title,
+                      children: [
+                        for (final paragraph in body) ...[
+                          Text(paragraph, style: bodyStyle),
+                          const SizedBox(height: 10),
+                        ],
+                        if (footer != null)
+                          footer!
+                        else
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ZapitiActionButton(
+                              label: context.tr('back'),
+                              icon: Icons.arrow_back,
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountDeletionScreen extends StatefulWidget {
+  final Future<void> Function(BuildContext context, String url) onOpenLink;
+
+  const _AccountDeletionScreen({required this.onOpenLink});
+
+  @override
+  State<_AccountDeletionScreen> createState() => _AccountDeletionScreenState();
+}
+
+class _AccountDeletionScreenState extends State<_AccountDeletionScreen> {
+  bool _clearing = false;
+
+  Future<void> _clearLocalProfile() async {
+    setState(() {
+      _clearing = true;
+    });
+    await AccountPrivacyService.clearLocalMultiplayerProfile();
+    if (!mounted) return;
+    setState(() {
+      _clearing = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Datos multijugador eliminados de este dispositivo.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _LegalTextScreen(
+      title: 'Eliminar cuenta',
+      body: const [
+        'Desde aquí puedes iniciar la eliminación de tu cuenta multijugador de Zapiti.',
+        'La solicitud debe eliminar usuario, nombre de jugador, credenciales, sesión y datos personales asociados al perfil online.',
+        'El historial de partidas puede conservarse de forma anónima para mantener resultados y ranking sin identificarte.',
+        'También puedes borrar de este dispositivo los datos locales de acceso al multijugador.',
+      ],
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _AboutLinkButton(
+                label: 'Abrir solicitud web',
+                icon: Icons.open_in_new,
+                onPressed: () => widget.onOpenLink(
+                  context,
+                  AppLinks.accountDeletion,
+                ),
+              ),
+              _AboutLinkButton(
+                label: _clearing ? 'Borrando...' : 'Borrar datos locales',
+                icon: Icons.delete_sweep_outlined,
+                onPressed: _clearing ? null : _clearLocalProfile,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ZapitiActionButton(
+              label: context.tr('back'),
+              icon: Icons.arrow_back,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -238,7 +445,7 @@ class AboutInfoSection extends StatelessWidget {
 class _AboutLinkButton extends StatelessWidget {
   final String label;
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _AboutLinkButton({
     required this.label,

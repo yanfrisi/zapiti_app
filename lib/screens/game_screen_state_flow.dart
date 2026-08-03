@@ -1052,7 +1052,10 @@ extension _GameScreenStateFlow on _GameScreenState {
   void _openAboutScreen() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const AboutScreen(),
+        builder: (_) => ZapitiLocalizations(
+          language: _language,
+          child: const AboutScreen(),
+        ),
       ),
     );
   }
