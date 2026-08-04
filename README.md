@@ -51,3 +51,36 @@ Si la conexión se corta en mitad de una partida, el cliente intenta volver a ab
 ```bash
 flutter test
 ```
+
+## Benchmark de IA
+
+Para imprimir un informe reproducible de balance entre dificultades:
+
+```bash
+flutter test test/domain/ai_balance_report_test.dart --dart-define=AI_BALANCE_REPORT=true
+```
+
+Para validar la infraestructura del benchmark sin imprimir el informe completo:
+
+```bash
+flutter test test/domain/ai_benchmark_report_test.dart
+```
+
+## Estado del plan v0.2.0
+
+La app ya incluye:
+
+- reglas de truco con alternancia real;
+- `BetState` y sincronizacion de `stateVersion`;
+- seña `Ven a mi`;
+- politicas de bots por dificultad;
+- determinizacion de cartas ocultas;
+- simulacion pura de mano;
+- `RolloutBotPolicy` e `IsmctsBotPolicy` inicial;
+- benchmarks reproducibles del lado app.
+
+Queda pendiente fuera de este repo o de esta sesion:
+
+- validar y cerrar completamente `C:\\ESD\\zapiti_server`;
+- generar APK release y AAB firmado;
+- cierre final de publicacion.

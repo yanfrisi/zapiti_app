@@ -2,10 +2,12 @@ import 'dart:math';
 
 import 'bot_al_ver_strategy.dart';
 import 'bot_bluff_strategy.dart';
+import 'bot_decision_context.dart';
+import 'bot_policy.dart';
 import 'bot_memory_context.dart';
-import 'bot_strategy.dart';
 import 'bot_table_read.dart';
 import 'bot_truco_raise_strategy.dart';
+import 'bot_truco_response_strategy.dart';
 import 'bot_truco_strategy.dart';
 import 'difficulty_profile.dart';
 import 'difficulty_strategy.dart';
@@ -366,6 +368,9 @@ class AiMatchSimulator {
       opponentHasStrongSignal: false,
       isCompanion: false,
       needsPoints: needsPoints,
+      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
+      opponentsSpentPower: memory.opponentsSpentPower,
+      teamSpentPower: memory.teamSpentPower,
     );
     final shouldBluff = shouldCall
         ? false
@@ -383,6 +388,8 @@ class AiMatchSimulator {
             opponentsSpentPower: memory.opponentsSpentPower,
             teamSpentPower: memory.teamSpentPower,
             teamIsUnderRoundPressure: memory.teamIsUnderRoundPressure,
+            scoreGap:
+                controller.score[teamId]! - controller.score[opponentTeamId]!,
           );
 
     if (!shouldCall && !shouldBluff) return false;
@@ -463,6 +470,12 @@ class AiMatchSimulator {
       hasStrongSignal: false,
       isWinningReparto: isWinningReparto,
       sawOpponentStrongSignal: false,
+      canCloseHand: controller.roundWins[teamId]! > 0,
+      mustSaveHand: controller.roundWins[opponentTeamId]! > 0,
+      needsPoints:
+          controller.score[teamId]! < controller.score[opponentTeamId]! ||
+              memory.teamIsUnderRoundPressure,
+      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
       roll: random.nextDouble(),
     );
     if (controller.raiseOptions.contains(raiseValue)) return raiseValue;
@@ -481,6 +494,7 @@ class AiMatchSimulator {
       isWinningReparto: isWinningReparto,
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
+      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
     );
     return controller.raiseOptions.contains(bluffValue) ? bluffValue : null;
   }
@@ -505,43 +519,32 @@ class AiMatchSimulator {
     final profileDifficulty = _difficultyFor(config, teamId);
     final profile = DifficultyProfiles.byLevel(profileDifficulty);
     final opponentTeamId = TeamRules.opponentOf(teamId);
-    final teamScore = _teamHandScore(controller, teamId);
-    final canCloseHand = controller.roundWins[teamId]! > 0;
-    final mustSaveHand = controller.roundWins[opponentTeamId]! > 0;
-    final scorePressure =
-        controller.score[teamId]! < controller.score[opponentTeamId]!;
-    final tableDiscount = controller.playedCards.length >= 2 ? 14 : 6;
-    final closingThreshold =
-        _callThreshold(profileDifficulty, 94) - tableDiscount;
-
-    if (canCloseHand && teamScore >= closingThreshold) return true;
-    if (profile.impulsiveTrucoChance > 0 &&
-        random.nextDouble() < profile.impulsiveTrucoChance) {
-      return pendingValue <= 5;
-    }
-    if (canCloseHand &&
-        teamScore >= _callThreshold(profileDifficulty, 86) &&
-        pendingValue <= 6) {
-      return true;
-    }
-    if (mustSaveHand &&
-        teamScore >= _callThreshold(profileDifficulty, 85) &&
-        pendingValue <= 5) {
-      return true;
-    }
-    if (scorePressure &&
-        teamScore >= _callThreshold(profileDifficulty, 105) &&
-        pendingValue <= 6) {
-      return true;
-    }
-    if (teamScore >= _callThreshold(profileDifficulty, 148)) {
-      return pendingValue <= 8;
-    }
-    if (teamScore >= _callThreshold(profileDifficulty, 122)) {
-      return pendingValue <= 5;
-    }
-    return teamScore >= _callThreshold(profileDifficulty, 100) &&
-        pendingValue <= 3;
+    final responder = _responderFor(controller, teamId);
+    final memory = BotMemoryContext.from(
+      bot: responder,
+      playedCards: controller.playedCards,
+      roundHistory: controller.roundHistory,
+    );
+    return BotTrucoResponseStrategy.shouldAccept(
+      difficulty: profileDifficulty,
+      pendingValue: pendingValue,
+      maxAllowedValue: controller.maxAllowedTrucoValue,
+      teamScoreEstimate: _teamHandScore(controller, teamId),
+      handStrength: BotTrucoStrategy.evaluateHandStrength(
+        _teamCards(controller, teamId),
+      ),
+      cardsOnTable: controller.playedCards.length,
+      canCloseHand: controller.roundWins[teamId]! > 0,
+      mustSaveHand: controller.roundWins[opponentTeamId]! > 0,
+      hasStrongSignal: false,
+      opponentHasStrongSignal: profile.readsOpponentSignals && false,
+      needsPoints:
+          controller.score[teamId]! < controller.score[opponentTeamId]! ||
+              memory.teamIsUnderRoundPressure,
+      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
+      currentRoundUnsavable: false,
+      roll: random.nextDouble(),
+    );
   }
 
   SpanishCard _chooseCard(
@@ -573,19 +576,29 @@ class AiMatchSimulator {
     final forceWinIfPossible = controller.handValue >= 6 ||
         controller.roundWins[opponentTeamId]! >
             controller.roundWins[player.teamId]!;
-
-    final strategicCard = BotStrategy.chooseCard(
-      player: player,
-      hand: controller.hands[player.id] ?? const <SpanishCard>[],
-      playedCards: controller.playedCards,
-      teamRoundWins: controller.roundWins[player.teamId]!,
-      opponentRoundWins: controller.roundWins[opponentTeamId]!,
-      preserveStrongCards: controller.handValue < 6 ||
-          memory.teammateWonLastRound ||
-          memory.opponentsSpentPower,
-      forceWinIfPossible: forceWinIfPossible,
-      teammateStillToPlay: teammateStillToPlay && !memory.opponentsWonAnyRound,
-      opponentStillToPlay: opponentStillToPlay,
+    final policy = BotPolicySelector.forDifficulty(
+      _difficultyFor(config, player.teamId),
+    );
+    final strategicCard = policy.chooseCard(
+      BotDecisionContext(
+        difficulty: _difficultyFor(config, player.teamId),
+        bot: player,
+        players: controller.players,
+        hand: controller.hands[player.id] ?? const <SpanishCard>[],
+        hands: controller.hands,
+        playedCards: controller.playedCards,
+        teamRoundWins: controller.roundWins[player.teamId]!,
+        opponentRoundWins: controller.roundWins[opponentTeamId]!,
+        preserveStrongCards: controller.handValue < 6 ||
+            memory.teammateWonLastRound ||
+            memory.opponentsSpentPower,
+        teammateHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        forceWinIfPossible: forceWinIfPossible,
+        teammateStillToPlay:
+            teammateStillToPlay && !memory.opponentsWonAnyRound,
+        opponentStillToPlay: opponentStillToPlay,
+      ),
     );
     return DifficultyStrategy.applyCardMistake(
       difficulty: _difficultyFor(config, player.teamId),
@@ -648,9 +661,6 @@ class AiMatchSimulator {
         : config.teamTwoDifficulty;
   }
 
-  int _callThreshold(int difficulty, int base) {
-    return base + DifficultyProfiles.byLevel(difficulty).callThresholdModifier;
-  }
 }
 
 class _SimulationMetrics {

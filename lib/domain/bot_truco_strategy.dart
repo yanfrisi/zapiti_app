@@ -17,11 +17,19 @@ class BotTrucoStrategy {
     required bool opponentHasStrongSignal,
     required bool isCompanion,
     required bool needsPoints,
+    int scoreGap = 0,
+    bool opponentsSpentPower = false,
+    bool teamSpentPower = false,
   }) {
     final profile = DifficultyProfiles.byLevel(difficulty);
     final canCloseHand = teamRoundWins > 0;
     final mustSaveHand = opponentRoundWins > 0;
     final readsOpponentSignals = profile.readsOpponentSignals;
+    final startsRound = cardsOnTable == 0;
+    final hasSomeTableInformation = cardsOnTable > 0;
+    final hasTableInformation = cardsOnTable >= 2;
+    final plansVeryStrongLead = startsRound && ownMaxStrength >= 112;
+    final plansStrongLead = startsRound && ownMaxStrength >= 97;
 
     if (handStrength < 0.40) return false;
     if (readsOpponentSignals && opponentHasStrongSignal && !canCloseHand) {
@@ -32,11 +40,25 @@ class BotTrucoStrategy {
         teamScore < _threshold(profile, 95)) {
       return false;
     }
-
-    final hasTableInformation = cardsOnTable >= 2;
-    final hasSomeTableInformation = cardsOnTable > 0;
-    final startsRound = cardsOnTable == 0;
-    final plansVeryStrongLead = startsRound && ownMaxStrength >= 112;
+    if (startsRound &&
+        !teamHasStrongSignal &&
+        !plansVeryStrongLead &&
+        handStrength < 0.84) {
+      return false;
+    }
+    if (startsRound &&
+        profile.level >= 4 &&
+        !teamHasStrongSignal &&
+        !plansStrongLead &&
+        handStrength < 0.90) {
+      return false;
+    }
+    if (scoreGap >= 6 &&
+        startsRound &&
+        !teamHasStrongSignal &&
+        !plansVeryStrongLead) {
+      return false;
+    }
 
     if (teamHasStrongSignal) {
       return handStrength >= 0.50 ||
@@ -56,26 +78,37 @@ class BotTrucoStrategy {
     }
 
     final tableDiscount = hasTableInformation ? 14 : 6;
+    final pressureBonus = needsPoints || scoreGap <= -6 ? 6 : 0;
+    final drainedBonus = opponentsSpentPower ? 14 : 0;
+    final spentPenalty = teamSpentPower && !opponentsSpentPower ? 8 : 0;
     if (canCloseHand &&
         handStrength >= 0.55 &&
-        teamScore >= _threshold(profile, 94) - tableDiscount) {
+        teamScore >=
+            _threshold(profile, 94) - tableDiscount - pressureBonus) {
       return true;
     }
     if (isCompanion &&
         hasSomeTableInformation &&
         handStrength >= 0.65 &&
-        teamScore >= _threshold(profile, 122) - tableDiscount) {
+        teamScore >=
+            _threshold(profile, 122) - tableDiscount - pressureBonus) {
       return true;
     }
     if (needsPoints &&
         hasSomeTableInformation &&
         handStrength >= 0.65 &&
-        teamScore >= _threshold(profile, 132) - tableDiscount) {
+        teamScore >=
+            _threshold(profile, 132) - tableDiscount - pressureBonus) {
       return true;
     }
 
     return handStrength >= 0.65 &&
-        teamScore >= _threshold(profile, 145) - tableDiscount;
+        teamScore >=
+            _threshold(profile, 145) -
+                tableDiscount -
+                pressureBonus -
+                drainedBonus +
+                spentPenalty;
   }
 
   static bool shouldCallWithRoll({
@@ -91,6 +124,9 @@ class BotTrucoStrategy {
     required bool opponentHasStrongSignal,
     required bool isCompanion,
     required bool needsPoints,
+    int scoreGap = 0,
+    bool opponentsSpentPower = false,
+    bool teamSpentPower = false,
   }) {
     if (!shouldCall(
       difficulty: difficulty,
@@ -104,6 +140,9 @@ class BotTrucoStrategy {
       opponentHasStrongSignal: opponentHasStrongSignal,
       isCompanion: isCompanion,
       needsPoints: needsPoints,
+      scoreGap: scoreGap,
+      opponentsSpentPower: opponentsSpentPower,
+      teamSpentPower: teamSpentPower,
     )) {
       return false;
     }
@@ -119,6 +158,9 @@ class BotTrucoStrategy {
       needsPoints: needsPoints,
       teamHasStrongSignal: teamHasStrongSignal,
       isCompanion: isCompanion,
+      scoreGap: scoreGap,
+      opponentsSpentPower: opponentsSpentPower,
+      teamSpentPower: teamSpentPower,
     );
     return roll < chance;
   }
@@ -133,6 +175,9 @@ class BotTrucoStrategy {
     required bool needsPoints,
     required bool teamHasStrongSignal,
     required bool isCompanion,
+    required int scoreGap,
+    required bool opponentsSpentPower,
+    required bool teamSpentPower,
   }) {
     var chance = switch (profile.level) {
       <= 2 => switch (handStrength) {
@@ -162,6 +207,10 @@ class BotTrucoStrategy {
     if (needsPoints) chance += 0.015;
     if (ownMaxStrength >= 97) chance += 0.015;
     if (teamScore >= 140) chance += 0.01;
+    if (scoreGap <= -6) chance += 0.025;
+    if (scoreGap >= 6) chance -= 0.03;
+    if (opponentsSpentPower) chance += 0.03;
+    if (teamSpentPower && !opponentsSpentPower) chance -= 0.03;
     if (isCompanion) chance -= 0.02;
 
     return chance.clamp(0, 0.48);

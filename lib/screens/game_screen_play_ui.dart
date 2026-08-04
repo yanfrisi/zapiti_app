@@ -130,34 +130,31 @@ class _GuidedTutorialOverlay extends StatelessWidget {
 class _CompactGameHeader extends StatelessWidget {
   final int roundNumber;
   final int handValue;
-  final int? pendingTrucoValue;
-  final int? trucoCallerTeamId;
-  final bool isTrucoAccepted;
+  final BetState betState;
   final DifficultyProfile difficultyProfile;
   final double visualScale;
 
   const _CompactGameHeader({
     required this.roundNumber,
     required this.handValue,
-    required this.pendingTrucoValue,
-    required this.trucoCallerTeamId,
-    required this.isTrucoAccepted,
+    required this.betState,
     required this.difficultyProfile,
     this.visualScale = 1,
   });
 
   @override
   Widget build(BuildContext context) {
-    final chinoText = handValue == 1 ? context.tr('chino') : context.tr('chinos');
-    final trucoText = isTrucoAccepted
+    final chinoText =
+        handValue == 1 ? context.tr('chino') : context.tr('chinos');
+    final trucoText = !betState.responsePending
         ? '$handValue $chinoText'
-        : trucoCallerTeamId == null
+        : betState.proposingTeam == null
             ? '$handValue $chinoText'
             : context.tr(
                 'teamRaises',
                 params: {
-                  'team': trucoCallerTeamId,
-                  'value': pendingTrucoValue,
+                  'team': betState.proposingTeam,
+                  'value': betState.proposedLevel?.value,
                 },
               );
 
@@ -205,7 +202,8 @@ class _CompactGameHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        context.tr('roundHeader', params: {'round': roundNumber}),
+                        context
+                            .tr('roundHeader', params: {'round': roundNumber}),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -417,6 +415,8 @@ class _TrucoResponseOverlay extends StatefulWidget {
   final int pendingTrucoValue;
   final List<int> raiseOptions;
   final VoidCallback onAskCompanionSignal;
+  final ValueChanged<String> onSignalStart;
+  final ValueChanged<String> onSignalEnd;
   final VoidCallback onAccept;
   final VoidCallback onPass;
   final ValueChanged<int> onRaise;
@@ -425,6 +425,8 @@ class _TrucoResponseOverlay extends StatefulWidget {
     required this.pendingTrucoValue,
     required this.raiseOptions,
     required this.onAskCompanionSignal,
+    required this.onSignalStart,
+    required this.onSignalEnd,
     required this.onAccept,
     required this.onPass,
     required this.onRaise,
@@ -460,15 +462,19 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
             builder: (context, constraints) {
               final shortest = min(constraints.maxWidth, constraints.maxHeight);
               final isNarrow = constraints.maxWidth < 560;
-              final gap = shortest * (isNarrow ? 0.022 : 0.018);
-              final panelWidth = min(
-                constraints.maxWidth * (isNarrow ? 0.86 : 0.54),
-                isNarrow ? 420.0 : 460.0,
-              );
+            final gap = shortest * (isNarrow ? 0.022 : 0.018);
+            final panelWidth = min(
+              constraints.maxWidth * (isNarrow ? 0.86 : 0.54),
+              isNarrow ? 420.0 : 460.0,
+            );
+            final signalHeight = (isNarrow ? 44.0 : 50.0).clamp(
+              shortest * 0.11,
+              shortest * 0.16,
+            );
 
-              return Material(
-                color: Colors.transparent,
-                child: Padding(
+            return Material(
+              color: Colors.transparent,
+              child: Padding(
                   padding: EdgeInsets.all(gap),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -502,7 +508,9 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                                   child: Text(
                                     context.tr(
                                       'calledValue',
-                                      params: {'value': widget.pendingTrucoValue},
+                                      params: {
+                                        'value': widget.pendingTrucoValue
+                                      },
                                     ),
                                     style: Theme.of(context)
                                         .textTheme
@@ -523,6 +531,17 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                                   ),
                                 ),
                               ],
+                            ),
+                            SizedBox(height: gap),
+                            SizedBox(
+                              height: signalHeight,
+                              child: _SignalsBar(
+                                enabled: true,
+                                compact: true,
+                                scale: isNarrow ? 0.68 : 0.78,
+                                onSignalStart: widget.onSignalStart,
+                                onSignalEnd: widget.onSignalEnd,
+                              ),
                             ),
                             SizedBox(height: gap),
                             Row(
@@ -624,9 +643,7 @@ class _VisibleGameControls extends StatelessWidget {
   final bool canPassHand;
   final bool canCallTruco;
   final int handValue;
-  final int? pendingTrucoValue;
-  final int? trucoCallerTeamId;
-  final bool isTrucoAccepted;
+  final BetState betState;
   final List<int> raiseOptions;
   final ValueChanged<String> onSignalStart;
   final ValueChanged<String> onSignalEnd;
@@ -634,6 +651,8 @@ class _VisibleGameControls extends StatelessWidget {
   final VoidCallback onAskCompanionSignal;
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
+  final VoidCallback onComeToMe;
+  final VoidCallback onKill;
   final VoidCallback onCallTruco;
   final VoidCallback onAcceptTruco;
   final VoidCallback onPassTruco;
@@ -655,9 +674,7 @@ class _VisibleGameControls extends StatelessWidget {
     required this.canPassHand,
     required this.canCallTruco,
     required this.handValue,
-    required this.pendingTrucoValue,
-    required this.trucoCallerTeamId,
-    required this.isTrucoAccepted,
+    required this.betState,
     required this.raiseOptions,
     required this.onSignalStart,
     required this.onSignalEnd,
@@ -665,6 +682,8 @@ class _VisibleGameControls extends StatelessWidget {
     required this.onAskCompanionSignal,
     required this.onPassHand,
     required this.onVoyATi,
+    required this.onComeToMe,
+    required this.onKill,
     required this.onCallTruco,
     required this.onAcceptTruco,
     required this.onPassTruco,
@@ -701,11 +720,19 @@ class _VisibleGameControls extends StatelessWidget {
           onPressed: signalsEnabled ? onAskCompanionSignal : null,
         );
         final companionCommand = ZapitiActionButton(
-          label: isHumanTurn ? context.tr('voyATiUpper') : context.tr('killUpper'),
-          icon: isHumanTurn
-              ? Icons.record_voice_over_outlined
-              : Icons.local_fire_department_outlined,
+          label: context.tr('voyATiUpper'),
+          icon: Icons.record_voice_over_outlined,
           onPressed: signalsEnabled ? onVoyATi : null,
+        );
+        final comeToMeCommand = ZapitiActionButton(
+          label: context.tr('comeToMeUpper'),
+          icon: Icons.keyboard_double_arrow_down_outlined,
+          onPressed: signalsEnabled ? onComeToMe : null,
+        );
+        final killCommand = ZapitiActionButton(
+          label: context.tr('killUpper'),
+          icon: Icons.local_fire_department_outlined,
+          onPressed: signalsEnabled ? onKill : null,
         );
         final options = ZapitiActionButton(
           label: context.tr('options'),
@@ -733,8 +760,15 @@ class _VisibleGameControls extends StatelessWidget {
                     ],
                     Expanded(child: askSignal),
                     SizedBox(height: gap),
-                    Expanded(child: companionCommand),
-                    SizedBox(height: gap),
+                    if (isHumanTurn) ...[
+                      Expanded(child: companionCommand),
+                      SizedBox(height: gap),
+                    ] else ...[
+                      Expanded(child: comeToMeCommand),
+                      SizedBox(height: gap),
+                      Expanded(child: killCommand),
+                      SizedBox(height: gap),
+                    ],
                     Expanded(child: options),
                     SizedBox(height: gap),
                     Expanded(child: _backButton(context)),
@@ -776,8 +810,15 @@ class _VisibleGameControls extends StatelessWidget {
                       ],
                       Expanded(child: askSignal),
                       SizedBox(width: gap),
-                      Expanded(child: companionCommand),
-                      SizedBox(width: gap),
+                      if (isHumanTurn) ...[
+                        Expanded(child: companionCommand),
+                        SizedBox(width: gap),
+                      ] else ...[
+                        Expanded(child: comeToMeCommand),
+                        SizedBox(width: gap),
+                        Expanded(child: killCommand),
+                        SizedBox(width: gap),
+                      ],
                       Expanded(child: options),
                     ],
                   ),
@@ -831,14 +872,15 @@ class _VisibleGameControls extends StatelessWidget {
 
   Widget _primaryAction(BuildContext context) {
     if (isGameFinished) {
-      return _button(context.tr('newMatchUpper'), Icons.restart_alt, onRestart, true);
+      return _button(
+          context.tr('newMatchUpper'), Icons.restart_alt, onRestart, true);
     }
     if (isHandFinished) {
       return _button(context.tr('newHandUpper'), Icons.add, onNewHand, true);
     }
     if (isRoundAwaitingContinue) {
-      return _button(
-          context.tr('nextRoundUpper'), Icons.arrow_forward, onContinueRound, true);
+      return _button(context.tr('nextRoundUpper'), Icons.arrow_forward,
+          onContinueRound, true);
     }
     return _button(context.tr('callTrucoUpper'), Icons.campaign,
         canCallTruco && !isWaitingHumanResponse ? onCallTruco : null, true);
@@ -1086,7 +1128,8 @@ class _AlVerDecisionOverlayState extends State<_AlVerDecisionOverlay> {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(context.tr('alVerTitle'), style: titleStyle),
+                                Text(context.tr('alVerTitle'),
+                                    style: titleStyle),
                                 SizedBox(height: gap * 0.75),
                                 Text(
                                   context.tr('alVerBody'),
@@ -1326,6 +1369,8 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final VoidCallback onAskCompanionSignal;
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
+  final VoidCallback onComeToMe;
+  final VoidCallback onKill;
   final VoidCallback onCallTruco;
   final VoidCallback onContinueRound;
   final VoidCallback onNewHand;
@@ -1358,6 +1403,8 @@ class _LandscapeBottomBoard extends StatelessWidget {
     required this.onAskCompanionSignal,
     required this.onPassHand,
     required this.onVoyATi,
+    required this.onComeToMe,
+    required this.onKill,
     required this.onCallTruco,
     required this.onContinueRound,
     required this.onNewHand,
@@ -1399,6 +1446,8 @@ class _LandscapeBottomBoard extends StatelessWidget {
                 onAskCompanionSignal: onAskCompanionSignal,
                 onPassHand: onPassHand,
                 onVoyATi: onVoyATi,
+                onComeToMe: onComeToMe,
+                onKill: onKill,
                 onCallTruco: onCallTruco,
                 onContinueRound: onContinueRound,
                 onNewHand: onNewHand,
@@ -1470,6 +1519,8 @@ class _LandscapeActionPanel extends StatelessWidget {
   final VoidCallback onAskCompanionSignal;
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
+  final VoidCallback onComeToMe;
+  final VoidCallback onKill;
   final VoidCallback onCallTruco;
   final VoidCallback onContinueRound;
   final VoidCallback onNewHand;
@@ -1491,6 +1542,8 @@ class _LandscapeActionPanel extends StatelessWidget {
     required this.onAskCompanionSignal,
     required this.onPassHand,
     required this.onVoyATi,
+    required this.onComeToMe,
+    required this.onKill,
     required this.onCallTruco,
     required this.onContinueRound,
     required this.onNewHand,
@@ -1542,17 +1595,31 @@ class _LandscapeActionPanel extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: gap),
-                Expanded(
-                  child: ZapitiActionButton(
-                    label: isHumanTurn
-                        ? context.tr('voyATiUpper')
-                        : context.tr('killUpper'),
-                    icon: isHumanTurn
-                        ? Icons.record_voice_over_outlined
-                        : Icons.local_fire_department_outlined,
-                    onPressed: signalsEnabled ? onVoyATi : null,
+                if (isHumanTurn)
+                  Expanded(
+                    child: ZapitiActionButton(
+                      label: context.tr('voyATiUpper'),
+                      icon: Icons.record_voice_over_outlined,
+                      onPressed: signalsEnabled ? onVoyATi : null,
+                    ),
+                  )
+                else ...[
+                  Expanded(
+                    child: ZapitiActionButton(
+                      label: context.tr('comeToMeUpper'),
+                      icon: Icons.keyboard_double_arrow_down_outlined,
+                      onPressed: signalsEnabled ? onComeToMe : null,
+                    ),
                   ),
-                ),
+                  SizedBox(width: gap),
+                  Expanded(
+                    child: ZapitiActionButton(
+                      label: context.tr('killUpper'),
+                      icon: Icons.local_fire_department_outlined,
+                      onPressed: signalsEnabled ? onKill : null,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1589,14 +1656,15 @@ class _LandscapeActionPanel extends StatelessWidget {
 
   Widget _primaryAction(BuildContext context) {
     if (isGameFinished) {
-      return _button(context.tr('newMatchUpper'), Icons.restart_alt, onRestart, true);
+      return _button(
+          context.tr('newMatchUpper'), Icons.restart_alt, onRestart, true);
     }
     if (isHandFinished) {
       return _button(context.tr('newHandUpper'), Icons.add, onNewHand, true);
     }
     if (isRoundAwaitingContinue) {
-      return _button(
-          context.tr('nextRoundUpper'), Icons.arrow_forward, onContinueRound, true);
+      return _button(context.tr('nextRoundUpper'), Icons.arrow_forward,
+          onContinueRound, true);
     }
     return _button(context.tr('callTrucoUpper'), Icons.campaign,
         canCallTruco && !isWaitingHumanResponse ? onCallTruco : null, true);
@@ -1823,11 +1891,13 @@ class _LandscapeHumanPanel extends StatelessWidget {
     if (value == 'No llevo seña.') return context.tr('companionNoSignal');
     const signalPrefix = 'Seña: ';
     if (value.startsWith(signalPrefix)) {
-      return context.tr('companionSignal', params: {'signal': value.substring(signalPrefix.length)});
+      return context.tr('companionSignal',
+          params: {'signal': value.substring(signalPrefix.length)});
     }
     const carriesPrefix = 'Lleva ';
     if (value.startsWith(carriesPrefix)) {
-      return context.tr('companionSignal', params: {'signal': value.substring(6)});
+      return context
+          .tr('companionSignal', params: {'signal': value.substring(6)});
     }
     return value;
   }
@@ -2218,7 +2288,9 @@ class _SignalHelpDialog extends StatelessWidget {
                   color: ZapitiColors.wineRed,
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: Text(context.tr('signalHelpTitle'), style: titleStyle)),
+                Expanded(
+                    child:
+                        Text(context.tr('signalHelpTitle'), style: titleStyle)),
                 IconButton(
                   tooltip: context.tr('close'),
                   onPressed: onClose,

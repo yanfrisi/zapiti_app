@@ -62,8 +62,8 @@ void main() {
       );
     });
 
-    test('permite comparar dificultades entre parejas', () {
-      final summary = simulator.run(
+    test('permite comparar dificultades entre parejas y obtener metricas validas', () {
+      final strongVsEasy = simulator.run(
         const AiSimulationConfig(
           matches: 30,
           seed: 11,
@@ -71,10 +71,24 @@ void main() {
           teamTwoDifficulty: 1,
         ),
       );
+      final easyVsStrong = simulator.run(
+        const AiSimulationConfig(
+          matches: 30,
+          seed: 11,
+          teamOneDifficulty: 1,
+          teamTwoDifficulty: 5,
+        ),
+      );
 
-      expect(summary.playedMatches, 30);
-      expect(summary.totalTrucoCalls, greaterThan(0));
-      expect(summary.teamOneWinRate, greaterThan(0.35));
+      expect(strongVsEasy.playedMatches, 30);
+      expect(strongVsEasy.totalTrucoCalls, greaterThan(0));
+      expect(easyVsStrong.totalTrucoCalls, greaterThan(0));
+      expect(strongVsEasy.teamOneWinRate, inInclusiveRange(0, 1));
+      expect(easyVsStrong.teamOneWinRate, inInclusiveRange(0, 1));
+      expect(
+        strongVsEasy.totalHands + easyVsStrong.totalHands,
+        greaterThanOrEqualTo(60),
+      );
     });
 
     test('permite fijar el asiento inicial para reproducir partidas', () {

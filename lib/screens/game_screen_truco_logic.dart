@@ -4,7 +4,8 @@ extension _GameScreenTrucoLogic on _GameScreenState {
   void _humanCallsTruco() {
     if (!_canHumanCallTruco || _isGameFinished) return;
 
-    const value = TrucoRules.firstTrucoValue;
+    final value = _game.nextTrucoValueForPlayer(_humanPlayer);
+    if (value == null) return;
     var didCall = false;
 
     _updateState(() {
@@ -35,7 +36,12 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
-        socket.callTruco(roomId: roomId, playerId: playerId, value: value);
+        socket.callTruco(
+          roomId: roomId,
+          playerId: playerId,
+          value: value,
+          expectedStateVersion: _multiplayerStateVersion,
+        );
       }
       if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
         _resolveBotResponseToTruco();
@@ -75,7 +81,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
-        socket.acceptTruco(roomId: roomId, playerId: playerId);
+        socket.acceptTruco(
+          roomId: roomId,
+          playerId: playerId,
+          expectedStateVersion: _multiplayerStateVersion,
+        );
       }
       return;
     }
@@ -115,7 +125,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
-        socket.passTruco(roomId: roomId, playerId: playerId);
+        socket.passTruco(
+          roomId: roomId,
+          playerId: playerId,
+          expectedStateVersion: _multiplayerStateVersion,
+        );
       }
       return;
     }
@@ -156,7 +170,12 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
-        socket.raiseTruco(roomId: roomId, playerId: playerId, value: value);
+        socket.raiseTruco(
+          roomId: roomId,
+          playerId: playerId,
+          value: value,
+          expectedStateVersion: _multiplayerStateVersion,
+        );
       }
       if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
         _resolveBotResponseToTruco();
@@ -385,6 +404,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       needsPoints: pressuredByScoreOrRounds,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
       isCompanion: false,
+      scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
+      opponentsSpentPower: memory.opponentsSpentPower,
+      teamSpentPower: memory.teamSpentPower,
     );
     final callRoll = _random.nextDouble();
     final shouldCall = BotTrucoStrategy.shouldCallWithRoll(
@@ -400,6 +422,9 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       opponentHasStrongSignal: _isStrongSignal(opponentSignal),
       isCompanion: false,
       needsPoints: pressuredByScoreOrRounds,
+      scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
+      opponentsSpentPower: memory.opponentsSpentPower,
+      teamSpentPower: memory.teamSpentPower,
     );
     if (kDebugMode) {
       debugPrint(
@@ -430,6 +455,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
       teamIsUnderRoundPressure: memory.teamIsUnderRoundPressure,
+      scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
     );
     if (kDebugMode) {
       debugPrint(
@@ -455,6 +481,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final strengths = teamCards.map(ZapitiRules.strength).toList()..sort();
     final isWinningReparto =
         _roundWins[teamId]! > _roundWins[TeamRules.opponentOf(teamId)]!;
+    final otherTeam = TeamRules.opponentOf(teamId);
     final raiseValue = BotTrucoRaiseStrategy.chooseRaiseValue(
       difficulty: _selectedDifficulty,
       pendingValue: pendingValue,
@@ -464,11 +491,15 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       hasStrongSignal: _isStrongSignal(_teamSignalsByTeam[teamId]),
       isWinningReparto: isWinningReparto,
       sawOpponentStrongSignal: _opponentSignalsSeenByTeam.containsKey(teamId),
+      canCloseHand: _roundWins[teamId]! > 0,
+      mustSaveHand: _roundWins[otherTeam]! > 0,
+      needsPoints: _score[teamId]! < _score[otherTeam]! ||
+          memory.teamIsUnderRoundPressure,
+      scoreGap: _score[teamId]! - _score[otherTeam]!,
       roll: _random.nextDouble(),
     );
     if (_game.raiseOptions.contains(raiseValue)) return raiseValue;
 
-    final otherTeam = TeamRules.opponentOf(teamId);
     final bluffValue = BotBluffStrategy.bluffRaiseValue(
       difficulty: _selectedDifficulty,
       roll: _random.nextDouble(),
@@ -482,6 +513,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       isWinningReparto: isWinningReparto,
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
+      scoreGap: _score[teamId]! - _score[otherTeam]!,
     );
     return _game.raiseOptions.contains(bluffValue) ? bluffValue : null;
   }
@@ -501,38 +533,31 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       return false;
     }
 
-    final teamScore = _teamHandScore(teamId);
-    final canCloseHand = _roundWins[teamId]! > 0;
-    final mustSaveHand = _roundWins[otherTeam]! > 0;
-    final scorePressure = _score[teamId]! < _score[otherTeam]!;
-    final closingThreshold = _callThreshold(94) - _tableInformationDiscount;
-
-    if (canCloseHand && teamScore >= closingThreshold) return true;
-
-    if (difficultyProfile.impulsiveTrucoChance > 0 &&
-        _random.nextDouble() < difficultyProfile.impulsiveTrucoChance) {
-      return pendingValue <= 5;
-    }
-    if (canCloseHand && teamScore >= _callThreshold(86) && pendingValue <= 6) {
-      return true;
-    }
-    if (mustSaveHand && teamScore >= _callThreshold(85) && pendingValue <= 5) {
-      return true;
-    }
-    if (_isStrongSignal(_teamSignalsByTeam[teamId]) && pendingValue <= 8) {
-      return true;
-    }
-    if (scorePressure &&
-        teamScore >= _callThreshold(105) &&
-        pendingValue <= 6) {
-      return true;
-    }
-    if (teamScore >= _callThreshold(148)) return pendingValue <= 8;
-    if (teamScore >= _callThreshold(122)) return pendingValue <= 5;
-    return teamScore >= _callThreshold(100) && pendingValue <= 3;
+    final teamCards = _teamCardsFor(teamId);
+    final memory = BotMemoryContext.from(
+      bot: _teamBotResponderPlayer(teamId),
+      playedCards: _playedCards,
+      roundHistory: _roundHistory,
+    );
+    return BotTrucoResponseStrategy.shouldAccept(
+      difficulty: _selectedDifficulty,
+      pendingValue: pendingValue,
+      maxAllowedValue: _game.maxAllowedTrucoValue,
+      teamScoreEstimate: _teamHandScore(teamId),
+      handStrength: BotTrucoStrategy.evaluateHandStrength(teamCards),
+      cardsOnTable: _playedCards.length,
+      canCloseHand: _roundWins[teamId]! > 0,
+      mustSaveHand: _roundWins[otherTeam]! > 0,
+      hasStrongSignal: _isStrongSignal(_teamSignalsByTeam[teamId]),
+      opponentHasStrongSignal:
+          difficultyProfile.readsOpponentSignals && _isStrongSignal(opponentSignal),
+      needsPoints:
+          _score[teamId]! < _score[otherTeam]! || memory.teamIsUnderRoundPressure,
+      scoreGap: _score[teamId]! - _score[otherTeam]!,
+      currentRoundUnsavable: false,
+      roll: _random.nextDouble(),
+    );
   }
-
-  int get _tableInformationDiscount => _playedCards.length >= 2 ? 14 : 6;
 
   bool _currentRoundIsUnsavableForTeam(int teamId) {
     return BotTableRead.currentRoundIsUnsavableForTeam(
@@ -548,7 +573,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
-      socket.acceptTruco(roomId: roomId, playerId: player.id);
+      socket.acceptTruco(
+        roomId: roomId,
+        playerId: player.id,
+        expectedStateVersion: _multiplayerStateVersion,
+      );
     }
   }
 
@@ -557,7 +586,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
-      socket.passTruco(roomId: roomId, playerId: player.id);
+      socket.passTruco(
+        roomId: roomId,
+        playerId: player.id,
+        expectedStateVersion: _multiplayerStateVersion,
+      );
     }
   }
 
@@ -566,13 +599,13 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
-      socket.raiseTruco(roomId: roomId, playerId: player.id, value: value);
+      socket.raiseTruco(
+        roomId: roomId,
+        playerId: player.id,
+        value: value,
+        expectedStateVersion: _multiplayerStateVersion,
+      );
     }
-  }
-
-  int _callThreshold(int base) {
-    return base +
-        DifficultyProfiles.byLevel(_selectedDifficulty).callThresholdModifier;
   }
 
   int _teamHandScore(int teamId) {

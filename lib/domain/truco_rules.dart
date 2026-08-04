@@ -51,6 +51,17 @@ class TrucoRules {
     return [firstRaise];
   }
 
+  static int? nextRaiseValue({
+    required int currentAcceptedValue,
+    required int maxAllowedValue,
+  }) {
+    final options = raiseOptions(
+      pendingValue: currentAcceptedValue,
+      maxAllowedValue: maxAllowedValue,
+    );
+    return options.isEmpty ? null : options.first;
+  }
+
   static bool isOpeningValue(int value) => value == firstTrucoValue;
 
   static bool isRaiseValue({

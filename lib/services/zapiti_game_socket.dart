@@ -311,12 +311,17 @@ class GameSocket {
     required String roomId,
     required String playerId,
     required SpanishCard card,
+    int? expectedStateVersion,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.playCard,
       roomId: roomId,
       playerId: playerId,
-      payload: {'card': cardToJson(card)},
+      payload: {
+        'card': cardToJson(card),
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 
@@ -324,12 +329,17 @@ class GameSocket {
     required String roomId,
     required String playerId,
     required String toPlayerId,
+    int? expectedStateVersion,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.passHand,
       roomId: roomId,
       playerId: playerId,
-      payload: {'toPlayerId': toPlayerId},
+      payload: {
+        'toPlayerId': toPlayerId,
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 
@@ -337,28 +347,49 @@ class GameSocket {
     required String roomId,
     required String playerId,
     required int value,
+    int? expectedStateVersion,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.callTruco,
       roomId: roomId,
       playerId: playerId,
-      payload: {'value': value},
+      payload: {
+        'value': value,
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 
-  void acceptTruco({required String roomId, required String playerId}) {
+  void acceptTruco({
+    required String roomId,
+    required String playerId,
+    int? expectedStateVersion,
+  }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.acceptTruco,
       roomId: roomId,
       playerId: playerId,
+      payload: {
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 
-  void passTruco({required String roomId, required String playerId}) {
+  void passTruco({
+    required String roomId,
+    required String playerId,
+    int? expectedStateVersion,
+  }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.passTruco,
       roomId: roomId,
       playerId: playerId,
+      payload: {
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 
@@ -366,20 +397,33 @@ class GameSocket {
     required String roomId,
     required String playerId,
     required int value,
+    int? expectedStateVersion,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.raiseTruco,
       roomId: roomId,
       playerId: playerId,
-      payload: {'value': value},
+      payload: {
+        'value': value,
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 
-  void continueRound({required String roomId, required String playerId}) {
+  void continueRound({
+    required String roomId,
+    required String playerId,
+    int? expectedStateVersion,
+  }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.continueRound,
       roomId: roomId,
       playerId: playerId,
+      payload: {
+        if (expectedStateVersion != null)
+          'expectedStateVersion': expectedStateVersion,
+      },
     ));
   }
 

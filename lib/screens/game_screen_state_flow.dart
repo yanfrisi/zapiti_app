@@ -404,6 +404,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _opponentSignalsSeenByTeam.clear();
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
+    _forceLowestRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
@@ -457,6 +458,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _opponentSignalsSeenByTeam.clear();
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
+    _forceLowestRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
@@ -478,6 +480,12 @@ extension _GameScreenStateFlow on _GameScreenState {
       _game.playCard(preplay.player, preplay.card);
     }
     if (scenario.pendingTrucoCaller != null) {
+      final pendingCallerIndex = _players.indexWhere(
+        (player) => player.id == scenario.pendingTrucoCaller!.id,
+      );
+      if (pendingCallerIndex >= 0) {
+        _game.turnIndex = pendingCallerIndex;
+      }
       _game.callTruco(
         scenario.pendingTrucoCaller!,
         value: scenario.pendingTrucoValue,
@@ -854,6 +862,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       _isMultiplayerMatch = false;
       _multiplayerPlayers = const [];
       _multiplayerServerHandSequence = null;
+      _multiplayerStateVersion = null;
       _alVerDecisionPromptedKey = null;
       _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
       _showMainMenu = true;
@@ -869,6 +878,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       _turnSecondsRemaining = null;
       _playerMessages.clear();
       _forceWinRequestedPlayerIds.clear();
+      _forceLowestRequestedPlayerIds.clear();
       _companionPrivateSignalStatus = null;
     });
     MultiplayerSessionStore.instance.clearAll();
@@ -880,6 +890,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       _isMultiplayerMatch = false;
       _multiplayerPlayers = const [];
       _multiplayerServerHandSequence = null;
+      _multiplayerStateVersion = null;
       _alVerDecisionPromptedKey = null;
       _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
       _showMainMenu = true;
@@ -895,6 +906,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       _turnSecondsRemaining = null;
       _playerMessages.clear();
       _forceWinRequestedPlayerIds.clear();
+      _forceLowestRequestedPlayerIds.clear();
       _companionPrivateSignalStatus = null;
 
       final session = MultiplayerSessionStore.instance;
@@ -925,6 +937,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _alVerDecisionPromptedKey = null;
     _turnDeadlineAt = null;
     _turnSecondsRemaining = null;
+    _multiplayerStateVersion = null;
     _pendingTrucoValue = null;
     _trucoCallerTeamId = null;
     _game.lastTrucoRaiserTeamId = null;
@@ -1088,6 +1101,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       }
       _allowPassHand = session.allowPassHand;
       _multiplayerServerHandSequence = null;
+      _multiplayerStateVersion = null;
       _controlledHumanPlayerIds = {localGamePlayerId};
       _game = ZapitiGameController(
         targetScore: 30,
@@ -1191,6 +1205,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     final parsedScore = _parseIntMap(match['score']);
     final parsedRoundWins = _parseIntMap(match['roundWins']);
     final serverHandSequence = match['handSequence'] as int?;
+    final serverStateVersion = _parseNullableInt(match['stateVersion']);
     final currentPlayerId = match['currentPlayerId']?.toString();
     final leadPlayerId = match['leadPlayerId']?.toString();
     final nextLeadPlayerId = match['nextLeadPlayerId']?.toString();
@@ -1209,6 +1224,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (serverHandSequence != null) {
       _multiplayerServerHandSequence = serverHandSequence;
     }
+    _multiplayerStateVersion = serverStateVersion;
     final currentPlayerIndex = currentPlayerId == null
         ? -1
         : _players.indexWhere((player) => player.id == currentPlayerId);
@@ -1245,8 +1261,34 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (match['handValue'] is int) {
       _handValue = match['handValue'] as int;
     }
-    _pendingTrucoValue = match['pendingTrucoValue'] as int?;
-    _trucoCallerTeamId = match['trucoCallerTeamId'] as int?;
+    final rawBetState = match['betState'];
+    if (rawBetState is Map<String, dynamic>) {
+      final proposedLevel = rawBetState['proposedLevel']?.toString();
+      final acceptedLevel = rawBetState['acceptedLevel']?.toString();
+      _pendingTrucoValue = switch (proposedLevel) {
+        'truco' => 3,
+        'six' => 6,
+        'nine' => 9,
+        'twelve' => 12,
+        'fifteen' => 15,
+        'ahorrisi' => 18,
+        _ => null,
+      };
+      _trucoCallerTeamId = rawBetState['proposingTeam'] as int?;
+      _game.lastTrucoRaiserTeamId = rawBetState['lastRaisingTeam'] as int?;
+      _handValue = switch (acceptedLevel) {
+        'truco' => 3,
+        'six' => 6,
+        'nine' => 9,
+        'twelve' => 12,
+        'fifteen' => 15,
+        'ahorrisi' => 18,
+        _ => 1,
+      };
+    } else {
+      _pendingTrucoValue = match['pendingTrucoValue'] as int?;
+      _trucoCallerTeamId = match['trucoCallerTeamId'] as int?;
+    }
     _allowPassHand = match['allowPassHand'] as bool? ?? _allowPassHand;
     _game.allowPassHand = _allowPassHand;
     _syncPassedHandFromMatch(match);

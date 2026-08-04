@@ -1,4 +1,6 @@
+import 'bet_state.dart';
 import 'hand_rules.dart';
+import 'legal_actions.dart';
 import 'limited_history.dart';
 import 'played_card.dart';
 import 'player.dart';
@@ -76,6 +78,7 @@ class ZapitiGameController {
   bool handFinished = false;
   bool isRoundAwaitingContinue = false;
   String status = '';
+  late final LegalActionProvider legalActions;
 
   ZapitiGameController({
     this.targetScore = defaultTargetScore,
@@ -92,6 +95,7 @@ class ZapitiGameController {
         ),
         eventLog = eventLog ?? LimitedHistory(limit: 6),
         handSummaries = handSummaries ?? LimitedHistory(limit: 8) {
+    legalActions = ControllerLegalActionProvider(this);
     passedHandState = PassedHandState(originalLeaderId: players.first.id);
     if (autoStart) {
       startNewHand();
@@ -106,6 +110,16 @@ class ZapitiGameController {
   List<SpanishCard> get humanHand => hands[humanPlayer.id] ?? const [];
   bool get isGameFinished => winningTeamId != null;
   bool get isTrucoPending => pendingTrucoValue != null;
+  BetState get betState => BetState(
+    acceptedLevel: BetLevel.fromAcceptedValue(handValue),
+    proposedLevel: pendingTrucoValue == null
+        ? null
+        : BetLevel.fromProposedValue(pendingTrucoValue!),
+    proposingTeam: trucoCallerTeamId,
+    respondingTeam: respondingTrucoTeamId,
+    lastRaisingTeam: lastTrucoRaiserTeamId,
+    responsePending: trucoState == TrucoNegotiationState.awaitingResponse,
+  );
   int? get alVerTeamId => alVerTeamIds.length == 1 ? alVerTeamIds.first : null;
   bool get isTrucoAccepted =>
       trucoState == TrucoNegotiationState.acceptedClosed;
@@ -119,6 +133,37 @@ class ZapitiGameController {
   int? get respondingTrucoTeamId => trucoCallerTeamId == null
       ? null
       : TeamRules.opponentOf(trucoCallerTeamId!);
+  int? nextTrucoValueForPlayer(Player player) {
+    if (handFinished || isGameFinished) return null;
+    if (alVerState == AlVerState.awaitingDecision) return null;
+    if (alVerState != AlVerState.none && alVerTeamIds.contains(player.teamId)) {
+      return null;
+    }
+    if (trucoState == TrucoNegotiationState.awaitingResponse) {
+      if (respondingTrucoTeamId != player.teamId || pendingTrucoValue == null) {
+        return null;
+      }
+      return TrucoRules.nextRaiseValue(
+        currentAcceptedValue: pendingTrucoValue!,
+        maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
+      );
+    }
+    if (currentPlayer.id != player.id) return null;
+    if (trucoState == TrucoNegotiationState.notStarted) {
+      return TrucoRules.firstTrucoValue <=
+              maxAllowedTrucoValueForTeam(player.teamId)
+          ? TrucoRules.firstTrucoValue
+          : null;
+    }
+    if (trucoState == TrucoNegotiationState.acceptedClosed &&
+        lastTrucoRaiserTeamId != player.teamId) {
+      return TrucoRules.nextRaiseValue(
+        currentAcceptedValue: handValue,
+        maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
+      );
+    }
+    return null;
+  }
   int get displayedRoundNumber {
     final offset = isRoundAwaitingContinue || handFinished ? 0 : 1;
     final number = roundHistory.length + offset;
@@ -230,6 +275,9 @@ class ZapitiGameController {
     if (alVerState == AlVerState.awaitingDecision) {
       throw StateError('La mano está al ver y debe decidirse antes de jugar.');
     }
+    if (!canPlayCard(player, card)) {
+      throw StateError('La carta no es legal en el estado actual.');
+    }
     if (handFinished || isRoundAwaitingContinue) {
       throw StateError('No se puede jugar en el estado actual.');
     }
@@ -243,6 +291,18 @@ class ZapitiGameController {
     turnIndex = (turnIndex + 1) % players.length;
     status = 'Turno de ${currentPlayer.name}.';
     return false;
+  }
+
+  bool canPlayCard(Player player, SpanishCard card) {
+    return legalActions.legalCardsFor(player).contains(card);
+  }
+
+  List<SpanishCard> legalCardsForPlayer(Player player) {
+    return legalActions.legalCardsFor(player);
+  }
+
+  List<BetAction> legalBetActionsForPlayer(Player player) {
+    return legalActions.legalBetActionsFor(player);
   }
 
   /// Resuelve las cuatro cartas jugadas y congela la ronda hasta continuar.
@@ -410,9 +470,19 @@ class ZapitiGameController {
       return raiseOptionsForTeam(player.teamId).contains(value);
     }
 
-    if (trucoState != TrucoNegotiationState.notStarted) return false;
-
-    return TrucoRules.isOpeningValue(value);
+    if (currentPlayer.id != player.id) return false;
+    if (trucoState == TrucoNegotiationState.notStarted) {
+      return TrucoRules.isOpeningValue(value);
+    }
+    if (trucoState == TrucoNegotiationState.acceptedClosed) {
+      if (lastTrucoRaiserTeamId == player.teamId) return false;
+      return TrucoRules.isRaiseValue(
+        currentAcceptedValue: handValue,
+        value: value,
+        maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
+      );
+    }
+    return false;
   }
 
   bool canAcceptTruco({required int teamId, String? actorPlayerId}) {

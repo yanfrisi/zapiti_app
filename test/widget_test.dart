@@ -80,7 +80,7 @@ void main() {
     );
     expect(find.text('VOLVER'), findsOneWidget);
 
-    await tester.tap(find.text('PRÁCTICA'));
+    await tester.tap(find.text('PRÃƒÂCTICA'));
     await tester.pumpAndSettle();
 
     expect(find.text('Guarda la fuerte'), findsOneWidget);
@@ -102,12 +102,12 @@ void main() {
       gameState.loadGuidedTutorialScenarioForTesting(3);
     });
     await tester.pumpAndSettle();
-    expect(find.text('Pide seña'), findsOneWidget);
-    expect(find.text('PEDIR SEÑA'), findsOneWidget);
-    await tester.tap(find.text('PEDIR SEÑA'));
+    expect(find.text('Pide seÃƒÂ±a'), findsOneWidget);
+    expect(find.text('PEDIR SEÃƒâ€˜A'), findsOneWidget);
+    await tester.tap(find.text('PEDIR SEÃƒâ€˜A'));
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle();
-    expect(find.text('Da seña'), findsOneWidget);
+    expect(find.text('Da seÃƒÂ±a'), findsOneWidget);
 
     await tester.tap(find.byTooltip('4 Bastos'));
     await tester.pump(const Duration(milliseconds: 1300));
@@ -141,9 +141,9 @@ void main() {
     await tester.tap(find.text('OPCIONES').first);
     await tester.pumpAndSettle();
     expect(find.text('Opciones'), findsNothing);
-    await tester.tap(find.text('AYUDA SEÑAS').first);
+    await tester.tap(find.text('AYUDA SEÃƒâ€˜AS').first);
     await tester.pumpAndSettle();
-    expect(find.text('Orden y señas'), findsNothing);
+    expect(find.text('Orden y seÃƒÂ±as'), findsNothing);
 
     await tester.tap(find.text('VOLVER'));
     await tester.pumpAndSettle();
@@ -185,10 +185,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Zapiti App'), findsOneWidget);
-    expect(find.textContaining('Versión'), findsOneWidget);
-    expect(find.text('Juan Francisco Gutiérrez Vázquez'), findsWidgets);
+    expect(find.textContaining('VersiÃƒÂ³n'), findsOneWidget);
+    expect(find.text('Juan Francisco GutiÃƒÂ©rrez VÃƒÂ¡zquez'), findsWidgets);
     expect(find.text('Miguel Mateos Borrego'), findsOneWidget);
-    expect(find.text('Agradecimientos especiales a la Peña el Trompazo.'),
+    expect(find.text('Agradecimientos especiales a la PeÃƒÂ±a el Trompazo.'),
         findsOneWidget);
     expect(find.text('VOLVER'), findsOneWidget);
 
@@ -208,7 +208,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Iniciar sesiÃƒÂ³n'), findsOneWidget);
     expect(find.text('Usuario'), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(find.text('ENTRAR'), findsOneWidget);
@@ -259,7 +259,7 @@ void main() {
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
     expect(find.text('Multijugador no disponible'), findsOneWidget);
     expect(find.text('Actualiza Zapiti para jugar online.'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsNothing);
+    expect(find.text('Iniciar sesiÃƒÂ³n'), findsNothing);
   });
 
   testWidgets('multijugador muestra espera mientras comprueba version',
@@ -281,7 +281,7 @@ void main() {
     expect(find.text('Comprobando multijugador'), findsOneWidget);
     expect(
       find.text(
-        'Comprobando versión. El servicio puede tardar unos segundos...',
+        'Comprobando versiÃƒÂ³n. El servicio puede tardar unos segundos...',
       ),
       findsOneWidget,
     );
@@ -294,7 +294,7 @@ void main() {
 ''');
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Iniciar sesiÃƒÂ³n'), findsOneWidget);
   });
 
   testWidgets('multijugador recuerda el usuario', (tester) async {
@@ -323,7 +323,7 @@ void main() {
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Iniciar sesiÃƒÂ³n'), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -391,7 +391,7 @@ void main() {
     expect(find.text('Mostrar ayuda'), findsNothing);
     await tester.tap(find.text('Confirmar jugada'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Rápida'));
+    await tester.tap(find.text('RÃƒÂ¡pida'));
     await tester.pumpAndSettle();
 
     final prefs = await SharedPreferences.getInstance();
@@ -421,9 +421,10 @@ void main() {
       find.text('Usa truco y subidas con riesgo razonable.'),
       findsOneWidget,
     );
-    expect(find.text('Muy fácil'), findsOneWidget);
+    expect(find.text('Muy fÃƒÂ¡cil'), findsOneWidget);
     expect(find.text('Experto'), findsOneWidget);
-    expect(find.text('Bots distraídos, errores claros y trucos precipitados.'),
+    expect(
+        find.text('Bots distraÃƒÂ­dos, errores claros y trucos precipitados.'),
         findsNothing);
     expect(find.text('Juegan aceptable, pero se precipitan.'), findsNothing);
   });
@@ -502,20 +503,20 @@ void main() {
 
     expect(find.textContaining('Ronda 1/3'), findsOneWidget);
     expect(find.text('Yo'), findsOneWidget);
-    expect(find.text('Compañero'), findsOneWidget);
+    expect(find.text('CompaÃƒÂ±ero'), findsOneWidget);
     expect(find.text('Jugador rival 1'), findsOneWidget);
     expect(find.text('Jugador rival 2'), findsOneWidget);
     expect(find.text('Eq1'), findsOneWidget);
     expect(find.text('Eq2'), findsOneWidget);
     expect(find.text('Rondas'), findsOneWidget);
     expect(find.text('0 - 0'), findsOneWidget);
-    expect(find.text('Señas'), findsNothing);
-    expect(find.text('PEDIR SEÑA'), findsOneWidget);
+    expect(find.text('SeÃƒÂ±as'), findsNothing);
+    expect(find.text('PEDIR SEÃƒâ€˜A'), findsOneWidget);
     expect(find.text('DEV'), findsNothing);
     expect(find.text('Manos prefijadas'), findsNothing);
   });
 
-  testWidgets('ayuda de señas muestra orden de cartas y señales',
+  testWidgets('ayuda de seÃƒÂ±as muestra orden de cartas y seÃƒÂ±ales',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
@@ -524,10 +525,10 @@ void main() {
 
     await startGame(tester);
 
-    await tester.tap(find.text('AYUDA SEÑAS'));
+    await tester.tap(find.text('AYUDA SEÃƒâ€˜AS'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Orden y señas'), findsOneWidget);
+    expect(find.text('Orden y seÃƒÂ±as'), findsOneWidget);
     expect(find.text('4 de Bastos'), findsOneWidget);
     expect(find.text('7 de Copas'), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -542,12 +543,12 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     expect(find.text('Mala'), findsOneWidget);
-    expect(find.text('Orden Númerico de Valor'), findsNothing);
+    expect(find.text('Orden NÃƒÂºmerico de Valor'), findsNothing);
 
     await tester.tap(find.text('CERRAR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Orden y señas'), findsNothing);
+    expect(find.text('Orden y seÃƒÂ±as'), findsNothing);
   });
 
   testWidgets('la mesa no desborda en movil vertical', (tester) async {
@@ -646,7 +647,7 @@ void main() {
     });
   }
 
-  testWidgets('pedir seña muestra respuesta en landscape', (tester) async {
+  testWidgets('pedir seÃƒÂ±a muestra respuesta en landscape', (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -654,7 +655,7 @@ void main() {
 
     await startGame(tester);
 
-    await tester.tap(find.text('PEDIR SEÑA'));
+    await tester.tap(find.text('PEDIR SEÃƒâ€˜A'));
     await tester.pump();
 
     expect(find.text('Compa mira...'), findsOneWidget);
@@ -663,7 +664,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('voy a ti cambia a mata si no es el turno humano',
+  testWidgets('si no es el turno humano aparecen ven a mi y mata',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
@@ -678,7 +679,9 @@ void main() {
     });
     await tester.pump();
 
+    expect(find.textContaining('VEN A'), findsOneWidget);
     expect(find.text('MATA'), findsOneWidget);
+    expect(find.text('VOY A TI'), findsNothing);
   });
 
   testWidgets('pasar mano no aparece si la regla esta desactivada',
@@ -790,7 +793,7 @@ void main() {
     gameState.showAlVerDecisionDialogForTesting();
     await tester.pumpAndSettle();
 
-    expect(find.text('Estás al ver'), findsOneWidget);
+    expect(find.text('EstÃƒÂ¡s al ver'), findsOneWidget);
     expect(
       find.text(
         'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
@@ -799,12 +802,12 @@ void main() {
     );
     expect(find.text('JUGAR'), findsWidgets);
     expect(find.text('IRSE A CASA'), findsOneWidget);
-    expect(find.text('PEDIR SEÑA'), findsWidgets);
+    expect(find.text('PEDIR SEÃƒâ€˜A'), findsWidgets);
 
     await tester.tap(find.text('JUGAR').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Estás al ver'), findsNothing);
+    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.playing);
   });
 
@@ -823,7 +826,7 @@ void main() {
     await tester.tap(find.text('IRSE A CASA'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Estás al ver'), findsNothing);
+    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.conceded);
     expect(gameState.gameController.score[TeamRules.teamTwo], 2);
     expect(gameState.gameController.handFinished, isTrue);
@@ -843,7 +846,7 @@ void main() {
     await gameState.resolveAlVerDecisionForTesting();
     await tester.pumpAndSettle();
 
-    expect(find.text('Estás al ver'), findsNothing);
+    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.conceded);
     expect(gameState.gameController.score[TeamRules.teamOne], 2);
     expect(gameState.gameController.handFinished, isTrue);
@@ -867,7 +870,7 @@ void main() {
     await gameState.resolveAlVerDecisionForTesting();
     await tester.pumpAndSettle();
 
-    expect(find.text('Estás al ver'), findsNothing);
+    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.playing);
     expect(gameState.gameController.handFinished, isFalse);
   });
@@ -886,15 +889,15 @@ void main() {
     });
     await tester.pumpAndSettle();
 
-    expect(find.text('Ganó el Equipo 1'), findsOneWidget);
+    expect(find.text('GanÃƒÂ³ el Equipo 1'), findsOneWidget);
     expect(find.textContaining('Yo y'), findsOneWidget);
-    expect(find.text('Puntuación final: 30 - 24'), findsOneWidget);
+    expect(find.text('PuntuaciÃƒÂ³n final: 30 - 24'), findsOneWidget);
     expect(find.text('OTRA PARTIDA'), findsWidgets);
 
     await tester.tap(find.text('OTRA PARTIDA').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Ganó el Equipo 1'), findsNothing);
+    expect(find.text('GanÃƒÂ³ el Equipo 1'), findsNothing);
     expect(gameState.gameController.winningTeamId, isNull);
     expect(gameState.gameController.score[TeamRules.teamOne], 0);
     expect(gameState.gameController.score[TeamRules.teamTwo], 0);

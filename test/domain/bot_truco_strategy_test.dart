@@ -215,5 +215,44 @@ void main() {
       expect(lowRoll, isTrue);
       expect(highRoll, isFalse);
     });
+
+    test('experto no abre de salida solo por ir perdiendo si no hay carta grande', () {
+      final shouldCall = BotTrucoStrategy.shouldCall(
+        difficulty: 5,
+        teamScore: 168,
+        ownMaxStrength: 90,
+        handStrength: 0.83,
+        cardsOnTable: 0,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: false,
+        needsPoints: true,
+        scoreGap: -8,
+      );
+
+      expect(shouldCall, isFalse);
+    });
+
+    test('si los rivales ya gastaron fuerza truca mas facil con mesa avanzada', () {
+      final shouldCall = BotTrucoStrategy.shouldCall(
+        difficulty: 5,
+        teamScore: 128,
+        ownMaxStrength: 97,
+        handStrength: 0.74,
+        cardsOnTable: 2,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: false,
+        needsPoints: false,
+        opponentsSpentPower: true,
+        teamSpentPower: false,
+      );
+
+      expect(shouldCall, isTrue);
+    });
   });
 }
