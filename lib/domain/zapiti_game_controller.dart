@@ -111,15 +111,15 @@ class ZapitiGameController {
   bool get isGameFinished => winningTeamId != null;
   bool get isTrucoPending => pendingTrucoValue != null;
   BetState get betState => BetState(
-    acceptedLevel: BetLevel.fromAcceptedValue(handValue),
-    proposedLevel: pendingTrucoValue == null
-        ? null
-        : BetLevel.fromProposedValue(pendingTrucoValue!),
-    proposingTeam: trucoCallerTeamId,
-    respondingTeam: respondingTrucoTeamId,
-    lastRaisingTeam: lastTrucoRaiserTeamId,
-    responsePending: trucoState == TrucoNegotiationState.awaitingResponse,
-  );
+        acceptedLevel: BetLevel.fromAcceptedValue(handValue),
+        proposedLevel: pendingTrucoValue == null
+            ? null
+            : BetLevel.fromProposedValue(pendingTrucoValue!),
+        proposingTeam: trucoCallerTeamId,
+        respondingTeam: respondingTrucoTeamId,
+        lastRaisingTeam: lastTrucoRaiserTeamId,
+        responsePending: trucoState == TrucoNegotiationState.awaitingResponse,
+      );
   int? get alVerTeamId => alVerTeamIds.length == 1 ? alVerTeamIds.first : null;
   bool get isTrucoAccepted =>
       trucoState == TrucoNegotiationState.acceptedClosed;
@@ -130,6 +130,7 @@ class ZapitiGameController {
             ? TrucoNegotiationState.notStarted
             : TrucoNegotiationState.awaitingResponse;
   }
+
   int? get respondingTrucoTeamId => trucoCallerTeamId == null
       ? null
       : TeamRules.opponentOf(trucoCallerTeamId!);
@@ -164,6 +165,7 @@ class ZapitiGameController {
     }
     return null;
   }
+
   int get displayedRoundNumber {
     final offset = isRoundAwaitingContinue || handFinished ? 0 : 1;
     final number = roundHistory.length + offset;
@@ -541,16 +543,8 @@ class ZapitiGameController {
     List<Player> players,
     String humanPlayerId,
   ) {
-    final humanTeamId = players
-        .firstWhere(
-          (player) => player.id == humanPlayerId,
-          orElse: () => players.first,
-        )
-        .teamId;
     return {
-      for (final player in players)
-        if (player.id == humanPlayerId || player.teamId != humanTeamId)
-          player.id,
+      for (final player in players) player.id,
     };
   }
 
@@ -650,9 +644,8 @@ class ZapitiGameController {
       alVerTeamIds.add(TeamRules.teamTwo);
     }
 
-    alVerState = alVerTeamIds.isEmpty
-        ? AlVerState.none
-        : AlVerState.awaitingDecision;
+    alVerState =
+        alVerTeamIds.isEmpty ? AlVerState.none : AlVerState.awaitingDecision;
   }
 
   Map<String, List<SpanishCard>> _dealRandomHands() {

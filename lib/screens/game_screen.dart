@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/bot_al_ver_strategy.dart';
 import '../domain/bot_bluff_strategy.dart';
@@ -12,6 +11,7 @@ import '../domain/bot_table_read.dart';
 import '../domain/bot_truco_raise_strategy.dart';
 import '../domain/bot_truco_response_strategy.dart';
 import '../domain/bot_truco_strategy.dart';
+import '../domain/bot_ven_a_mi_strategy.dart';
 import '../domain/bot_voy_a_ti_strategy.dart';
 import '../domain/bet_state.dart';
 import '../domain/bot_decision_context.dart';
@@ -36,6 +36,7 @@ import '../domain/zapiti_rules.dart';
 import '../config/server_config.dart';
 import '../l10n/zapiti_localizations.dart';
 import '../services/app_version_check_service.dart';
+import '../services/account_privacy_service.dart';
 import '../services/game_preferences_store.dart';
 import '../services/multiplayer_session_store.dart';
 import '../services/zapiti_game_socket.dart';
@@ -149,13 +150,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static const _showGameplayHelpPrefsKey = 'show_gameplay_help';
   static const _confirmCardPlayPrefsKey = 'confirm_card_play';
   static const _languagePrefsKey = 'language';
-  static const _multiplayerPlayerNamePrefsKey = 'multiplayer_player_name';
-  static const _multiplayerPlayerIdPrefsKey = 'multiplayer_player_id';
-  static const _multiplayerUsernamePrefsKey = 'multiplayer_username';
-  static const _multiplayerPasswordPrefsKey = 'multiplayer_password';
-  static const _multiplayerPlayerPinPrefsKey = 'multiplayer_player_pin';
-  static const _multiplayerSessionTokenPrefsKey = 'multiplayer_session_token';
-  static const _multiplayerTeamNamePrefsKey = 'multiplayer_team_name';
 
   final Map<String, String> _playerMessages = {};
   final Map<String, Timer> _playerMessageTimers = {};
@@ -185,6 +179,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   int? _turnSecondsRemaining;
   Timer? _turnCountdownTimer;
   bool _isAutoPlaying = false;
+  bool _isRecoveringMultiplayerConnection = false;
+  bool _isAwaitingMultiplayerResync = false;
+  bool _multiplayerConnectionFailed = false;
+  bool _multiplayerMatchCanceled = false;
+  int _multiplayerConnectionGeneration = 0;
+  int _multiplayerSnapshotDelayGeneration = 0;
   bool _isWaitingHumanTrucoResponse = false;
   bool _isRequestingCompanionSignal = false;
   bool _showGameOptions = false;
@@ -257,6 +257,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool get _isGameFinished => _winningTeamId != null;
   @visibleForTesting
   ZapitiGameController get gameController => _game;
+  @visibleForTesting
+  bool get isMultiplayerMatchForTesting => _isMultiplayerMatch;
+  @visibleForTesting
+  bool get multiplayerMatchCanceledForTesting => _multiplayerMatchCanceled;
+  @visibleForTesting
+  void simulateStaleMultiplayerCancellationForTesting() {
+    _updateState(() {
+      _isMultiplayerMatch = true;
+      _multiplayerPlayers = const [
+        Player(id: 'remote_1', name: 'Remoto 1', teamId: 1),
+        Player(id: 'remote_2', name: 'Remoto 2', teamId: 2),
+      ];
+      _multiplayerMatchCanceled = true;
+      _showMainMenu = true;
+      _showCharacterSelection = false;
+      _showDifficultySelection = false;
+    });
+  }
+
   @visibleForTesting
   Future<void> showAlVerDecisionDialogForTesting() async {
     final teamId = _game.alVerTeamId;
@@ -397,6 +416,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _humanVoyATi() {
     if (_handFinished || _isGameFinished) return;
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('voyATi'));
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
@@ -422,6 +442,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _humanVenAMi() {
     if (_handFinished || _isGameFinished) return;
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('comeToMe'));
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
@@ -451,6 +472,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _humanMata() {
     if (_handFinished || _isGameFinished) return;
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('kill'));
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
@@ -481,6 +503,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _humanPassHand() {
     if (!_canHumanPassHand) return;
     if (_isMultiplayerMatch) {
+      if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -595,8 +618,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             final gap = shortest * (isPortrait ? 0.018 : 0.008);
                             final padding = EdgeInsets.all(
                                 shortest * (isPortrait ? 0.018 : 0.006));
+                            final connectionBlocked = _isMultiplayerMatch &&
+                                !_canSendMultiplayerAction;
+                            final multiplayerBlocked =
+                                connectionBlocked || _multiplayerMatchCanceled;
                             final canUseGameControls =
-                                !_guidedTutorialCompleted;
+                                !_guidedTutorialCompleted &&
+                                    !multiplayerBlocked;
                             final header = _CompactGameHeader(
                               roundNumber: _displayedRoundNumber,
                               handValue: _handValue,
@@ -916,6 +944,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         index: _guidedTutorialScenarioIndex,
                         total: _guidedTutorialScenarios.length,
                         completed: _guidedTutorialCompleted,
+                      ),
+                    if (_isMultiplayerMatch && !_canSendMultiplayerAction)
+                      _MultiplayerConnectionOverlay(
+                        reconnecting: _isRecoveringMultiplayerConnection ||
+                            _isAwaitingMultiplayerResync,
+                        onReturnToMenu: _multiplayerConnectionFailed
+                            ? _returnToMainMenu
+                            : null,
+                      ),
+                    if (_multiplayerMatchCanceled)
+                      _MultiplayerMatchCanceledOverlay(
+                        onReturnToMenu: _returnToMainMenu,
                       ),
                     if (_isGameFinished && _winningTeamId != null)
                       _GameFinishedOverlay(

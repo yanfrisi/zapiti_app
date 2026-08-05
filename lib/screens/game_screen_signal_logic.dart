@@ -10,6 +10,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     }
 
     if (_isMultiplayerMatch) {
+      if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -95,6 +96,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     if (_handFinished || _isGameFinished) {
       return;
     }
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     _updateState(() {
       _playerMessages[_humanPlayer.id] = 'Seña: $label';
@@ -119,6 +121,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
       ));
     }
     if (_isMultiplayerMatch) {
+      if (!_canSendMultiplayerAction) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -151,6 +154,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
       _playerMessages.remove(_humanPlayer.id);
     });
     if (_isMultiplayerMatch) {
+      if (!_canSendMultiplayerAction) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =

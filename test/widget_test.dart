@@ -61,6 +61,46 @@ void main() {
     expect(find.text('Jugador 4'), findsOneWidget);
   });
 
+  testWidgets(
+      'puede iniciar partida local tras un estado multijugador cancelado',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.simulateStaleMultiplayerCancellationForTesting();
+    await tester.pumpAndSettle();
+
+    expect(gameState.isMultiplayerMatchForTesting, isTrue);
+    expect(gameState.multiplayerMatchCanceledForTesting, isTrue);
+    expect(find.text('JUGAR'), findsOneWidget);
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+
+    expect(gameState.isMultiplayerMatchForTesting, isFalse);
+    expect(gameState.multiplayerMatchCanceledForTesting, isFalse);
+    expect(find.text('Elige tu personaje'), findsOneWidget);
+    expect(find.text('La partida se ha cancelado.'), findsNothing);
+
+    final startButton = find.text('EMPEZAR PARTIDA');
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige dificultad'), findsOneWidget);
+
+    final playButton = find.text('JUGAR');
+    await tester.ensureVisible(playButton);
+    await tester.tap(playButton);
+    await tester.pumpAndSettle();
+
+    expect(gameState.isMultiplayerMatchForTesting, isFalse);
+    expect(gameState.gameController.players.length, 4);
+    expect(gameState.gameController.humanPlayerId, 'p1');
+  });
+
   testWidgets('menu principal abre tutorial y opciones', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
@@ -208,11 +248,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
-    expect(find.text('Iniciar sesiÃƒÂ³n'), findsOneWidget);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
     expect(find.text('Usuario'), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(find.text('ENTRAR'), findsOneWidget);
     expect(find.text('CREAR USUARIO'), findsOneWidget);
+  });
+
+  testWidgets('crear usuario exige nombre de jugador sin valor por defecto',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
+
+    await tester.tap(find.text('MULTIJUGADOR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CREAR USUARIO'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('multiplayer-create-account')),
+        findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Nombre de jugador'), findsOneWidget);
+    expect(find.text('Jugador'), findsNothing);
+    expect(find.text('Escribe tu nombre para continuar.'), findsOneWidget);
   });
 
   testWidgets('multijugador usa textos traducidos al cambiar idioma',
@@ -259,7 +317,7 @@ void main() {
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
     expect(find.text('Multijugador no disponible'), findsOneWidget);
     expect(find.text('Actualiza Zapiti para jugar online.'), findsOneWidget);
-    expect(find.text('Iniciar sesiÃƒÂ³n'), findsNothing);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsNothing);
   });
 
   testWidgets('multijugador muestra espera mientras comprueba version',
@@ -280,9 +338,7 @@ void main() {
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
     expect(find.text('Comprobando multijugador'), findsOneWidget);
     expect(
-      find.text(
-        'Comprobando versiÃƒÂ³n. El servicio puede tardar unos segundos...',
-      ),
+      find.textContaining('El servicio puede tardar unos segundos'),
       findsOneWidget,
     );
 
@@ -294,10 +350,10 @@ void main() {
 ''');
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesiÃƒÂ³n'), findsOneWidget);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
   });
 
-  testWidgets('multijugador recuerda el usuario', (tester) async {
+  testWidgets('multijugador no recupera el usuario al reabrir', (tester) async {
     SharedPreferences.setMockInitialValues({
       'multiplayer_username': 'juan',
     });
@@ -307,7 +363,8 @@ void main() {
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('juan'), findsOneWidget);
+    expect(find.text('juan'), findsNothing);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
   });
 
   testWidgets('multijugador no desborda en movil horizontal', (tester) async {
@@ -323,7 +380,7 @@ void main() {
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesiÃƒÂ³n'), findsOneWidget);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

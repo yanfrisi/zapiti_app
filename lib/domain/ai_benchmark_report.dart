@@ -38,10 +38,16 @@ class AiBenchmarkResult {
       'subida=${_percent(summary.trucoRaiseRate)}',
       'alVerJuega=${summary.totalAlVerPlayed}',
       'alVerCasa=${summary.totalAlVerConceded}',
+      'senas=${summary.totalSignalsGiven}/${summary.totalSignalOpportunities}',
+      'senasFuertes=${summary.totalStrongSignalsGiven}',
+      'voyATi=${summary.totalVoyATiRequests}',
+      'venAMi=${summary.totalVenAMiOrders}',
+      'venProtege=${_percent(summary.venAMiProtectionRate)}',
     ].join(' | ');
   }
 
-  static String _percent(double value) => '${(value * 100).toStringAsFixed(1)}%';
+  static String _percent(double value) =>
+      '${(value * 100).toStringAsFixed(1)}%';
 }
 
 class AiBenchmarkReport {

@@ -3,6 +3,7 @@ part of 'game_screen.dart';
 extension _GameScreenTrucoLogic on _GameScreenState {
   void _humanCallsTruco() {
     if (!_canHumanCallTruco || _isGameFinished) return;
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     final value = _game.nextTrucoValueForPlayer(_humanPlayer);
     if (value == null) return;
@@ -57,6 +58,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _pendingTrucoValue == null) {
       return;
     }
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     final respondingTeamId = _game.respondingTrucoTeamId;
     if (respondingTeamId == null) return;
@@ -99,6 +101,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _pendingTrucoValue == null) {
       return;
     }
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     final passingTeamId = _game.respondingTrucoTeamId;
     if (passingTeamId == null) {
@@ -141,6 +144,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         !_humanRaiseOptions.contains(value)) {
       return;
     }
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     var didRaise = false;
     final raisingTeamId = _game.respondingTrucoTeamId;
@@ -354,7 +358,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
   }
 
   bool _shouldBotCallTruco(Player bot) {
-    if (!_isLocalBotPlayer(bot) || bot.teamId == _humanPlayer.teamId) {
+    if (!_isLocalBotPlayer(bot)) {
       return false;
     }
     if (_pendingTrucoValue != null ||
@@ -403,7 +407,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       teamRoundWins: _roundWins[bot.teamId]!,
       needsPoints: pressuredByScoreOrRounds,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
-      isCompanion: false,
+      isCompanion: bot.teamId == _humanPlayer.teamId,
       scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
@@ -420,7 +424,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       opponentRoundWins: _roundWins[otherTeam]!,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
       opponentHasStrongSignal: _isStrongSignal(opponentSignal),
-      isCompanion: false,
+      isCompanion: bot.teamId == _humanPlayer.teamId,
       needsPoints: pressuredByScoreOrRounds,
       scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
       opponentsSpentPower: memory.opponentsSpentPower,
@@ -439,6 +443,8 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     if (shouldCall) {
       return true;
     }
+
+    if (bot.teamId == _humanPlayer.teamId) return false;
 
     final bluffRoll = _random.nextDouble();
     final shouldBluff = BotBluffStrategy.shouldBluffCall(
@@ -549,10 +555,10 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       canCloseHand: _roundWins[teamId]! > 0,
       mustSaveHand: _roundWins[otherTeam]! > 0,
       hasStrongSignal: _isStrongSignal(_teamSignalsByTeam[teamId]),
-      opponentHasStrongSignal:
-          difficultyProfile.readsOpponentSignals && _isStrongSignal(opponentSignal),
-      needsPoints:
-          _score[teamId]! < _score[otherTeam]! || memory.teamIsUnderRoundPressure,
+      opponentHasStrongSignal: difficultyProfile.readsOpponentSignals &&
+          _isStrongSignal(opponentSignal),
+      needsPoints: _score[teamId]! < _score[otherTeam]! ||
+          memory.teamIsUnderRoundPressure,
       scoreGap: _score[teamId]! - _score[otherTeam]!,
       currentRoundUnsavable: false,
       roll: _random.nextDouble(),
@@ -570,6 +576,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
   void _sendMultiplayerTrucoAcceptIfNeeded(Player player) {
     if (!_isMultiplayerMatch) return;
+    if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
@@ -583,6 +590,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
   void _sendMultiplayerTrucoPassIfNeeded(Player player) {
     if (!_isMultiplayerMatch) return;
+    if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
@@ -596,6 +604,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
   void _sendMultiplayerTrucoRaiseIfNeeded(Player player, int value) {
     if (!_isMultiplayerMatch) return;
+    if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {

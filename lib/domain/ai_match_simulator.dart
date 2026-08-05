@@ -9,9 +9,13 @@ import 'bot_table_read.dart';
 import 'bot_truco_raise_strategy.dart';
 import 'bot_truco_response_strategy.dart';
 import 'bot_truco_strategy.dart';
+import 'bot_ven_a_mi_strategy.dart';
+import 'bot_voy_a_ti_strategy.dart';
 import 'difficulty_profile.dart';
 import 'difficulty_strategy.dart';
+import 'played_card.dart';
 import 'player.dart';
+import 'signal_rules.dart';
 import 'spanish_card.dart';
 import 'team_rules.dart';
 import 'truco_rules.dart';
@@ -54,6 +58,12 @@ class AiSimulationSummary {
   final int totalTrucoPasses;
   final int totalAlVerPlayed;
   final int totalAlVerConceded;
+  final int totalSignalOpportunities;
+  final int totalSignalsGiven;
+  final int totalStrongSignalsGiven;
+  final int totalVoyATiRequests;
+  final int totalVenAMiOrders;
+  final int totalVenAMiProtectedRounds;
   final int totalTeamOneScore;
   final int totalTeamTwoScore;
 
@@ -69,6 +79,12 @@ class AiSimulationSummary {
     required this.totalTrucoPasses,
     required this.totalAlVerPlayed,
     required this.totalAlVerConceded,
+    required this.totalSignalOpportunities,
+    required this.totalSignalsGiven,
+    required this.totalStrongSignalsGiven,
+    required this.totalVoyATiRequests,
+    required this.totalVenAMiOrders,
+    required this.totalVenAMiProtectedRounds,
     required this.totalTeamOneScore,
     required this.totalTeamTwoScore,
   });
@@ -94,6 +110,14 @@ class AiSimulationSummary {
       playedMatches == 0 ? 0 : totalTeamOneScore / playedMatches;
   double get averageFinalScoreTeamTwo =>
       playedMatches == 0 ? 0 : totalTeamTwoScore / playedMatches;
+  double get signalGiveRate => totalSignalOpportunities == 0
+      ? 0
+      : totalSignalsGiven / totalSignalOpportunities;
+  double get strongSignalRate =>
+      totalSignalsGiven == 0 ? 0 : totalStrongSignalsGiven / totalSignalsGiven;
+  double get venAMiProtectionRate => totalVenAMiOrders == 0
+      ? 0
+      : totalVenAMiProtectedRounds / totalVenAMiOrders;
 
   static AiSimulationSummary combine(
     AiSimulationConfig config,
@@ -109,6 +133,12 @@ class AiSimulationSummary {
     var totalTrucoPasses = 0;
     var totalAlVerPlayed = 0;
     var totalAlVerConceded = 0;
+    var totalSignalOpportunities = 0;
+    var totalSignalsGiven = 0;
+    var totalStrongSignalsGiven = 0;
+    var totalVoyATiRequests = 0;
+    var totalVenAMiOrders = 0;
+    var totalVenAMiProtectedRounds = 0;
     var totalTeamOneScore = 0;
     var totalTeamTwoScore = 0;
 
@@ -123,6 +153,12 @@ class AiSimulationSummary {
       totalTrucoPasses += summary.totalTrucoPasses;
       totalAlVerPlayed += summary.totalAlVerPlayed;
       totalAlVerConceded += summary.totalAlVerConceded;
+      totalSignalOpportunities += summary.totalSignalOpportunities;
+      totalSignalsGiven += summary.totalSignalsGiven;
+      totalStrongSignalsGiven += summary.totalStrongSignalsGiven;
+      totalVoyATiRequests += summary.totalVoyATiRequests;
+      totalVenAMiOrders += summary.totalVenAMiOrders;
+      totalVenAMiProtectedRounds += summary.totalVenAMiProtectedRounds;
       totalTeamOneScore += summary.totalTeamOneScore;
       totalTeamTwoScore += summary.totalTeamTwoScore;
     }
@@ -139,6 +175,12 @@ class AiSimulationSummary {
       totalTrucoPasses: totalTrucoPasses,
       totalAlVerPlayed: totalAlVerPlayed,
       totalAlVerConceded: totalAlVerConceded,
+      totalSignalOpportunities: totalSignalOpportunities,
+      totalSignalsGiven: totalSignalsGiven,
+      totalStrongSignalsGiven: totalStrongSignalsGiven,
+      totalVoyATiRequests: totalVoyATiRequests,
+      totalVenAMiOrders: totalVenAMiOrders,
+      totalVenAMiProtectedRounds: totalVenAMiProtectedRounds,
       totalTeamOneScore: totalTeamOneScore,
       totalTeamTwoScore: totalTeamTwoScore,
     );
@@ -159,6 +201,12 @@ class AiMatchSimulator {
     var totalTrucoPasses = 0;
     var totalAlVerPlayed = 0;
     var totalAlVerConceded = 0;
+    var totalSignalOpportunities = 0;
+    var totalSignalsGiven = 0;
+    var totalStrongSignalsGiven = 0;
+    var totalVoyATiRequests = 0;
+    var totalVenAMiOrders = 0;
+    var totalVenAMiProtectedRounds = 0;
     var totalTeamOneScore = 0;
     var totalTeamTwoScore = 0;
 
@@ -183,6 +231,12 @@ class AiMatchSimulator {
       totalTrucoPasses += result.trucoPasses;
       totalAlVerPlayed += result.alVerPlayed;
       totalAlVerConceded += result.alVerConceded;
+      totalSignalOpportunities += result.signalOpportunities;
+      totalSignalsGiven += result.signalsGiven;
+      totalStrongSignalsGiven += result.strongSignalsGiven;
+      totalVoyATiRequests += result.voyATiRequests;
+      totalVenAMiOrders += result.venAMiOrders;
+      totalVenAMiProtectedRounds += result.venAMiProtectedRounds;
       totalTeamOneScore += result.finalScoreTeamOne;
       totalTeamTwoScore += result.finalScoreTeamTwo;
     }
@@ -199,6 +253,12 @@ class AiMatchSimulator {
       totalTrucoPasses: totalTrucoPasses,
       totalAlVerPlayed: totalAlVerPlayed,
       totalAlVerConceded: totalAlVerConceded,
+      totalSignalOpportunities: totalSignalOpportunities,
+      totalSignalsGiven: totalSignalsGiven,
+      totalStrongSignalsGiven: totalStrongSignalsGiven,
+      totalVoyATiRequests: totalVoyATiRequests,
+      totalVenAMiOrders: totalVenAMiOrders,
+      totalVenAMiProtectedRounds: totalVenAMiProtectedRounds,
       totalTeamOneScore: totalTeamOneScore,
       totalTeamTwoScore: totalTeamTwoScore,
     );
@@ -221,14 +281,14 @@ class AiMatchSimulator {
     controller.nextLeadIndex = startingPlayerIndex % controller.players.length;
     final metrics = _SimulationMetrics();
 
-    _startNewSimulatedHand(controller, random);
+    _startNewSimulatedHand(controller, random, config, metrics);
     metrics.hands += 1;
 
     while (!controller.isGameFinished &&
         metrics.hands <= config.maxHandsPerMatch) {
       _playCurrentHand(controller, config, random, metrics);
       if (!controller.isGameFinished) {
-        _startNewSimulatedHand(controller, random);
+        _startNewSimulatedHand(controller, random, config, metrics);
         metrics.hands += 1;
       }
     }
@@ -245,6 +305,12 @@ class AiMatchSimulator {
       trucoPasses: metrics.trucoPasses,
       alVerPlayed: metrics.alVerPlayed,
       alVerConceded: metrics.alVerConceded,
+      signalOpportunities: metrics.signalOpportunities,
+      signalsGiven: metrics.signalsGiven,
+      strongSignalsGiven: metrics.strongSignalsGiven,
+      voyATiRequests: metrics.voyATiRequests,
+      venAMiOrders: metrics.venAMiOrders,
+      venAMiProtectedRounds: metrics.venAMiProtectedRounds,
     );
   }
 
@@ -277,7 +343,7 @@ class AiMatchSimulator {
         continue;
       }
 
-      final card = _chooseCard(controller, config, random, player);
+      final card = _chooseCard(controller, config, random, player, metrics);
       final roundCompleted = controller.playCard(player, card);
       if (roundCompleted) {
         controller.resolveRound();
@@ -552,6 +618,7 @@ class AiMatchSimulator {
     AiSimulationConfig config,
     Random random,
     Player player,
+    _SimulationMetrics metrics,
   ) {
     final playedPlayerIds = {
       for (final playedCard in controller.playedCards) playedCard.player.id,
@@ -573,6 +640,18 @@ class AiMatchSimulator {
       playedCards: controller.playedCards,
       roundHistory: controller.roundHistory,
     );
+    final venAMiCard = _tryVenAMiCard(controller, player, metrics);
+    if (venAMiCard != null) {
+      return DifficultyStrategy.applyCardMistake(
+        difficulty: _difficultyFor(config, player.teamId),
+        random: random,
+        player: player,
+        hand: controller.hands[player.id] ?? const <SpanishCard>[],
+        strategicCard: venAMiCard,
+        playedCards: controller.playedCards,
+      );
+    }
+    _trackVoyATiOpportunity(controller, config, random, player, metrics);
     final forceWinIfPossible = controller.handValue >= 6 ||
         controller.roundWins[opponentTeamId]! >
             controller.roundWins[player.teamId]!;
@@ -624,6 +703,8 @@ class AiMatchSimulator {
   void _startNewSimulatedHand(
     ZapitiGameController controller,
     Random random,
+    AiSimulationConfig config,
+    _SimulationMetrics metrics,
   ) {
     final deck = ZapitiDeck.shuffled(random: random);
     controller.startNewHand(
@@ -632,6 +713,7 @@ class AiMatchSimulator {
           controller.players[i].id: deck.skip(i * 3).take(3).toList(),
       },
     );
+    _trackSignals(controller, config, metrics);
   }
 
   List<SpanishCard> _teamCards(ZapitiGameController controller, int teamId) {
@@ -661,6 +743,111 @@ class AiMatchSimulator {
         : config.teamTwoDifficulty;
   }
 
+  void _trackSignals(
+    ZapitiGameController controller,
+    AiSimulationConfig config,
+    _SimulationMetrics metrics,
+  ) {
+    for (final player in controller.players) {
+      final signal = SignalRules.signalForHand(
+        controller.hands[player.id] ?? const <SpanishCard>[],
+      );
+      if (signal == null) continue;
+
+      metrics.signalOpportunities += 1;
+      final profile = DifficultyProfiles.byLevel(
+        _difficultyFor(config, player.teamId),
+      );
+      if (!profile.rivalsGiveSignals) continue;
+
+      metrics.signalsGiven += 1;
+      if (SignalRules.isStrongSignal(signal)) {
+        metrics.strongSignalsGiven += 1;
+      }
+    }
+  }
+
+  void _trackVoyATiOpportunity(
+    ZapitiGameController controller,
+    AiSimulationConfig config,
+    Random random,
+    Player player,
+    _SimulationMetrics metrics,
+  ) {
+    final teammate = controller.players.cast<Player?>().firstWhere(
+      (candidate) {
+        if (candidate == null ||
+            candidate.id == player.id ||
+            candidate.teamId != player.teamId) {
+          return false;
+        }
+        final alreadyPlayed = controller.playedCards.any(
+          (playedCard) => playedCard.player.id == candidate.id,
+        );
+        return !alreadyPlayed &&
+            (controller.hands[candidate.id] ?? const <SpanishCard>[])
+                .isNotEmpty;
+      },
+      orElse: () => null,
+    );
+    if (teammate == null) return;
+
+    final shouldAsk = BotVoyATiStrategy.shouldAskTeammateToWin(
+      bot: player,
+      teammate: teammate,
+      players: controller.players,
+      hands: controller.hands,
+      playedCards: controller.playedCards,
+      teamRoundWins: controller.roundWins[player.teamId]!,
+      opponentRoundWins: controller.roundWins[TeamRules.opponentOf(
+        player.teamId,
+      )]!,
+      handValue: controller.handValue,
+      difficulty: _difficultyFor(config, player.teamId),
+      roll: random.nextDouble(),
+    );
+    if (shouldAsk) {
+      metrics.voyATiRequests += 1;
+    }
+  }
+
+  SpanishCard? _tryVenAMiCard(
+    ZapitiGameController controller,
+    Player player,
+    _SimulationMetrics metrics,
+  ) {
+    if (controller.playedCards.isEmpty) return null;
+    final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(
+      controller.playedCards,
+    );
+    if (currentWinningTeam != player.teamId) return null;
+    final teammateAlreadyWinning = controller.playedCards.any(
+      (playedCard) =>
+          playedCard.player.teamId == player.teamId &&
+          playedCard.player.id != player.id,
+    );
+    if (!teammateAlreadyWinning) return null;
+
+    final hand = controller.hands[player.id] ?? const <SpanishCard>[];
+    if (hand.isEmpty) return null;
+
+    metrics.venAMiOrders += 1;
+    final chosen = BotVenAMiStrategy.chooseCard(
+      bot: player,
+      hand: hand,
+      playedCards: controller.playedCards,
+      players: controller.players,
+      hands: controller.hands,
+    );
+    final simulated = [
+      ...controller.playedCards,
+      PlayedCard(player: player, card: chosen),
+    ];
+    if (BotTableRead.currentWinningTeamOnTable(simulated) == player.teamId) {
+      metrics.venAMiProtectedRounds += 1;
+    }
+    return chosen;
+  }
 }
 
 class _SimulationMetrics {
@@ -672,6 +859,12 @@ class _SimulationMetrics {
   int trucoPasses = 0;
   int alVerPlayed = 0;
   int alVerConceded = 0;
+  int signalOpportunities = 0;
+  int signalsGiven = 0;
+  int strongSignalsGiven = 0;
+  int voyATiRequests = 0;
+  int venAMiOrders = 0;
+  int venAMiProtectedRounds = 0;
 }
 
 class _SimulatedMatchResult {
@@ -686,6 +879,12 @@ class _SimulatedMatchResult {
   final int trucoPasses;
   final int alVerPlayed;
   final int alVerConceded;
+  final int signalOpportunities;
+  final int signalsGiven;
+  final int strongSignalsGiven;
+  final int voyATiRequests;
+  final int venAMiOrders;
+  final int venAMiProtectedRounds;
 
   const _SimulatedMatchResult({
     required this.winningTeamId,
@@ -699,5 +898,11 @@ class _SimulatedMatchResult {
     required this.trucoPasses,
     required this.alVerPlayed,
     required this.alVerConceded,
+    required this.signalOpportunities,
+    required this.signalsGiven,
+    required this.strongSignalsGiven,
+    required this.voyATiRequests,
+    required this.venAMiOrders,
+    required this.venAMiProtectedRounds,
   });
 }

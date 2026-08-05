@@ -216,7 +216,9 @@ void main() {
       expect(highRoll, isFalse);
     });
 
-    test('experto no abre de salida solo por ir perdiendo si no hay carta grande', () {
+    test(
+        'experto no abre de salida solo por ir perdiendo si no hay carta grande',
+        () {
       final shouldCall = BotTrucoStrategy.shouldCall(
         difficulty: 5,
         teamScore: 168,
@@ -235,7 +237,8 @@ void main() {
       expect(shouldCall, isFalse);
     });
 
-    test('si los rivales ya gastaron fuerza truca mas facil con mesa avanzada', () {
+    test('si los rivales ya gastaron fuerza truca mas facil con mesa avanzada',
+        () {
       final shouldCall = BotTrucoStrategy.shouldCall(
         difficulty: 5,
         teamScore: 128,
@@ -253,6 +256,58 @@ void main() {
       );
 
       expect(shouldCall, isTrue);
+    });
+
+    test('el companero no truca esporadicamente con mano solo decente', () {
+      final shouldCall = BotTrucoStrategy.shouldCall(
+        difficulty: 4,
+        teamScore: 142,
+        ownMaxStrength: 97,
+        handStrength: 0.70,
+        cardsOnTable: 2,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: true,
+        needsPoints: false,
+      );
+
+      expect(shouldCall, isFalse);
+    });
+
+    test('el companero puede trucar si ve la mano muy favorable', () {
+      final lowRoll = BotTrucoStrategy.shouldCallWithRoll(
+        difficulty: 4,
+        roll: 0.04,
+        teamScore: 166,
+        ownMaxStrength: 112,
+        handStrength: 0.90,
+        cardsOnTable: 2,
+        teamRoundWins: 1,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: true,
+        opponentHasStrongSignal: false,
+        isCompanion: true,
+        needsPoints: false,
+      );
+      final highRoll = BotTrucoStrategy.shouldCallWithRoll(
+        difficulty: 4,
+        roll: 0.12,
+        teamScore: 166,
+        ownMaxStrength: 112,
+        handStrength: 0.90,
+        cardsOnTable: 2,
+        teamRoundWins: 1,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: true,
+        opponentHasStrongSignal: false,
+        isCompanion: true,
+        needsPoints: false,
+      );
+
+      expect(lowRoll, isTrue);
+      expect(highRoll, isFalse);
     });
   });
 }

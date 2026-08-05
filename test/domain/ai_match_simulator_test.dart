@@ -17,6 +17,9 @@ void main() {
       expect(summary.averageHandsPerMatch, greaterThan(1));
       expect(summary.trucoPassRate, inInclusiveRange(0, 1));
       expect(summary.trucoRaiseRate, inInclusiveRange(0, 1));
+      expect(summary.signalGiveRate, inInclusiveRange(0, 1));
+      expect(summary.strongSignalRate, inInclusiveRange(0, 1));
+      expect(summary.venAMiProtectionRate, inInclusiveRange(0, 1));
       expect(summary.averageFinalScoreTeamOne, greaterThan(0));
       expect(summary.averageFinalScoreTeamTwo, greaterThan(0));
     });
@@ -37,6 +40,15 @@ void main() {
       expect(second.totalTrucoPasses, first.totalTrucoPasses);
       expect(second.totalAlVerPlayed, first.totalAlVerPlayed);
       expect(second.totalAlVerConceded, first.totalAlVerConceded);
+      expect(second.totalSignalOpportunities, first.totalSignalOpportunities);
+      expect(second.totalSignalsGiven, first.totalSignalsGiven);
+      expect(second.totalStrongSignalsGiven, first.totalStrongSignalsGiven);
+      expect(second.totalVoyATiRequests, first.totalVoyATiRequests);
+      expect(second.totalVenAMiOrders, first.totalVenAMiOrders);
+      expect(
+        second.totalVenAMiProtectedRounds,
+        first.totalVenAMiProtectedRounds,
+      );
       expect(second.totalTeamOneScore, first.totalTeamOneScore);
       expect(second.totalTeamTwoScore, first.totalTeamTwoScore);
     });
@@ -60,9 +72,19 @@ void main() {
         combined.totalTrucoCalls,
         first.totalTrucoCalls + second.totalTrucoCalls,
       );
+      expect(
+        combined.totalSignalsGiven,
+        first.totalSignalsGiven + second.totalSignalsGiven,
+      );
+      expect(
+        combined.totalVoyATiRequests,
+        first.totalVoyATiRequests + second.totalVoyATiRequests,
+      );
     });
 
-    test('permite comparar dificultades entre parejas y obtener metricas validas', () {
+    test(
+        'permite comparar dificultades entre parejas y obtener metricas validas',
+        () {
       final strongVsEasy = simulator.run(
         const AiSimulationConfig(
           matches: 30,

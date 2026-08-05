@@ -7,9 +7,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
 
   Future<void> _playHumanCardAfterConfirmation(SpanishCard card) async {
     if (!_isHumanTurn) return;
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     if (_confirmCardPlay) {
       final confirmed = await _confirmCardPlayDialog(card);
       if (!confirmed || !mounted || !_isHumanTurn) return;
+      if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     }
 
     var roundCompleted = false;
@@ -84,6 +86,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
       return;
     }
 
+    final difficultyProfile = DifficultyProfiles.byLevel(_selectedDifficulty);
+    final isRivalBot = bot.teamId != _humanPlayer.teamId;
+    if (isRivalBot && !difficultyProfile.rivalsGiveSignals) {
+      return;
+    }
+
     final signal = SignalRules.signalForHand(_hands[bot.id] ?? const []);
     if (signal == null) return;
 
@@ -94,7 +102,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
       _knownSignalsByTeam[bot.teamId] = signal;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final revealDuration = isRivalBot
+        ? Duration(
+            milliseconds: difficultyProfile.rivalSignalRevealMilliseconds,
+          )
+        : const Duration(milliseconds: 300);
+    await Future<void>.delayed(revealDuration);
     if (!mounted || version != _handVersion) return;
     _updateState(() {
       if (_playerMessages[bot.id] == 'Seña: $signal') {
@@ -113,6 +126,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
 
   void _sendMultiplayerCardIfNeeded(Player player, SpanishCard card) {
     if (!_isMultiplayerMatch) return;
+    if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
@@ -127,6 +141,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
 
   void _sendMultiplayerTrucoCallIfNeeded(Player player, int value) {
     if (!_isMultiplayerMatch) return;
+    if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
     final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
     if (socket != null && socket.isConnected && roomId != null) {
@@ -257,11 +272,13 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final shouldPlayLowest = _forceLowestRequestedPlayerIds.contains(bot.id);
     if (shouldPlayLowest) {
       _forceLowestRequestedPlayerIds.remove(bot.id);
-      final sorted = [...hand]
-        ..sort(
-          (a, b) => ZapitiRules.strength(a).compareTo(ZapitiRules.strength(b)),
-        );
-      return sorted.first;
+      return BotVenAMiStrategy.chooseCard(
+        bot: bot,
+        hand: hand,
+        playedCards: _playedCards,
+        players: _players,
+        hands: _hands,
+      );
     }
     if (shouldPlayHighest) {
       _forceHighestRequestedPlayerIds.remove(bot.id);
@@ -454,6 +471,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (!_isRoundAwaitingContinue || _handFinished || _isGameFinished) return;
 
     if (_isMultiplayerMatch) {
+      if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -794,17 +812,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
       case MultiplayerMessageType.roomSnapshot:
         final snapshot = MultiplayerRoomSnapshot.fromJson(message.payload);
         MultiplayerSessionStore.instance.roomSnapshot = snapshot;
-        _updateState(() {
-          if (snapshot.match != null) {
-            _applyMultiplayerMatchSnapshot(snapshot.match!);
-          }
-          _status = snapshot.phase == 'playing'
-              ? context.tr('matchSynced')
-              : 'Sala ${snapshot.roomId} actualizada.';
-        });
-        if (snapshot.phase == 'lobby') {
-          _returnToMultiplayerLobby();
+        if (_shouldDelayMultiplayerBotSnapshot(snapshot)) {
+          unawaited(_applyDelayedMultiplayerBotSnapshot(snapshot));
+          return;
         }
+        _applyMultiplayerRoomSnapshot(snapshot);
         break;
       case MultiplayerMessageType.startGame:
         _updateState(() {
@@ -813,12 +825,93 @@ extension _GameScreenPlayLogic on _GameScreenState {
         break;
       case MultiplayerMessageType.error:
         _updateState(() {
+          _isRecoveringMultiplayerConnection = false;
+          _isAwaitingMultiplayerResync = false;
+          _multiplayerConnectionFailed = true;
+          _multiplayerMatchCanceled = false;
           _status = context.tr('onlineMatchSyncError');
         });
         break;
       default:
         break;
     }
+  }
+
+  bool _shouldDelayMultiplayerBotSnapshot(MultiplayerRoomSnapshot snapshot) {
+    if (snapshot.phase != 'playing' || snapshot.match == null) return false;
+    final rawPlayedCards = snapshot.match!['playedCards'];
+    if (rawPlayedCards is! List) return false;
+    final newCards = rawPlayedCards.length - _playedCards.length;
+    if (newCards != 1) return false;
+    final rawLastCard = rawPlayedCards.last;
+    if (rawLastCard is! Map) return false;
+    final playerId = rawLastCard['playerId']?.toString();
+    if (playerId == null || _controlledHumanPlayerIds.contains(playerId)) {
+      return false;
+    }
+    return playerId.startsWith('bot_');
+  }
+
+  Future<void> _applyDelayedMultiplayerBotSnapshot(
+    MultiplayerRoomSnapshot snapshot,
+  ) async {
+    final rawPlayedCards = snapshot.match?['playedCards'];
+    final rawLastCard = rawPlayedCards is List && rawPlayedCards.isNotEmpty
+        ? rawPlayedCards.last
+        : null;
+    final playerId =
+        rawLastCard is Map ? rawLastCard['playerId']?.toString() : null;
+    final player = playerId == null
+        ? null
+        : _players.firstWhere(
+            (candidate) => candidate.id == playerId,
+            orElse: () => _players.first,
+          );
+    final generation = ++_multiplayerSnapshotDelayGeneration;
+    if (player != null) {
+      _updateState(() {
+        _isAutoPlaying = true;
+        _status = context.tr('botThinking', params: {'name': player.name});
+      });
+    }
+
+    await _botDelay(1500);
+    if (!mounted ||
+        generation != _multiplayerSnapshotDelayGeneration ||
+        !_isMultiplayerMatch) {
+      return;
+    }
+    _applyMultiplayerRoomSnapshot(snapshot);
+  }
+
+  void _applyMultiplayerRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
+    _multiplayerSnapshotDelayGeneration += 1;
+    MultiplayerSessionStore.instance.roomSnapshot = snapshot;
+    if (snapshot.phase != 'playing' || snapshot.match == null) {
+      _updateState(() {
+        _isRecoveringMultiplayerConnection = false;
+        _isAwaitingMultiplayerResync = false;
+        _multiplayerConnectionFailed = false;
+        _multiplayerMatchCanceled = true;
+        _isAutoPlaying = false;
+        _isWaitingHumanTrucoResponse = false;
+        _isRequestingCompanionSignal = false;
+        _status = context.tr('multiplayerMatchCanceledByLeave');
+      });
+      return;
+    }
+    _updateState(() {
+      _isRecoveringMultiplayerConnection = false;
+      _isAwaitingMultiplayerResync = false;
+      _multiplayerConnectionFailed = false;
+      _multiplayerMatchCanceled = false;
+      if (snapshot.match != null) {
+        _applyMultiplayerMatchSnapshot(snapshot.match!);
+      }
+      _status = snapshot.phase == 'playing'
+          ? context.tr('matchSynced')
+          : 'Sala ${snapshot.roomId} actualizada.';
+    });
   }
 
   void _finishRound() {

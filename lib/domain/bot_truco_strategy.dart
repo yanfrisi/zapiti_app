@@ -59,6 +59,26 @@ class BotTrucoStrategy {
         !plansVeryStrongLead) {
       return false;
     }
+    if (isCompanion) {
+      final hasVeryFavorableHand =
+          handStrength >= 0.82 && teamScore >= _threshold(profile, 160);
+      final canCloseWithStrongSupport = canCloseHand &&
+          handStrength >= 0.72 &&
+          teamScore >= _threshold(profile, 132);
+      final tableAlreadyLooksGood = hasTableInformation &&
+          handStrength >= 0.76 &&
+          teamScore >= _threshold(profile, 145);
+      final signalBacked = teamHasStrongSignal &&
+          hasSomeTableInformation &&
+          handStrength >= 0.68 &&
+          teamScore >= _threshold(profile, 126);
+      if (!hasVeryFavorableHand &&
+          !canCloseWithStrongSupport &&
+          !tableAlreadyLooksGood &&
+          !signalBacked) {
+        return false;
+      }
+    }
 
     if (teamHasStrongSignal) {
       return handStrength >= 0.50 ||
@@ -83,22 +103,19 @@ class BotTrucoStrategy {
     final spentPenalty = teamSpentPower && !opponentsSpentPower ? 8 : 0;
     if (canCloseHand &&
         handStrength >= 0.55 &&
-        teamScore >=
-            _threshold(profile, 94) - tableDiscount - pressureBonus) {
+        teamScore >= _threshold(profile, 94) - tableDiscount - pressureBonus) {
       return true;
     }
     if (isCompanion &&
         hasSomeTableInformation &&
         handStrength >= 0.65 &&
-        teamScore >=
-            _threshold(profile, 122) - tableDiscount - pressureBonus) {
+        teamScore >= _threshold(profile, 122) - tableDiscount - pressureBonus) {
       return true;
     }
     if (needsPoints &&
         hasSomeTableInformation &&
         handStrength >= 0.65 &&
-        teamScore >=
-            _threshold(profile, 132) - tableDiscount - pressureBonus) {
+        teamScore >= _threshold(profile, 132) - tableDiscount - pressureBonus) {
       return true;
     }
 
@@ -211,7 +228,17 @@ class BotTrucoStrategy {
     if (scoreGap >= 6) chance -= 0.03;
     if (opponentsSpentPower) chance += 0.03;
     if (teamSpentPower && !opponentsSpentPower) chance -= 0.03;
-    if (isCompanion) chance -= 0.02;
+    if (isCompanion) {
+      chance *= switch (profile.level) {
+        <= 2 => 0.18,
+        3 => 0.22,
+        4 => 0.26,
+        _ => 0.30,
+      };
+      if (teamRoundWins > 0) chance += 0.01;
+      if (handStrength >= 0.88 && teamScore >= 165) chance += 0.015;
+      return chance.clamp(0, 0.09);
+    }
 
     return chance.clamp(0, 0.48);
   }

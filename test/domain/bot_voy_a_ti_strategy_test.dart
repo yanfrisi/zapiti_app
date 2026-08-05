@@ -75,6 +75,10 @@ void main() {
         SpanishCard(value: 2, suit: Suit.copas),
         SpanishCard(value: 11, suit: Suit.espadas),
       ];
+      const rivalLeftHand = [
+        SpanishCard(value: 12, suit: Suit.copas),
+        SpanishCard(value: 10, suit: Suit.espadas),
+      ];
       const playedCards = [
         PlayedCard(
           player: rivalRight,
@@ -88,7 +92,9 @@ void main() {
         players: companionBeforeHumanPlayers,
         hands: const {
           'p1': humanHand,
+          'p2': [],
           'p3': botHand,
+          'p4': rivalLeftHand,
         },
         playedCards: playedCards,
         teamRoundWins: 0,
@@ -159,6 +165,47 @@ void main() {
         hands: const {
           'p1': humanHand,
           'p3': botHand,
+        },
+        playedCards: playedCards,
+        teamRoundWins: 0,
+        opponentRoundWins: 1,
+        handValue: 3,
+        difficulty: 5,
+        roll: 0,
+      );
+
+      expect(shouldAsk, isFalse);
+    });
+
+    test('no pide voy a ti si el humano ganaria con mucho riesgo oculto', () {
+      const botHand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 4, suit: Suit.bastos),
+      ];
+      const humanHand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 11, suit: Suit.espadas),
+      ];
+      const rivalLeftHand = [
+        SpanishCard(value: 1, suit: Suit.espadas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 1, suit: Suit.bastos),
+        ),
+      ];
+
+      final shouldAsk = BotVoyATiStrategy.shouldAskTeammateToWin(
+        bot: companion,
+        teammate: human,
+        players: companionBeforeHumanPlayers,
+        hands: const {
+          'p1': humanHand,
+          'p2': [],
+          'p3': botHand,
+          'p4': rivalLeftHand,
         },
         playedCards: playedCards,
         teamRoundWins: 0,

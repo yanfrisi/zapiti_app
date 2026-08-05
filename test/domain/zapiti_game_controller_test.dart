@@ -330,6 +330,31 @@ void main() {
       expect(controller.trucoState, TrucoNegotiationState.rejectedHandFinished);
     });
 
+    test('rechazar truco mantiene la salida del siguiente jugador en mesa', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      controller.startNewHand();
+      expect(controller.currentPlayer, ZapitiPlayers.rightRival);
+
+      controller.callTruco(
+        ZapitiPlayers.rightRival,
+        value: 3,
+      );
+      controller.passTruco(
+        passingTeamId: TeamRules.teamOne,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+
+      expect(controller.score[TeamRules.teamTwo], 1);
+      expect(controller.handFinished, isTrue);
+
+      controller.startNewHand();
+
+      expect(controller.currentPlayer, ZapitiPlayers.companion);
+    });
+
     test('rechazar una subida concede el valor aceptado anterior', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
@@ -393,15 +418,30 @@ void main() {
       expect(controller.roundWins[TeamRules.teamTwo], 0);
     });
 
-    test('el companero local no puede ejecutar acciones de apuesta', () {
+    test('el companero local puede abrir truco pero no responder a su equipo',
+        () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
+      controller
+        ..startNewHand()
+        ..startNewHand();
 
       expect(
-        () => controller.callTruco(ZapitiPlayers.companion, value: 3),
-        throwsArgumentError,
+        controller.canCallTruco(
+          ZapitiPlayers.companion,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.companion.id,
+        ),
+        isTrue,
       );
+      controller.callTruco(
+        ZapitiPlayers.companion,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.companion.id,
+      );
+
+      expect(controller.trucoCallerTeamId, TeamRules.teamOne);
       expect(
         controller.canCallTruco(
           ZapitiPlayers.rightRival,
@@ -411,7 +451,6 @@ void main() {
         isFalse,
       );
 
-      controller.callTruco(ZapitiPlayers.human, value: 3);
       expect(
         controller.canAcceptTruco(
           teamId: TeamRules.teamTwo,
@@ -430,6 +469,7 @@ void main() {
         () => controller.raiseTruco(
           ZapitiPlayers.companion,
           value: 6,
+          actorPlayerId: ZapitiPlayers.companion.id,
         ),
         throwsArgumentError,
       );

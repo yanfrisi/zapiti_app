@@ -11,6 +11,194 @@ String _difficultyLabel(BuildContext context, int level) {
   };
 }
 
+class _MultiplayerConnectionOverlay extends StatelessWidget {
+  final bool reconnecting;
+  final VoidCallback? onReturnToMenu;
+
+  const _MultiplayerConnectionOverlay({
+    required this.reconnecting,
+    required this.onReturnToMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = reconnecting
+        ? context.tr('multiplayerRecoveringConnection')
+        : context.tr('connectionLostMatch');
+    final body = reconnecting
+        ? context.tr('multiplayerConnectionActionsPaused')
+        : context.tr('multiplayerConnectionFailedReturn');
+
+    return Positioned.fill(
+      child: AbsorbPointer(
+        absorbing: reconnecting,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.34),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 390),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: ZapitiColors.darkBrown.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: reconnecting
+                        ? ZapitiColors.oldGold
+                        : ZapitiColors.wineRed.withValues(alpha: 0.85),
+                    width: 1.4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.34),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (reconnecting) ...[
+                        const SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                        const SizedBox(height: 14),
+                      ] else ...[
+                        const Icon(
+                          Icons.wifi_off_rounded,
+                          color: ZapitiColors.oldGold,
+                          size: 34,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: ZapitiColors.cardCream,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        body,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: ZapitiColors.cardCream
+                                  .withValues(alpha: 0.86),
+                              fontWeight: FontWeight.w700,
+                              height: 1.22,
+                            ),
+                      ),
+                      if (onReturnToMenu != null) ...[
+                        const SizedBox(height: 16),
+                        ZapitiActionButton(
+                          label: context.tr('returnToMenu'),
+                          icon: Icons.home_outlined,
+                          onPressed: onReturnToMenu,
+                          primary: true,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MultiplayerMatchCanceledOverlay extends StatelessWidget {
+  final VoidCallback onReturnToMenu;
+
+  const _MultiplayerMatchCanceledOverlay({
+    required this.onReturnToMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.38),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 390),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: ZapitiColors.darkBrown.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: ZapitiColors.oldGold,
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.34),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.person_off_outlined,
+                      color: ZapitiColors.oldGold,
+                      size: 36,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      context.tr('multiplayerMatchCanceledByLeave'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: ZapitiColors.cardCream,
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      context.tr('multiplayerMatchCanceledByLeaveBody'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                ZapitiColors.cardCream.withValues(alpha: 0.86),
+                            fontWeight: FontWeight.w700,
+                            height: 1.22,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    ZapitiActionButton(
+                      label: context.tr('returnToMenu'),
+                      icon: Icons.home_outlined,
+                      onPressed: onReturnToMenu,
+                      primary: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GuidedTutorialOverlay extends StatelessWidget {
   final _TutorialTableScenario scenario;
   final int index;
@@ -438,6 +626,14 @@ class _TrucoResponseOverlay extends StatefulWidget {
 
 class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
   int _selectedRaiseIndex = 0;
+  bool _peekThroughOverlay = false;
+
+  void _setPeekThroughOverlay(bool value) {
+    if (_peekThroughOverlay == value) return;
+    setState(() {
+      _peekThroughOverlay = value;
+    });
+  }
 
   @override
   void didUpdateWidget(covariant _TrucoResponseOverlay oldWidget) {
@@ -462,56 +658,147 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
             builder: (context, constraints) {
               final shortest = min(constraints.maxWidth, constraints.maxHeight);
               final isNarrow = constraints.maxWidth < 560;
-            final gap = shortest * (isNarrow ? 0.022 : 0.018);
-            final panelWidth = min(
-              constraints.maxWidth * (isNarrow ? 0.86 : 0.54),
-              isNarrow ? 420.0 : 460.0,
-            );
-            final signalHeight = (isNarrow ? 44.0 : 50.0).clamp(
-              shortest * 0.11,
-              shortest * 0.16,
-            );
+              final gap = shortest * (isNarrow ? 0.022 : 0.018);
+              final panelWidth = min(
+                constraints.maxWidth * (isNarrow ? 0.86 : 0.54),
+                isNarrow ? 420.0 : 460.0,
+              );
+              final signalHeight = (isNarrow ? 44.0 : 50.0).clamp(
+                shortest * 0.11,
+                shortest * 0.16,
+              );
 
-            return Material(
-              color: Colors.transparent,
-              child: Padding(
+              return Material(
+                color: Colors.transparent,
+                child: Padding(
                   padding: EdgeInsets.all(gap),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.center,
                     child: SizedBox(
                       width: panelWidth,
-                      child: Container(
-                        padding: EdgeInsets.all(gap),
-                        decoration: BoxDecoration(
-                          color: ZapitiColors.cardCream.withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(gap),
-                          border: Border.all(
-                            color: ZapitiColors.oldGold,
-                            width: max(gap * 0.12, 1),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.32),
-                              blurRadius: gap * 2,
-                              offset: Offset(0, gap * 0.7),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    context.tr(
-                                      'calledValue',
-                                      params: {
-                                        'value': widget.pendingTrucoValue
-                                      },
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AnimatedOpacity(
+                            opacity: _peekThroughOverlay ? 0.16 : 1,
+                            duration: const Duration(milliseconds: 90),
+                            child: Container(
+                              padding: EdgeInsets.all(gap),
+                              decoration: BoxDecoration(
+                                color: ZapitiColors.cardCream
+                                    .withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(gap),
+                                border: Border.all(
+                                  color: ZapitiColors.oldGold,
+                                  width: max(gap * 0.12, 1),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.32),
+                                    blurRadius: gap * 2,
+                                    offset: Offset(0, gap * 0.7),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          context.tr(
+                                            'calledValue',
+                                            params: {
+                                              'value': widget.pendingTrucoValue,
+                                            },
+                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                color: ZapitiColors.darkBrown,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                        ),
+                                      ),
+                                      SizedBox(width: max(42.0, gap * 4.0)),
+                                    ],
+                                  ),
+                                  SizedBox(height: gap),
+                                  Align(
+                                    alignment: Alignment.center,
+                                    child: SizedBox(
+                                      width: min(panelWidth * 0.56, 230.0),
+                                      child: ZapitiActionButton(
+                                        label: context.tr('askSignalUpper'),
+                                        icon: Icons.visibility_outlined,
+                                        onPressed: widget.onAskCompanionSignal,
+                                      ),
                                     ),
+                                  ),
+                                  SizedBox(height: gap),
+                                  SizedBox(
+                                    height: signalHeight,
+                                    child: _SignalsBar(
+                                      enabled: true,
+                                      compact: true,
+                                      scale: isNarrow ? 0.68 : 0.78,
+                                      onSignalStart: widget.onSignalStart,
+                                      onSignalEnd: widget.onSignalEnd,
+                                    ),
+                                  ),
+                                  SizedBox(height: gap),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ZapitiActionButton(
+                                          label: context.tr('rejectUpper'),
+                                          icon: Icons.block,
+                                          onPressed: widget.onPass,
+                                        ),
+                                      ),
+                                      SizedBox(width: gap),
+                                      Expanded(
+                                        child: ZapitiActionButton(
+                                          label: context.tr('acceptUpper'),
+                                          icon: Icons.check,
+                                          onPressed: widget.onAccept,
+                                          primary: true,
+                                        ),
+                                      ),
+                                      SizedBox(width: gap),
+                                      Expanded(
+                                        child: ZapitiActionButton(
+                                          label: selectedRaise == null
+                                              ? context.tr('raiseUpper')
+                                              : context.tr(
+                                                  'raiseToUpper',
+                                                  params: {
+                                                    'value': selectedRaise,
+                                                  },
+                                                ),
+                                          icon: Icons.trending_up,
+                                          onPressed: selectedRaise == null
+                                              ? null
+                                              : () =>
+                                                  widget.onRaise(selectedRaise),
+                                          primary: true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: gap * 0.8),
+                                  Text(
+                                    selectedRaise == null
+                                        ? context.tr('noLegalRaise')
+                                        : context.tr(
+                                            'raiseValue',
+                                            params: {'value': selectedRaise},
+                                          ),
+                                    textAlign: TextAlign.center,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleMedium
@@ -520,105 +807,63 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                                           fontWeight: FontWeight.w900,
                                         ),
                                   ),
-                                ),
-                                SizedBox(width: gap),
-                                SizedBox(
-                                  width: panelWidth * 0.30,
-                                  child: ZapitiActionButton(
-                                    label: context.tr('askSignalUpper'),
-                                    icon: Icons.visibility_outlined,
-                                    onPressed: widget.onAskCompanionSignal,
+                                  Slider(
+                                    value: _selectedRaiseIndex.toDouble(),
+                                    min: 0,
+                                    max: max(widget.raiseOptions.length - 1, 0)
+                                        .toDouble(),
+                                    divisions: widget.raiseOptions.length > 1
+                                        ? widget.raiseOptions.length - 1
+                                        : null,
+                                    label: selectedRaise?.toString(),
+                                    activeColor: ZapitiColors.wineRed,
+                                    inactiveColor: ZapitiColors.darkBrown
+                                        .withValues(alpha: 0.18),
+                                    onChanged: canRaise
+                                        ? (value) {
+                                            setState(() {
+                                              _selectedRaiseIndex =
+                                                  value.round();
+                                            });
+                                          }
+                                        : null,
                                   ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: gap),
-                            SizedBox(
-                              height: signalHeight,
-                              child: _SignalsBar(
-                                enabled: true,
-                                compact: true,
-                                scale: isNarrow ? 0.68 : 0.78,
-                                onSignalStart: widget.onSignalStart,
-                                onSignalEnd: widget.onSignalEnd,
+                                ],
                               ),
                             ),
-                            SizedBox(height: gap),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ZapitiActionButton(
-                                    label: context.tr('rejectUpper'),
-                                    icon: Icons.block,
-                                    onPressed: widget.onPass,
-                                  ),
-                                ),
-                                SizedBox(width: gap),
-                                Expanded(
-                                  child: ZapitiActionButton(
-                                    label: context.tr('acceptUpper'),
-                                    icon: Icons.check,
-                                    onPressed: widget.onAccept,
-                                    primary: true,
-                                  ),
-                                ),
-                                SizedBox(width: gap),
-                                Expanded(
-                                  child: ZapitiActionButton(
-                                    label: selectedRaise == null
-                                        ? context.tr('raiseUpper')
-                                        : context.tr(
-                                            'raiseToUpper',
-                                            params: {'value': selectedRaise},
-                                          ),
-                                    icon: Icons.trending_up,
-                                    onPressed: selectedRaise == null
-                                        ? null
-                                        : () => widget.onRaise(selectedRaise),
-                                    primary: true,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: gap * 0.8),
-                            Text(
-                              selectedRaise == null
-                                  ? context.tr('noLegalRaise')
-                                  : context.tr(
-                                      'raiseValue',
-                                      params: {'value': selectedRaise},
+                          ),
+                          Positioned(
+                            top: max(4.0, gap * 0.55),
+                            right: max(4.0, gap * 0.55),
+                            child: GestureDetector(
+                              onTapDown: (_) => _setPeekThroughOverlay(true),
+                              onTapUp: (_) => _setPeekThroughOverlay(false),
+                              onTapCancel: () => _setPeekThroughOverlay(false),
+                              child: Tooltip(
+                                message: context.tr('holdToViewCards'),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: ZapitiColors.darkBrown
+                                        .withValues(alpha: 0.90),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: ZapitiColors.oldGold,
+                                      width: 1,
                                     ),
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: ZapitiColors.darkBrown,
-                                    fontWeight: FontWeight.w900,
                                   ),
+                                  child: SizedBox.square(
+                                    dimension: max(34.0, gap * 3.3),
+                                    child: Icon(
+                                      Icons.visibility_outlined,
+                                      color: ZapitiColors.cardCream,
+                                      size: max(18.0, gap * 1.55),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                            Slider(
-                              value: _selectedRaiseIndex.toDouble(),
-                              min: 0,
-                              max: max(widget.raiseOptions.length - 1, 0)
-                                  .toDouble(),
-                              divisions: widget.raiseOptions.length > 1
-                                  ? widget.raiseOptions.length - 1
-                                  : null,
-                              label: selectedRaise?.toString(),
-                              activeColor: ZapitiColors.wineRed,
-                              inactiveColor: ZapitiColors.darkBrown
-                                  .withValues(alpha: 0.18),
-                              onChanged: canRaise
-                                  ? (value) {
-                                      setState(() {
-                                        _selectedRaiseIndex = value.round();
-                                      });
-                                    }
-                                  : null,
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

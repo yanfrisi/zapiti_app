@@ -419,9 +419,8 @@ extension _GameScreenStateFlow on _GameScreenState {
 
   void _startGuidedTutorialMatch() {
     _updateState(() {
+      _resetMultiplayerStateForLocalMode();
       _applyCharacterSelection(_selectedHumanCharacterId);
-      _isMultiplayerMatch = false;
-      _multiplayerPlayers = const [];
       _isGuidedTutorialMatch = true;
       _guidedTutorialCompleted = false;
       _guidedTutorialScenarioIndex = 0;
@@ -513,7 +512,9 @@ extension _GameScreenStateFlow on _GameScreenState {
             );
       _showTemporaryPlayerMessage(
         _humanPlayer.id,
-        correct ? context.tr('guidedGoodSpeech') : context.tr('guidedAlmostSpeech'),
+        correct
+            ? context.tr('guidedGoodSpeech')
+            : context.tr('guidedAlmostSpeech'),
         duration: const Duration(milliseconds: 900),
       );
     });
@@ -685,12 +686,14 @@ extension _GameScreenStateFlow on _GameScreenState {
         _game.alVerTeamId != teamId) {
       return;
     }
+    if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     _updateState(() {
       _isAlVerDecisionDialogOpen = false;
       _game.chooseAlVerDecision(teamId: teamId, play: play);
     });
 
     if (_isMultiplayerMatch) {
+      if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -738,6 +741,7 @@ extension _GameScreenStateFlow on _GameScreenState {
   void _newHand() {
     if (_isGameFinished) return;
     if (_isMultiplayerMatch) {
+      if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
       final playerId =
@@ -857,7 +861,27 @@ extension _GameScreenStateFlow on _GameScreenState {
     }
   }
 
+  void _notifyMultiplayerLeaveIfNeeded() {
+    if (!_isMultiplayerMatch) return;
+    final session = MultiplayerSessionStore.instance;
+    final socket = session.socket;
+    final roomId = session.roomSnapshot?.roomId ?? session.reconnectRoomId;
+    final playerId = session.localGamePlayerId;
+    if (socket == null ||
+        !socket.isConnected ||
+        roomId == null ||
+        playerId == null) {
+      return;
+    }
+    try {
+      socket.leaveRoom(roomId: roomId, playerId: playerId);
+    } catch (_) {
+      // Salir de la mesa no debe mostrar una excepcion al jugador.
+    }
+  }
+
   void _returnToMainMenu() {
+    _notifyMultiplayerLeaveIfNeeded();
     _updateState(() {
       _isMultiplayerMatch = false;
       _multiplayerPlayers = const [];
@@ -870,6 +894,10 @@ extension _GameScreenStateFlow on _GameScreenState {
       _showDifficultySelection = false;
       _isGuidedTutorialMatch = false;
       _guidedTutorialCompleted = false;
+      _isRecoveringMultiplayerConnection = false;
+      _isAwaitingMultiplayerResync = false;
+      _multiplayerConnectionFailed = false;
+      _multiplayerMatchCanceled = false;
       _showGameOptions = false;
       _mainMenuPanel = _MainMenuPanel.home;
       _isWaitingHumanTrucoResponse = false;
@@ -882,40 +910,6 @@ extension _GameScreenStateFlow on _GameScreenState {
       _companionPrivateSignalStatus = null;
     });
     MultiplayerSessionStore.instance.clearAll();
-    unawaited(_syncMusic());
-  }
-
-  void _returnToMultiplayerLobby() {
-    _updateState(() {
-      _isMultiplayerMatch = false;
-      _multiplayerPlayers = const [];
-      _multiplayerServerHandSequence = null;
-      _multiplayerStateVersion = null;
-      _alVerDecisionPromptedKey = null;
-      _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
-      _showMainMenu = true;
-      _showCharacterSelection = false;
-      _showDifficultySelection = false;
-      _isGuidedTutorialMatch = false;
-      _guidedTutorialCompleted = false;
-      _showGameOptions = false;
-      _mainMenuPanel = _MainMenuPanel.multiplayer;
-      _isWaitingHumanTrucoResponse = false;
-      _isRequestingCompanionSignal = false;
-      _turnDeadlineAt = null;
-      _turnSecondsRemaining = null;
-      _playerMessages.clear();
-      _forceWinRequestedPlayerIds.clear();
-      _forceLowestRequestedPlayerIds.clear();
-      _companionPrivateSignalStatus = null;
-
-      final session = MultiplayerSessionStore.instance;
-      session.matchStarted = false;
-      session.players = const [];
-      session.controlledPlayerIds = const [];
-      session.fixedHands = null;
-      session.seed = null;
-    });
     unawaited(_syncMusic());
   }
 
@@ -996,6 +990,7 @@ extension _GameScreenStateFlow on _GameScreenState {
 
   void _continueToDifficultySelection() {
     _updateState(() {
+      _resetMultiplayerStateForLocalMode();
       _applyCharacterSelection(_selectedHumanCharacterId);
       _showMainMenu = false;
       _showCharacterSelection = false;
@@ -1006,6 +1001,7 @@ extension _GameScreenStateFlow on _GameScreenState {
 
   void _startFromMainMenu() {
     _updateState(() {
+      _resetMultiplayerStateForLocalMode();
       _showMainMenu = false;
       _showCharacterSelection = true;
       _showDifficultySelection = false;
@@ -1092,6 +1088,10 @@ extension _GameScreenStateFlow on _GameScreenState {
         : _GameScreenState._defaultPlayers;
     _updateState(() {
       _isMultiplayerMatch = true;
+      _isRecoveringMultiplayerConnection = false;
+      _isAwaitingMultiplayerResync = false;
+      _multiplayerConnectionFailed = false;
+      _multiplayerMatchCanceled = false;
       _isGuidedTutorialMatch = false;
       _guidedTutorialCompleted = false;
       _random = session.seed == null ? Random() : Random(session.seed!);
@@ -1141,23 +1141,171 @@ extension _GameScreenStateFlow on _GameScreenState {
     });
     if (socket != null) {
       socket.onMessage = _handleMultiplayerMessage;
-      socket.onError = (error) {
-        if (!mounted) return;
-        _updateState(() {
-          _status = context.tr('connectionLostMatch');
-        });
-      };
-      socket.onDone = () {
-        if (!mounted) return;
-        if (_isMultiplayerMatch) {
-          _returnToMainMenu();
-        }
-      };
+      socket.onError = (error) => _handleMultiplayerSocketDropped();
+      socket.onDone = _handleMultiplayerSocketDropped;
     }
     if (!_isHumanTurn) {
       _advanceBots();
     }
     unawaited(_syncMusic());
+  }
+
+  bool get _canSendMultiplayerAction {
+    if (!_isMultiplayerMatch ||
+        _isRecoveringMultiplayerConnection ||
+        _isAwaitingMultiplayerResync ||
+        _multiplayerMatchCanceled) {
+      return false;
+    }
+    final socket = MultiplayerSessionStore.instance.socket;
+    return socket != null && socket.isConnected;
+  }
+
+  bool _ensureMultiplayerActionConnection() {
+    if (!_isMultiplayerMatch) return true;
+    if (_canSendMultiplayerAction) return true;
+
+    _updateState(() {
+      _status = context.tr('multiplayerRecoveringConnection');
+    });
+    if (_isAwaitingMultiplayerResync) return false;
+
+    _handleMultiplayerSocketDropped();
+    return false;
+  }
+
+  void _handleMultiplayerSocketDropped() {
+    if (!mounted ||
+        !_isMultiplayerMatch ||
+        _isRecoveringMultiplayerConnection) {
+      return;
+    }
+    unawaited(_recoverMultiplayerMatchConnection());
+  }
+
+  Future<void> _recoverMultiplayerMatchConnection() async {
+    if (!mounted || !_isMultiplayerMatch) return;
+
+    final session = MultiplayerSessionStore.instance;
+    final roomId = session.reconnectRoomId ?? session.roomSnapshot?.roomId;
+    final playerId = session.localGamePlayerId;
+    if (!session.canReconnectMatch || roomId == null || playerId == null) {
+      _updateState(() {
+        _isRecoveringMultiplayerConnection = false;
+        _isAwaitingMultiplayerResync = false;
+        _multiplayerConnectionFailed = true;
+        _status = context.tr('connectionLostMatch');
+      });
+      return;
+    }
+
+    final generation = ++_multiplayerConnectionGeneration;
+    final previousSocket = session.socket;
+    previousSocket?.onMessage = null;
+    previousSocket?.onError = null;
+    previousSocket?.onDone = null;
+    previousSocket?.close();
+    session.socket = null;
+
+    _updateState(() {
+      _isRecoveringMultiplayerConnection = true;
+      _isAwaitingMultiplayerResync = false;
+      _multiplayerConnectionFailed = false;
+      _isAutoPlaying = false;
+      _status = context.tr('multiplayerRecoveringConnection');
+    });
+
+    const attemptDelays = [
+      Duration.zero,
+      Duration(seconds: 2),
+      Duration(seconds: 5),
+      Duration(seconds: 10),
+    ];
+    const attemptTimeout = Duration(seconds: 18);
+
+    for (var attempt = 0; attempt < attemptDelays.length; attempt++) {
+      if (!mounted ||
+          !_isMultiplayerMatch ||
+          generation != _multiplayerConnectionGeneration) {
+        return;
+      }
+
+      final delay = attemptDelays[attempt];
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+        if (!mounted ||
+            !_isMultiplayerMatch ||
+            generation != _multiplayerConnectionGeneration) {
+          return;
+        }
+      }
+
+      final nextSocket = GameSocket(ServerConfig.websocketUrl);
+      nextSocket.onMessage = _handleMultiplayerMessage;
+      nextSocket.onError = (error) {
+        if (!mounted ||
+            generation != _multiplayerConnectionGeneration ||
+            !_isMultiplayerMatch) {
+          return;
+        }
+        session.socket = null;
+        _handleMultiplayerSocketDropped();
+      };
+      nextSocket.onDone = () {
+        if (!mounted ||
+            generation != _multiplayerConnectionGeneration ||
+            !_isMultiplayerMatch) {
+          return;
+        }
+        session.socket = null;
+        _handleMultiplayerSocketDropped();
+      };
+
+      try {
+        await nextSocket.connect(timeout: attemptTimeout);
+        if (!mounted ||
+            !_isMultiplayerMatch ||
+            generation != _multiplayerConnectionGeneration) {
+          nextSocket.close();
+          return;
+        }
+        session.socket = nextSocket;
+        nextSocket.joinRoom(
+          roomId: roomId,
+          playerId: playerId,
+          username: session.reconnectUsername!,
+          playerName: session.reconnectPlayerName!,
+          teamName: session.reconnectTeamName!,
+          password: session.reconnectSessionToken == null
+              ? session.reconnectPassword
+              : null,
+          sessionToken: session.reconnectSessionToken,
+          pairId: session.reconnectPairId,
+          characterId: session.reconnectCharacterId,
+        );
+        _updateState(() {
+          _isRecoveringMultiplayerConnection = false;
+          _isAwaitingMultiplayerResync = true;
+          _multiplayerConnectionFailed = false;
+          _status = context.tr('multiplayerRecoveringConnection');
+        });
+        return;
+      } catch (_) {
+        nextSocket.close();
+      }
+    }
+
+    if (!mounted ||
+        !_isMultiplayerMatch ||
+        generation != _multiplayerConnectionGeneration) {
+      return;
+    }
+    _updateState(() {
+      _isRecoveringMultiplayerConnection = false;
+      _isAwaitingMultiplayerResync = false;
+      _multiplayerConnectionFailed = true;
+      _status = context.tr('connectionLostMatch');
+    });
   }
 
   void _applyMultiplayerMatchSnapshot(Map<String, dynamic> match) {
@@ -1477,6 +1625,7 @@ extension _GameScreenStateFlow on _GameScreenState {
 
   void _startWithSelectedSettings() {
     _updateState(() {
+      _resetMultiplayerStateForLocalMode();
       _applyCharacterSelection(_selectedHumanCharacterId);
       _showMainMenu = false;
       _showCharacterSelection = false;
@@ -1496,6 +1645,22 @@ extension _GameScreenStateFlow on _GameScreenState {
     }
     unawaited(_syncMusic());
     unawaited(_saveSelectedSettings());
+  }
+
+  void _resetMultiplayerStateForLocalMode() {
+    MultiplayerSessionStore.instance.clearAll();
+    _isMultiplayerMatch = false;
+    _multiplayerPlayers = const [];
+    _multiplayerServerHandSequence = null;
+    _multiplayerStateVersion = null;
+    _isRecoveringMultiplayerConnection = false;
+    _isAwaitingMultiplayerResync = false;
+    _multiplayerConnectionFailed = false;
+    _multiplayerMatchCanceled = false;
+    _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
+    _turnDeadlineAt = null;
+    _turnSecondsRemaining = null;
+    _syncTurnCountdownTimer();
   }
 
   Future<void> _saveSelectedSettings() {

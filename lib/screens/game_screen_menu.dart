@@ -1805,7 +1805,7 @@ class _MainMenuMultiplayerContent extends StatefulWidget {
 class _MainMenuMultiplayerContentState
     extends State<_MainMenuMultiplayerContent> {
   static const _maxPlayerNameLength = 18;
-  static const _maxUsernameLength = 24;
+  static const _maxUsernameLength = 20;
   static const _maxTeamNameLength = 22;
 
   final TextEditingController _nameController = TextEditingController();
@@ -1915,7 +1915,6 @@ class _MainMenuMultiplayerContentState
     super.didChangeDependencies();
     if (_didInitializeLocalizedTexts) return;
     _didInitializeLocalizedTexts = true;
-    _nameController.text = _tr('defaultPlayerName');
     _status = _tr('multiplayerReadyToConnect');
     _profileStatus = _tr('multiplayerProfileSetup');
   }
@@ -1979,7 +1978,7 @@ class _MainMenuMultiplayerContentState
 
   void _setPlayerNameField(String value) {
     final cleaned = _cleanPlayerName(value);
-    if (cleaned.isEmpty || _nameController.text == cleaned) return;
+    if (_nameController.text == cleaned) return;
     _nameController.text = cleaned;
     _nameController.selection = TextSelection.collapsed(
       offset: _nameController.text.length,
@@ -2017,89 +2016,43 @@ class _MainMenuMultiplayerContentState
   }
 
   Future<void> _loadSavedPlayerProfile() async {
-    final prefs = await SharedPreferences.getInstance();
+    await AccountPrivacyService.clearLocalMultiplayerProfile();
     if (!mounted || _roomSnapshot != null) return;
-    _setPlayerNameField(
-      prefs.getString(_GameScreenState._multiplayerPlayerNamePrefsKey) ??
-          _nameController.text,
-    );
-    final savedUsername =
-        prefs.getString(_GameScreenState._multiplayerUsernamePrefsKey) ?? '';
-    _setUsernameField(savedUsername);
-    _playerId = prefs.getString(_GameScreenState._multiplayerPlayerIdPrefsKey);
-    _sessionToken = prefs.getString(
-      _GameScreenState._multiplayerSessionTokenPrefsKey,
-    );
-    if (_playerId == null || _playerId!.isEmpty) {
-      _playerId = _createPersistentPlayerId();
-      await prefs.setString(
-        _GameScreenState._multiplayerPlayerIdPrefsKey,
-        _playerId!,
-      );
-    }
-    final savedPin = prefs.getString(
-      _GameScreenState._multiplayerPlayerPinPrefsKey,
-    );
-    _passwordController.text =
-        prefs.getString(_GameScreenState._multiplayerPasswordPrefsKey) ??
-            savedPin ??
-            '';
-    _setTeamNameField(
-      prefs.getString(_GameScreenState._multiplayerTeamNamePrefsKey) ?? '',
-    );
+    _playerId = null;
+    _sessionToken = null;
+    _setUsernameField('');
+    _passwordController.clear();
+    _setTeamNameField('');
     if (mounted) {
       setState(() {
-        _profileReady = _sessionToken != null && _sessionToken!.isNotEmpty;
-        _profileStatus = _profileReady
-            ? _tr('multiplayerProfileActive')
-            : _tr('multiplayerProfileRecover');
+        _profileReady = false;
+        _profileStatus = _tr('multiplayerProfileRecover');
       });
     }
   }
 
   Future<void> _savePlayerName(String playerName) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerPlayerNamePrefsKey,
-      playerName,
-    );
+    return;
   }
 
   Future<void> _savePlayerId(String playerId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerPlayerIdPrefsKey,
-      playerId,
-    );
+    return;
   }
 
   Future<void> _saveUsername(String username) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerUsernamePrefsKey,
-      username,
-    );
+    return;
   }
 
   Future<void> _saveSessionToken(String sessionToken) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerSessionTokenPrefsKey,
-      sessionToken,
-    );
+    return;
   }
 
   Future<void> _clearSavedSessionToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_GameScreenState._multiplayerSessionTokenPrefsKey);
+    return;
   }
 
   Future<void> _saveTeamName(String teamName) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerTeamNamePrefsKey,
-      teamName,
-    );
+    return;
   }
 
   String _createPersistentPlayerId() {
@@ -2520,6 +2473,13 @@ class _MainMenuMultiplayerContentState
           };
         });
         MultiplayerSessionStore.instance.roomSnapshot = snapshot;
+        final reconnectPlayerId = message.playerId ?? _playerId;
+        if (reconnectPlayerId != null && reconnectPlayerId.isNotEmpty) {
+          _rememberReconnectCredentials(
+            playerId: reconnectPlayerId,
+            roomId: snapshot.roomId,
+          );
+        }
         final allowPassHand = snapshot.match?['allowPassHand'];
         if (allowPassHand is bool) {
           MultiplayerSessionStore.instance.allowPassHand = allowPassHand;
@@ -2819,6 +2779,10 @@ class _MainMenuMultiplayerContentState
       _roomActionRetriedWithoutCharacter = false;
       _roomActionRetriedWithoutSession = false;
       MultiplayerSessionStore.instance.allowPassHand = _allowPassHandForRoom;
+      _rememberReconnectCredentials(
+        playerId: localPlayerId,
+        roomId: _connectedRoomId,
+      );
       socket.createRoom(
         playerId: localPlayerId,
         username: username,
@@ -2896,6 +2860,10 @@ class _MainMenuMultiplayerContentState
       _pendingRoomAction = 'join';
       _roomActionRetriedWithoutCharacter = false;
       _roomActionRetriedWithoutSession = false;
+      _rememberReconnectCredentials(
+        playerId: localPlayerId,
+        roomId: roomCode,
+      );
       socket.joinRoom(
         roomId: roomCode,
         playerId: localPlayerId,
@@ -2967,6 +2935,25 @@ class _MainMenuMultiplayerContentState
       });
     }
     return false;
+  }
+
+  void _rememberReconnectCredentials({
+    required String playerId,
+    String? roomId,
+  }) {
+    final selectedCharacterId =
+        _characterSelectionReleased ? null : _selectedCharacterId;
+    MultiplayerSessionStore.instance.rememberReconnectCredentials(
+      roomId: roomId ?? _connectedRoomId ?? _roomSnapshot?.roomId ?? '',
+      playerId: playerId,
+      username: _username,
+      playerName: _playerName,
+      teamName: _selectedTeamName,
+      password: _sessionToken == null ? _usableProfilePassword : null,
+      sessionToken: _sessionToken,
+      pairId: _selectedPairId,
+      characterId: selectedCharacterId,
+    );
   }
 
   bool _retryPendingRoomActionWithoutSession() {
@@ -3917,7 +3904,8 @@ class _MainMenuMultiplayerContentState
         onCreateAccount: () {
           setState(() {
             _showCreateAccount = true;
-            _profileStatus = _tr('multiplayerCreateAccountPrompt');
+            _setPlayerNameField('');
+            _profileStatus = _tr('multiplayerProfileNameRequiredCreate');
           });
         },
       );
