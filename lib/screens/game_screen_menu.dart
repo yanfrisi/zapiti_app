@@ -866,7 +866,6 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
           shortest * 0.22,
           min(visualHeight * 0.74, 110.0),
         );
-        final bodyMaxLines = compact ? 1 : (contentHeight < 430 ? 2 : 3);
         final selectedAnswer = _selectedAnswers[_stepIndex];
 
         if (_mode == _TutorialMode.practice) {

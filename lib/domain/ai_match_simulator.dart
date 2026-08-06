@@ -13,6 +13,7 @@ import 'bot_ven_a_mi_strategy.dart';
 import 'bot_voy_a_ti_strategy.dart';
 import 'difficulty_profile.dart';
 import 'difficulty_strategy.dart';
+import 'monte_carlo_difficulty_config.dart';
 import 'played_card.dart';
 import 'player.dart';
 import 'signal_rules.dart';
@@ -44,6 +45,14 @@ class AiSimulationConfig {
     this.rotateStartingPlayerPerMatch = true,
   })  : teamOneDifficulty = teamOneDifficulty ?? difficulty,
         teamTwoDifficulty = teamTwoDifficulty ?? difficulty;
+}
+
+class DifficultyConfigAdapter {
+  const DifficultyConfigAdapter._();
+
+  static MonteCarloDifficultyConfig forDifficulty(int difficulty) {
+    return MonteCarloDifficultyConfigs.forDifficulty(difficulty);
+  }
 }
 
 class AiSimulationSummary {

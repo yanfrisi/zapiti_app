@@ -1,9 +1,13 @@
 import 'dart:math';
 
+import 'bet_state.dart';
 import 'bot_decision_context.dart';
 import 'bot_rollout_evaluator.dart';
 import 'bot_strategy.dart';
 import 'difficulty_profile.dart';
+import 'monte_carlo_card_selector.dart';
+import 'monte_carlo_difficulty_config.dart';
+import 'observable_game_state.dart';
 import 'spanish_card.dart';
 
 abstract interface class BotPolicy {
@@ -58,6 +62,51 @@ class RolloutBotPolicy implements BotPolicy {
       teammateStillToPlay: context.teammateStillToPlay,
       opponentStillToPlay: context.opponentStillToPlay,
       rolloutCount: rolloutCount,
+    );
+  }
+}
+
+class MonteCarloBotPolicy implements BotPolicy {
+  final MonteCarloCardSelector selector;
+
+  MonteCarloBotPolicy({
+    MonteCarloCardSelector? selector,
+  }) : selector = selector ?? MonteCarloCardSelector();
+
+  @override
+  SpanishCard chooseCard(BotDecisionContext context) {
+    final observable = ObservableGameState(
+      botPlayerId: context.bot.id,
+      players: context.players,
+      botHand: context.hand,
+      playedCards: context.playedCards,
+      cardsRemainingByPlayerId: {
+        for (final player in context.players)
+          player.id: context.hands[player.id]?.length ?? 0,
+      },
+      publiclyKnownCardsByPlayerId: const {},
+      currentPlayerId: context.bot.id,
+      trickLeaderId:
+          context.playedCards.isEmpty ? context.bot.id : context.playedCards.first.player.id,
+      betState: const BetState(
+        acceptedLevel: BetLevel.none,
+        proposedLevel: null,
+        proposingTeam: null,
+        respondingTeam: null,
+        lastRaisingTeam: null,
+        responsePending: false,
+      ),
+      score: const {1: 0, 2: 0},
+      roundWins: {
+        1: context.teamRoundWins,
+        2: context.opponentRoundWins,
+      },
+      visibleSignals: const [],
+    );
+    return selector.selectCard(
+      botPlayerId: context.bot.id,
+      state: observable,
+      config: MonteCarloDifficultyConfigs.forDifficulty(context.difficulty),
     );
   }
 }
@@ -163,13 +212,10 @@ class BotPolicySelector {
 
   static BotPolicy forDifficulty(int difficulty) {
     final profile = DifficultyProfiles.byLevel(difficulty);
-    if (profile.level >= 5) {
-      return const RolloutBotPolicy(
-        handValueEstimate: 2,
-        rolloutCount: 24,
-      );
-    }
     if (profile.level >= 4) {
+      return MonteCarloBotPolicy();
+    }
+    if (profile.level == 3) {
       return const RolloutBotPolicy();
     }
     return const HeuristicBotPolicy();

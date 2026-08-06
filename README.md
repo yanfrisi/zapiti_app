@@ -1,13 +1,15 @@
 # Zapiti App
 
-Cliente Flutter de Zapiti con modo local y multijugador.
+Zapiti es un juego de cartas españolas por parejas. Este repositorio contiene el cliente Flutter con partida local, multijugador y la base de IA para los bots.
 
-## Ejecutar en local
+## Arranque rápido
 
 ```bash
 flutter pub get
 flutter run
 ```
+
+La app arranca en horizontal por defecto y carga recursos desde `assets/`.
 
 ## Multijugador
 
@@ -23,8 +25,6 @@ wss://zapiti-server.onrender.com/
 
 ### Desarrollo local
 
-Arranca el cliente con:
-
 ```bash
 flutter run -d chrome --dart-define=USE_LOCAL_SERVER=true
 ```
@@ -34,17 +34,24 @@ URLs locales por defecto:
 - Web: `ws://localhost:8080/`
 - Android Emulator: `ws://10.0.2.2:8080/`
 
-Si necesitas otra URL local, puedes pasarla con:
+Si necesitas otra URL local:
 
 ```bash
 flutter run -d chrome --dart-define=USE_LOCAL_SERVER=true --dart-define=LOCAL_SERVER_URL=ws://IP_LOCAL:8080
 ```
 
-## Estados de conexión
+## IA y simulación
 
-El cliente muestra estados claros mientras conecta al servidor, lo despierta, se reconecta o falla.
+El proyecto ya separa la lógica observable de la simulación pura:
 
-Si la conexión se corta en mitad de una partida, el cliente intenta volver a abrir el canal, pero no recupera automáticamente la sala anterior porque el protocolo aún no tiene reanudación de sesión.
+- `ObservableGameState` expone solo información permitida al bot.
+- `UniformPossibleDealSampler` genera determinizaciones compatibles.
+- `SimulationGameState` representa un mundo simulado concreto.
+- `DefaultSimulationGameEngine` aplica cartas y resuelve bazas sobre el estado simulado.
+- `MonteCarloCardSelector` evalúa cartas por simulaciones y elige la mejor.
+- `MonteCarloDifficultyConfigs` centraliza la potencia por dificultad.
+
+Los bots mantienen un fallback heurístico seguro si la simulación no puede decidir.
 
 ## Tests
 
@@ -52,35 +59,47 @@ Si la conexión se corta en mitad de una partida, el cliente intenta volver a ab
 flutter test
 ```
 
-## Benchmark de IA
-
-Para imprimir un informe reproducible de balance entre dificultades:
+Tests útiles del motor de IA:
 
 ```bash
-flutter test test/domain/ai_balance_report_test.dart --dart-define=AI_BALANCE_REPORT=true
+flutter test test/domain/observable_game_state_test.dart test/domain/possible_deal_sampler_test.dart test/domain/simulation_game_engine_test.dart
 ```
 
-Para validar la infraestructura del benchmark sin imprimir el informe completo:
+## Análisis estático
 
 ```bash
-flutter test test/domain/ai_benchmark_report_test.dart
+flutter analyze
 ```
 
-## Estado del plan v0.2.0
+## Benchmark básico de IA
 
-La app ya incluye:
+```bash
+flutter test test/domain/monte_carlo_benchmark_test.dart
+```
+
+## Estructura principal
+
+- `lib/domain/` contiene reglas, simulación y bots.
+- `lib/screens/` contiene la UI de juego, menú y setup.
+- `lib/services/` contiene red, preferencias y sincronización.
+- `assets/` contiene cartas, personajes, audio e idiomas.
+
+## Estado actual
+
+La app incluye:
 
 - reglas de truco con alternancia real;
-- `BetState` y sincronizacion de `stateVersion`;
-- seña `Ven a mi`;
-- politicas de bots por dificultad;
-- determinizacion de cartas ocultas;
-- simulacion pura de mano;
-- `RolloutBotPolicy` e `IsmctsBotPolicy` inicial;
-- benchmarks reproducibles del lado app.
+- `BetState` y sincronización de `stateVersion`;
+- señal `Ven a mí`;
+- políticas de bots por dificultad;
+- determinización de cartas ocultas;
+- simulación pura de mano;
+- Monte Carlo básico para elección de cartas;
+- benchmark reproducible del lado app.
 
-Queda pendiente fuera de este repo o de esta sesion:
+## Pendiente
 
-- validar y cerrar completamente `C:\\ESD\\zapiti_server`;
+- cerrar completamente `C:\ESD\zapiti_server`;
 - generar APK release y AAB firmado;
-- cierre final de publicacion.
+- cerrar ajustes finos de fuerza táctica en IA;
+- añadir más paridad entre simulación pura y controlador real.
