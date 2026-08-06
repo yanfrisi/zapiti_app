@@ -66,6 +66,37 @@ void main() {
       expect(chosen, const SpanishCard(value: 2, suit: Suit.copas));
     });
 
+    test('sube de carta si la ganadora barata deja demasiado riesgo pendiente',
+        () {
+      const hand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.bastos),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 1, suit: Suit.copas),
+        ),
+      ];
+      const rivalLeftHand = [
+        SpanishCard(value: 3, suit: Suit.espadas),
+      ];
+
+      final chosen = BotVoyATiStrategy.chooseCard(
+        bot: companion,
+        hand: hand,
+        playedCards: playedCards,
+        players: players,
+        hands: const {
+          'p3': hand,
+          'p4': rivalLeftHand,
+        },
+      );
+
+      expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
+    });
+
     test('pide voy a ti al humano si el companero va antes y conviene', () {
       const botHand = [
         SpanishCard(value: 12, suit: Suit.oros),

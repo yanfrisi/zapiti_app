@@ -999,6 +999,25 @@ extension _GameScreenStateFlow on _GameScreenState {
     unawaited(_syncMusic());
   }
 
+  void _backToCharacterSelection() {
+    _updateState(() {
+      _showMainMenu = false;
+      _showCharacterSelection = true;
+      _showDifficultySelection = false;
+    });
+    unawaited(_syncMusic());
+  }
+
+  void _backToMainMenuFromCharacterSelection() {
+    _updateState(() {
+      _showMainMenu = true;
+      _showCharacterSelection = false;
+      _showDifficultySelection = false;
+      _mainMenuPanel = _MainMenuPanel.home;
+    });
+    unawaited(_syncMusic());
+  }
+
   void _startFromMainMenu() {
     _updateState(() {
       _resetMultiplayerStateForLocalMode();

@@ -486,6 +486,37 @@ void main() {
     expect(find.text('Juegan aceptable, pero se precipitan.'), findsNothing);
   });
 
+  testWidgets('permite volver atras en el flujo de un jugador', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige tu personaje'), findsOneWidget);
+
+    final backButton = find.text('VOLVER');
+    await tester.ensureVisible(backButton);
+    await tester.tap(backButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('JUGAR'), findsOneWidget);
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EMPEZAR PARTIDA'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige dificultad'), findsOneWidget);
+
+    final difficultyBackButton = find.text('VOLVER');
+    await tester.ensureVisible(difficultyBackButton);
+    await tester.tap(difficultyBackButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige tu personaje'), findsOneWidget);
+  });
+
   testWidgets('setup no desborda en movil pequeno vertical', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1;

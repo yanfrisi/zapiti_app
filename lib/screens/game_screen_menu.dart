@@ -528,6 +528,98 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
   final Map<int, int> _selectedAnswers = {};
   final Map<int, int> _practiceAnswers = {};
 
+  static const _lessonSections = [
+    _TutorialLessonSection(
+      title: 'tutorialGuideIntroTitle',
+      body: [
+        'tutorialGuideIntroBody1',
+        'tutorialGuideIntroBody2',
+      ],
+      icon: Icons.school_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideOriginTitle',
+      body: [
+        'tutorialGuideOriginBody1',
+        'tutorialGuideOriginBody2',
+      ],
+      icon: Icons.auto_stories_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideObjectiveTitle',
+      body: [
+        'tutorialGuideObjectiveBody1',
+        'tutorialGuideObjectiveBody2',
+      ],
+      icon: Icons.emoji_events_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideTurnsTitle',
+      body: [
+        'tutorialGuideTurnsBody1',
+        'tutorialGuideTurnsBody2',
+        'tutorialGuideTurnsBody3',
+      ],
+      icon: Icons.sync_alt_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideCardsTitle',
+      body: [
+        'tutorialGuideCardsBody1',
+        'tutorialGuideCardsBody2',
+      ],
+      icon: Icons.style_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideTeamplayTitle',
+      body: [
+        'tutorialGuideTeamplayBody1',
+        'tutorialGuideTeamplayBody2',
+      ],
+      icon: Icons.groups_2_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideSignalsTitle',
+      body: [
+        'tutorialGuideSignalsBody1',
+        'tutorialGuideSignalsBody2',
+      ],
+      icon: Icons.visibility_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideTrucoTitle',
+      body: [
+        'tutorialGuideTrucoBody1',
+        'tutorialGuideTrucoBody2',
+      ],
+      icon: Icons.campaign_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideBluffTitle',
+      body: [
+        'tutorialGuideBluffBody1',
+        'tutorialGuideBluffBody2',
+      ],
+      icon: Icons.psychology_alt_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideAlVerTitle',
+      body: [
+        'tutorialGuideAlVerBody1',
+        'tutorialGuideAlVerBody2',
+      ],
+      icon: Icons.flag_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideFirstStepsTitle',
+      body: [
+        'tutorialGuideFirstStepsBody1',
+        'tutorialGuideFirstStepsBody2',
+      ],
+      icon: Icons.checklist_outlined,
+    ),
+  ];
+
   static const _steps = [
     _TutorialStep(
       title: 'tutorialObjectiveTitle',
@@ -789,259 +881,300 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
           );
 
           return Column(
-            mainAxisSize: MainAxisSize.max,
             children: [
               _modeSelector(compact),
               SizedBox(height: compact ? 4 : 8),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: ZapitiColors.oldGold.withValues(alpha: 0.72),
-                  ),
-                ),
-                child: SizedBox(
-                  height: practiceVisualHeight,
-                  width: double.infinity,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _PracticeVisual(
-                      key: ValueKey(_practiceIndex),
-                      challenge: challenge,
-                      cardWidth: cardWidth,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: compact ? 3 : 10),
-              Row(
-                children: [
-                  Icon(
-                    challenge.icon,
-                    color: ZapitiColors.wineRed,
-                    size: compact ? 18 : 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      context.tr(challenge.title),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: titleStyle,
-                    ),
-                  ),
-                  SizedBox(
-                    width: compact ? 76 : 94,
-                    height: compact ? 28 : 32,
-                    child: ZapitiActionButton(
-                      label: context.tr('tutorialTableUpper'),
-                      icon: Icons.table_bar_outlined,
-                      onPressed: widget.onStartTableTutorial,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: compact ? 1 : 5),
               Expanded(
-                child: Text(
-                  context.tr(challenge.situation),
-                  maxLines: bodyMaxLines,
-                  overflow: TextOverflow.ellipsis,
-                  style: bodyStyle,
-                ),
-              ),
-              if (showPracticePrompt) ...[
-                SizedBox(height: compact ? 2 : 6),
-                _PracticeDecisionPrompt(
-                  challenge: challenge,
-                  selectedIndex: selectedPracticeAnswer,
-                  onSelected: (index) {
-                    setState(() {
-                      _practiceAnswers[_practiceIndex] = index;
-                    });
-                  },
-                ),
-              ],
-              SizedBox(height: compact ? 6 : 10),
-              Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Anterior',
-                    onPressed: _previousPractice,
-                    icon: const Icon(Icons.chevron_left),
-                    color: ZapitiColors.darkBrown,
-                    constraints: BoxConstraints.tightFor(
-                      width: compact ? 30 : 44,
-                      height: compact ? 26 : 40,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (var index = 0;
-                            index < _practiceChallenges.length;
-                            index++)
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            width: index == _practiceIndex
-                                ? (compact ? 15 : 18)
-                                : (compact ? 6 : 8),
-                            height: compact ? 6 : 8,
-                            margin: EdgeInsets.symmetric(
-                              horizontal: compact ? 2 : 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: index == _practiceIndex
-                                  ? (selectedPracticeAnswer == null
-                                      ? ZapitiColors.wineRed
-                                      : answerIsCorrect
-                                          ? ZapitiColors.tableGreenDark
-                                          : ZapitiColors.wineRed)
-                                  : ZapitiColors.darkBrown
-                                      .withValues(alpha: 0.24),
-                              borderRadius: BorderRadius.circular(99),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(bottom: compact ? 8 : 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: ZapitiColors.oldGold.withValues(alpha: 0.72),
+                          ),
+                        ),
+                        child: SizedBox(
+                          height: practiceVisualHeight,
+                          width: double.infinity,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: _PracticeVisual(
+                              key: ValueKey(_practiceIndex),
+                              challenge: challenge,
+                              cardWidth: cardWidth,
                             ),
                           ),
+                        ),
+                      ),
+                      SizedBox(height: compact ? 6 : 10),
+                      Row(
+                        children: [
+                          Icon(
+                            challenge.icon,
+                            color: ZapitiColors.wineRed,
+                            size: compact ? 18 : 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              context.tr(challenge.title),
+                              maxLines: compact ? 2 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: titleStyle,
+                            ),
+                          ),
+                          SizedBox(
+                            width: compact ? 76 : 94,
+                            height: compact ? 28 : 32,
+                            child: ZapitiActionButton(
+                              label: context.tr('tutorialTableUpper'),
+                              icon: Icons.table_bar_outlined,
+                              onPressed: widget.onStartTableTutorial,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: compact ? 4 : 6),
+                      Text(
+                        context.tr(challenge.situation),
+                        style: bodyStyle,
+                      ),
+                      if (showPracticePrompt) ...[
+                        SizedBox(height: compact ? 6 : 10),
+                        _PracticeDecisionPrompt(
+                          challenge: challenge,
+                          selectedIndex: selectedPracticeAnswer,
+                          onSelected: (index) {
+                            setState(() {
+                              _practiceAnswers[_practiceIndex] = index;
+                            });
+                          },
+                        ),
                       ],
-                    ),
+                      SizedBox(height: compact ? 8 : 12),
+                      Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Anterior',
+                            onPressed: _previousPractice,
+                            icon: const Icon(Icons.chevron_left),
+                            color: ZapitiColors.darkBrown,
+                            constraints: BoxConstraints.tightFor(
+                              width: compact ? 30 : 44,
+                              height: compact ? 26 : 40,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var index = 0;
+                                    index < _practiceChallenges.length;
+                                    index++)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 160),
+                                    width: index == _practiceIndex
+                                        ? (compact ? 15 : 18)
+                                        : (compact ? 6 : 8),
+                                    height: compact ? 6 : 8,
+                                    margin: EdgeInsets.symmetric(
+                                      horizontal: compact ? 2 : 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: index == _practiceIndex
+                                          ? (selectedPracticeAnswer == null
+                                              ? ZapitiColors.wineRed
+                                              : answerIsCorrect
+                                                  ? ZapitiColors.tableGreenDark
+                                                  : ZapitiColors.wineRed)
+                                          : ZapitiColors.darkBrown
+                                              .withValues(alpha: 0.24),
+                                      borderRadius: BorderRadius.circular(99),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Siguiente',
+                            onPressed: _nextPractice,
+                            icon: const Icon(Icons.chevron_right),
+                            color: ZapitiColors.darkBrown,
+                            constraints: BoxConstraints.tightFor(
+                              width: compact ? 30 : 44,
+                              height: compact ? 26 : 40,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: 'Siguiente',
-                    onPressed: _nextPractice,
-                    icon: const Icon(Icons.chevron_right),
-                    color: ZapitiColors.darkBrown,
-                    constraints: BoxConstraints.tightFor(
-                      width: compact ? 30 : 44,
-                      height: compact ? 26 : 40,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
+                ),
               ),
             ],
           );
         }
-
         return Column(
-          mainAxisSize: MainAxisSize.max,
           children: [
             _modeSelector(compact),
             SizedBox(height: compact ? 4 : 8),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: ZapitiColors.oldGold.withValues(alpha: 0.72),
-                ),
-              ),
-              child: SizedBox(
-                height: visualHeight,
-                width: double.infinity,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: _TutorialVisual(
-                    key: ValueKey(_stepIndex),
-                    index: _stepIndex,
-                    cardWidth: cardWidth,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: compact ? 3 : 10),
-            Row(
-              children: [
-                Icon(
-                  step.icon,
-                  color: ZapitiColors.wineRed,
-                  size: compact ? 18 : 24,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    context.tr(step.title),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: titleStyle,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: compact ? 1 : 5),
             Expanded(
-              child: Text(
-                context.tr(step.body),
-                maxLines: bodyMaxLines,
-                overflow: TextOverflow.ellipsis,
-                style: bodyStyle,
-              ),
-            ),
-            if (showPrompt) ...[
-              SizedBox(height: compact ? 2 : 6),
-              _TutorialDecisionPrompt(
-                step: step,
-                selectedIndex: selectedAnswer,
-                onSelected: (index) {
-                  setState(() {
-                    _selectedAnswers[_stepIndex] = index;
-                  });
-                },
-              ),
-            ],
-            SizedBox(height: compact ? 6 : 10),
-            Row(
-              children: [
-                IconButton(
-                  tooltip: 'Anterior',
-                  onPressed: _previousStep,
-                  icon: const Icon(Icons.chevron_left),
-                  color: ZapitiColors.darkBrown,
-                  constraints: BoxConstraints.tightFor(
-                    width: compact ? 30 : 44,
-                    height: compact ? 26 : 40,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (var index = 0; index < _steps.length; index++)
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          width: index == _stepIndex
-                              ? (compact ? 15 : 18)
-                              : (compact ? 6 : 8),
-                          height: compact ? 6 : 8,
-                          margin: EdgeInsets.symmetric(
-                            horizontal: compact ? 2 : 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: index == _stepIndex
-                                ? ZapitiColors.wineRed
-                                : ZapitiColors.darkBrown
-                                    .withValues(alpha: 0.24),
-                            borderRadius: BorderRadius.circular(99),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: compact ? 8 : 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: ZapitiColors.oldGold.withValues(alpha: 0.72),
+                        ),
+                      ),
+                      child: SizedBox(
+                        height: visualHeight,
+                        width: double.infinity,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: _TutorialVisual(
+                            key: ValueKey(_stepIndex),
+                            index: _stepIndex,
+                            cardWidth: cardWidth,
                           ),
                         ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZapitiColors.wineRed.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ZapitiColors.oldGold.withValues(alpha: 0.46),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('tutorialGuideTitle'),
+                              style: titleStyle,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              context.tr('tutorialGuideSubtitle'),
+                              style: bodyStyle,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    for (final section in _lessonSections) ...[
+                      _TutorialLessonCard(section: section),
+                      SizedBox(height: compact ? 8 : 12),
                     ],
-                  ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.56),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  step.icon,
+                                  color: ZapitiColors.wineRed,
+                                  size: compact ? 18 : 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    context.tr(step.title),
+                                    style: titleStyle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              context.tr(step.body),
+                              style: bodyStyle,
+                            ),
+                            if (showPrompt) ...[
+                              const SizedBox(height: 10),
+                              _TutorialDecisionPrompt(
+                                step: step,
+                                selectedIndex: selectedAnswer,
+                                onSelected: (index) {
+                                  setState(() {
+                                    _selectedAnswers[_stepIndex] = index;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Anterior',
+                                    onPressed: _previousStep,
+                                    icon: const Icon(Icons.chevron_left),
+                                    color: ZapitiColors.darkBrown,
+                                  ),
+                                  Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        context.tr(
+                                          'tutorialQuestion',
+                                          params: {
+                                            'current': _stepIndex + 1,
+                                            'total': _steps.length,
+                                          },
+                                        ),
+                                        style: bodyStyle,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Siguiente',
+                                    onPressed: _nextStep,
+                                    icon: const Icon(Icons.chevron_right),
+                                    color: ZapitiColors.darkBrown,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    ZapitiActionButton(
+                      label: context.tr('tutorialStartPractice'),
+                      icon: Icons.table_bar_outlined,
+                      onPressed: widget.onStartTableTutorial,
+                      primary: true,
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Siguiente',
-                  onPressed: _nextStep,
-                  icon: const Icon(Icons.chevron_right),
-                  color: ZapitiColors.darkBrown,
-                  constraints: BoxConstraints.tightFor(
-                    width: compact ? 30 : 44,
-                    height: compact ? 26 : 40,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
+              ),
             ),
           ],
         );
@@ -1070,6 +1203,18 @@ class _TutorialStep {
   });
 }
 
+class _TutorialLessonSection {
+  final String title;
+  final List<String> body;
+  final IconData icon;
+
+  const _TutorialLessonSection({
+    required this.title,
+    required this.body,
+    required this.icon,
+  });
+}
+
 enum _TutorialMode { lessons, practice }
 
 class _PracticeChallenge {
@@ -1092,6 +1237,68 @@ class _PracticeChallenge {
     required this.correctIndex,
     required this.feedback,
   });
+}
+
+class _TutorialLessonCard extends StatelessWidget {
+  final _TutorialLessonSection section;
+
+  const _TutorialLessonCard({
+    required this.section,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w900,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.86),
+          height: 1.28,
+          fontWeight: FontWeight.w700,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.56),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  section.icon,
+                  color: ZapitiColors.wineRed,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    context.tr(section.title),
+                    style: titleStyle,
+                  ),
+                ),
+              ],
+            ),
+            for (final bodyKey in section.body) ...[
+              const SizedBox(height: 6),
+              Text(
+                context.tr(bodyKey),
+                style: bodyStyle,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PracticeDecisionPrompt extends StatelessWidget {

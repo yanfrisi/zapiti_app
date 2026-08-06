@@ -583,6 +583,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 child: _CharacterSelectionScreen(
                   selectedCharacterId: _selectedHumanCharacterId,
                   onSelected: _selectHumanCharacter,
+                  onBack: _backToMainMenuFromCharacterSelection,
                   onStart: _continueToDifficultySelection,
                 ),
               ),
@@ -595,6 +596,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 child: _DifficultySelectionScreen(
                   selectedDifficulty: _selectedDifficulty,
                   onSelected: _selectDifficulty,
+                  onBack: _backToCharacterSelection,
                   onStart: _startWithSelectedSettings,
                 ),
               ),

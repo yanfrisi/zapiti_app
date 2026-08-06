@@ -25,27 +25,44 @@ class BotVoyATiStrategy {
     final bestTableStrength = playedCards
         .map((playedCard) => ZapitiRules.strength(playedCard.card))
         .reduce((best, current) => current > best ? current : best);
-    final winningCard = sorted.firstWhere(
-      (card) => ZapitiRules.strength(card) > bestTableStrength,
-      orElse: () => sorted.first,
-    );
-    if (ZapitiRules.strength(winningCard) <= bestTableStrength) {
+    final winningCards = sorted
+        .where((card) => ZapitiRules.strength(card) > bestTableStrength)
+        .toList();
+    if (winningCards.isEmpty) {
       return sorted.first;
     }
 
-    final risk = riskThatRivalStillToPlayBeats(
-      bot: bot,
-      card: winningCard,
-      players: players,
-      hands: hands,
-      playedCards: playedCards,
+    final winningRisks = {
+      for (final card in winningCards)
+        card: riskThatRivalStillToPlayBeats(
+          bot: bot,
+          card: card,
+          players: players,
+          hands: hands,
+          playedCards: playedCards,
+        ),
+    };
+
+    final safeWinningCard = winningCards.firstWhere(
+      (card) => winningRisks[card]! < riskyCardThreshold,
+      orElse: () => winningCards.last,
     );
-    final cardIsCostly = ZapitiRules.strength(winningCard) >= 80;
-    if (cardIsCostly && risk >= riskyCardThreshold) {
+    final cheapestWinningCard = winningCards.first;
+    final cheapestRisk = winningRisks[cheapestWinningCard]!;
+    final safeRisk = winningRisks[safeWinningCard]!;
+    final safeCardImprovesSecurity =
+        safeWinningCard != cheapestWinningCard &&
+        cheapestRisk - safeRisk >= 0.18;
+    if (safeCardImprovesSecurity) {
+      return safeWinningCard;
+    }
+
+    final cheapestIsCostly = ZapitiRules.strength(cheapestWinningCard) >= 80;
+    if (cheapestIsCostly && cheapestRisk >= riskyCardThreshold) {
       return sorted.first;
     }
 
-    return winningCard;
+    return cheapestWinningCard;
   }
 
   static double riskThatRivalStillToPlayBeats({
