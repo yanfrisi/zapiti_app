@@ -954,6 +954,10 @@ extension _GameScreenStateFlow on _GameScreenState {
 
   void _selectHumanCharacter(String characterId) {
     _updateState(() {
+      if (!_isMultiplayerMatch &&
+          (_showMainMenu || _showCharacterSelection || _showDifficultySelection)) {
+        _resetMultiplayerStateForLocalMode();
+      }
       _selectedHumanCharacterId = characterId;
     });
     unawaited(_saveSelectedSettings());

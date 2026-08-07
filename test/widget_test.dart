@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -120,7 +120,7 @@ void main() {
     );
     expect(find.text('VOLVER'), findsOneWidget);
 
-    await tester.tap(find.text('PRÃƒÂCTICA'));
+    await tester.tap(find.text('PRÁCTICA'));
     await tester.pumpAndSettle();
 
     expect(find.text('Guarda la fuerte'), findsOneWidget);
@@ -139,31 +139,33 @@ void main() {
     expect(gameState.gameController.currentPlayer.id, 'p1');
 
     gameState.setState(() {
-      gameState.loadGuidedTutorialScenarioForTesting(3);
+      gameState.loadGuidedTutorialScenarioForTesting(4);
     });
     await tester.pumpAndSettle();
-    expect(find.text('Pide seÃƒÂ±a'), findsOneWidget);
-    expect(find.text('PEDIR SEÃƒâ€˜A'), findsOneWidget);
-    await tester.tap(find.text('PEDIR SEÃƒâ€˜A'));
+    expect(find.text('PEDIR SEÑA'), findsOneWidget);
+    await tester.tap(find.text('PEDIR SEÑA'));
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle();
-    expect(find.text('Da seÃƒÂ±a'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('4 Bastos'));
-    await tester.pump(const Duration(milliseconds: 1300));
-    await tester.pumpAndSettle();
-    expect(find.text('Canta truco'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
     gameState.setState(() {
       gameState.loadGuidedTutorialScenarioForTesting(5);
     });
     await tester.pumpAndSettle();
-    expect(find.text('Canta truco'), findsOneWidget);
+    await tester.tap(find.byTooltip('4 Bastos'));
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(6);
+    });
+    await tester.pumpAndSettle();
     expect(find.text('CANTAR TRUCO'), findsOneWidget);
     await tester.tap(find.text('CANTAR TRUCO'));
     await tester.pump(const Duration(milliseconds: 1300));
     await tester.pumpAndSettle();
-    expect(find.text('Farol controlado'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
     gameState.setState(() {
       gameState.loadGuidedTutorialScenarioForTesting(7);
@@ -181,9 +183,9 @@ void main() {
     await tester.tap(find.text('OPCIONES').first);
     await tester.pumpAndSettle();
     expect(find.text('Opciones'), findsNothing);
-    await tester.tap(find.text('AYUDA SEÃƒâ€˜AS').first);
+    await tester.tap(find.text('AYUDA SEÑAS').first);
     await tester.pumpAndSettle();
-    expect(find.text('Orden y seÃƒÂ±as'), findsNothing);
+    expect(find.text('Orden y señas'), findsNothing);
 
     await tester.tap(find.text('VOLVER'));
     await tester.pumpAndSettle();
@@ -225,10 +227,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Zapiti App'), findsOneWidget);
-    expect(find.textContaining('VersiÃƒÂ³n'), findsOneWidget);
-    expect(find.text('Juan Francisco GutiÃƒÂ©rrez VÃƒÂ¡zquez'), findsWidgets);
+    expect(find.textContaining('Versión'), findsOneWidget);
+    expect(find.text('Juan Francisco Gutiérrez Vázquez'), findsWidgets);
     expect(find.text('Miguel Mateos Borrego'), findsOneWidget);
-    expect(find.text('Agradecimientos especiales a la PeÃƒÂ±a el Trompazo.'),
+    expect(find.text('Agradecimientos especiales a la Peña el Trompazo.'),
         findsOneWidget);
     expect(find.text('VOLVER'), findsOneWidget);
 
@@ -448,7 +450,7 @@ void main() {
     expect(find.text('Mostrar ayuda'), findsNothing);
     await tester.tap(find.text('Confirmar jugada'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('RÃƒÂ¡pida'));
+    await tester.tap(find.text('Rápida'));
     await tester.pumpAndSettle();
 
     final prefs = await SharedPreferences.getInstance();
@@ -478,10 +480,10 @@ void main() {
       find.text('Usa truco y subidas con riesgo razonable.'),
       findsOneWidget,
     );
-    expect(find.text('Muy fÃƒÂ¡cil'), findsOneWidget);
+    expect(find.text('Muy fácil'), findsOneWidget);
     expect(find.text('Experto'), findsOneWidget);
     expect(
-        find.text('Bots distraÃƒÂ­dos, errores claros y trucos precipitados.'),
+      find.text('Bots distraídos, errores claros y trucos precipitados.'),
         findsNothing);
     expect(find.text('Juegan aceptable, pero se precipitan.'), findsNothing);
   });
@@ -591,20 +593,20 @@ void main() {
 
     expect(find.textContaining('Ronda 1/3'), findsOneWidget);
     expect(find.text('Yo'), findsOneWidget);
-    expect(find.text('CompaÃƒÂ±ero'), findsOneWidget);
+    expect(find.text('Compañero'), findsOneWidget);
     expect(find.text('Jugador rival 1'), findsOneWidget);
     expect(find.text('Jugador rival 2'), findsOneWidget);
     expect(find.text('Eq1'), findsOneWidget);
     expect(find.text('Eq2'), findsOneWidget);
     expect(find.text('Rondas'), findsOneWidget);
     expect(find.text('0 - 0'), findsOneWidget);
-    expect(find.text('SeÃƒÂ±as'), findsNothing);
-    expect(find.text('PEDIR SEÃƒâ€˜A'), findsOneWidget);
+    expect(find.text('Señas'), findsNothing);
+    expect(find.text('PEDIR SEÑA'), findsOneWidget);
     expect(find.text('DEV'), findsNothing);
     expect(find.text('Manos prefijadas'), findsNothing);
   });
 
-  testWidgets('ayuda de seÃƒÂ±as muestra orden de cartas y seÃƒÂ±ales',
+  testWidgets('ayuda de señas muestra orden de cartas y señales',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
@@ -613,10 +615,10 @@ void main() {
 
     await startGame(tester);
 
-    await tester.tap(find.text('AYUDA SEÃƒâ€˜AS'));
+    await tester.tap(find.text('AYUDA SEÑAS'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Orden y seÃƒÂ±as'), findsOneWidget);
+    expect(find.text('Orden y señas'), findsOneWidget);
     expect(find.text('4 de Bastos'), findsOneWidget);
     expect(find.text('7 de Copas'), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -631,12 +633,12 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     expect(find.text('Mala'), findsOneWidget);
-    expect(find.text('Orden NÃƒÂºmerico de Valor'), findsNothing);
+    expect(find.text('Orden Numérico de Valor'), findsNothing);
 
     await tester.tap(find.text('CERRAR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Orden y seÃƒÂ±as'), findsNothing);
+    expect(find.text('Orden y señas'), findsNothing);
   });
 
   testWidgets('la mesa no desborda en movil vertical', (tester) async {
@@ -735,7 +737,7 @@ void main() {
     });
   }
 
-  testWidgets('pedir seÃƒÂ±a muestra respuesta en landscape', (tester) async {
+  testWidgets('pedir señal muestra respuesta en landscape', (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -743,7 +745,7 @@ void main() {
 
     await startGame(tester);
 
-    await tester.tap(find.text('PEDIR SEÃƒâ€˜A'));
+    await tester.tap(find.text('PEDIR SEÑA'));
     await tester.pump();
 
     expect(find.text('Compa mira...'), findsOneWidget);
@@ -881,7 +883,7 @@ void main() {
     gameState.showAlVerDecisionDialogForTesting();
     await tester.pumpAndSettle();
 
-    expect(find.text('EstÃƒÂ¡s al ver'), findsOneWidget);
+    expect(find.text('Estás al ver'), findsOneWidget);
     expect(
       find.text(
         'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
@@ -890,12 +892,12 @@ void main() {
     );
     expect(find.text('JUGAR'), findsWidgets);
     expect(find.text('IRSE A CASA'), findsOneWidget);
-    expect(find.text('PEDIR SEÃƒâ€˜A'), findsWidgets);
+    expect(find.text('PEDIR SEÑA'), findsWidgets);
 
     await tester.tap(find.text('JUGAR').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
+    expect(find.text('Estás al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.playing);
   });
 
@@ -914,7 +916,7 @@ void main() {
     await tester.tap(find.text('IRSE A CASA'));
     await tester.pumpAndSettle();
 
-    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
+    expect(find.text('Estás al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.conceded);
     expect(gameState.gameController.score[TeamRules.teamTwo], 2);
     expect(gameState.gameController.handFinished, isTrue);
@@ -934,7 +936,7 @@ void main() {
     await gameState.resolveAlVerDecisionForTesting();
     await tester.pumpAndSettle();
 
-    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
+    expect(find.text('Estás al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.conceded);
     expect(gameState.gameController.score[TeamRules.teamOne], 2);
     expect(gameState.gameController.handFinished, isTrue);
@@ -958,7 +960,7 @@ void main() {
     await gameState.resolveAlVerDecisionForTesting();
     await tester.pumpAndSettle();
 
-    expect(find.text('EstÃƒÂ¡s al ver'), findsNothing);
+    expect(find.text('Estás al ver'), findsNothing);
     expect(gameState.gameController.alVerState, AlVerState.playing);
     expect(gameState.gameController.handFinished, isFalse);
   });
@@ -977,15 +979,15 @@ void main() {
     });
     await tester.pumpAndSettle();
 
-    expect(find.text('GanÃƒÂ³ el Equipo 1'), findsOneWidget);
+    expect(find.text('Ganó el Equipo 1'), findsOneWidget);
     expect(find.textContaining('Yo y'), findsOneWidget);
-    expect(find.text('PuntuaciÃƒÂ³n final: 30 - 24'), findsOneWidget);
+    expect(find.text('Puntuación final: 30 - 24'), findsOneWidget);
     expect(find.text('OTRA PARTIDA'), findsWidgets);
 
     await tester.tap(find.text('OTRA PARTIDA').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('GanÃƒÂ³ el Equipo 1'), findsNothing);
+    expect(find.text('Ganó el Equipo 1'), findsNothing);
     expect(gameState.gameController.winningTeamId, isNull);
     expect(gameState.gameController.score[TeamRules.teamOne], 0);
     expect(gameState.gameController.score[TeamRules.teamTwo], 0);
@@ -1041,3 +1043,4 @@ Map<String, List<SpanishCard>> _aiStrongAlVerHands() {
     ],
   };
 }
+

@@ -292,10 +292,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
       playedCards: _playedCards,
       roundHistory: _roundHistory,
     );
-    final policy = BotPolicySelector.forDifficulty(_selectedDifficulty);
+    final difficulty = _botDifficultyFor(bot);
+    final policy = BotPolicySelector.forDifficulty(difficulty);
     final strategicCard = policy.chooseCard(
       BotDecisionContext(
-        difficulty: _selectedDifficulty,
+        difficulty: difficulty,
         bot: bot,
         players: _players,
         hand: hand,
@@ -328,6 +329,16 @@ extension _GameScreenPlayLogic on _GameScreenState {
       );
     }
     return _maybeApplyDifficultyCardMistake(bot, hand, strategicCard);
+  }
+
+  int _botDifficultyFor(Player bot) {
+    if (_isMultiplayerMatch) {
+      return _selectedDifficulty;
+    }
+    if (bot.id == _companionPlayer.id) {
+      return 3;
+    }
+    return _selectedDifficulty;
   }
 
   bool _maybeCompanionBotRequestsHumanVoyATi(Player bot) {

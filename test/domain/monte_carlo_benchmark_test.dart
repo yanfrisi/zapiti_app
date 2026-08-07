@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zapiti_app/domain/bet_state.dart';
 import 'package:zapiti_app/domain/monte_carlo_card_selector.dart';
@@ -13,7 +11,7 @@ import 'package:zapiti_app/domain/zapiti_players.dart';
 
 void main() {
   test('benchmark basico del selector Monte Carlo', () {
-    final selector = MonteCarloCardSelector(random: Random(7));
+    final selector = MonteCarloCardSelector();
     final state = ObservableGameState(
       botPlayerId: ZapitiPlayers.human.id,
       players: ZapitiPlayers.tableOrder,
@@ -65,4 +63,3 @@ void main() {
     }
   });
 }
-

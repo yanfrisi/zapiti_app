@@ -12,9 +12,9 @@ void main() {
       expect(BotPolicySelector.forDifficulty(2), isA<HeuristicBotPolicy>());
     });
 
-    test('usa rollouts en dificultad alta y rollout reforzado en experto', () {
-      expect(BotPolicySelector.forDifficulty(4), isA<RolloutBotPolicy>());
-      expect(BotPolicySelector.forDifficulty(5), isA<RolloutBotPolicy>());
+    test('usa Monte Carlo en dificultad alta y experto', () {
+      expect(BotPolicySelector.forDifficulty(4), isA<MonteCarloBotPolicy>());
+      expect(BotPolicySelector.forDifficulty(5), isA<MonteCarloBotPolicy>());
     });
   });
 
