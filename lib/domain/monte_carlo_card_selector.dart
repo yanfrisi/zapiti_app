@@ -18,25 +18,30 @@ class ScoredCard {
 }
 
 class MonteCarloCardSelector {
-  final Random random;
   final PossibleDealSampler sampler;
   final SimulationStateFactory stateFactory;
   final SimulationGameEngine engine;
   final SimulationEvaluator evaluator;
 
   MonteCarloCardSelector({
-    Random? random,
     this.sampler = const UniformPossibleDealSampler(),
     this.stateFactory = const DefaultSimulationStateFactory(),
     this.engine = const DefaultSimulationGameEngine(),
     this.evaluator = const TeamSimulationEvaluator(),
-  }) : random = random ?? Random();
+  });
 
   SpanishCard selectCard({
     required String botPlayerId,
     required ObservableGameState state,
     required MonteCarloDifficultyConfig config,
   }) {
+    final random = Random(
+      _stableSeed(
+        botPlayerId: botPlayerId,
+        state: state,
+        config: config,
+      ),
+    );
     final legalCards = state.botHand.toList();
     if (legalCards.isEmpty) {
       return state.botHand.first;
@@ -100,5 +105,48 @@ class MonteCarloCardSelector {
       teammateStillToPlay: true,
       opponentStillToPlay: true,
     );
+  }
+
+  int _stableSeed({
+    required String botPlayerId,
+    required ObservableGameState state,
+    required MonteCarloDifficultyConfig config,
+  }) {
+    var hash = 0x1fffffff;
+    int mix(int value) {
+      hash = 0x1fffffff & (hash + value);
+      hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+      return hash ^ (hash >> 6);
+    }
+
+    mix(botPlayerId.hashCode);
+    mix(config.simulationsPerMove);
+    mix(config.rolloutDepth);
+    mix((config.mistakeProbability * 1000).round());
+    mix(config.topCandidateCount);
+    mix(config.useActionInference ? 1 : 0);
+    mix(config.usePartnerModel ? 1 : 0);
+    mix(config.useOpponentProfiles ? 1 : 0);
+    mix(state.currentPlayerId.hashCode);
+    mix(state.trickLeaderId.hashCode);
+    mix(state.botHand.length);
+    for (final card in state.botHand) {
+      mix(card.value);
+      mix(card.suit.index);
+    }
+    mix(state.playedCards.length);
+    for (final played in state.playedCards) {
+      mix(played.player.id.hashCode);
+      mix(played.player.teamId);
+      mix(played.card.value);
+      mix(played.card.suit.index);
+    }
+    for (final player in state.players) {
+      mix(player.id.hashCode);
+      mix(player.teamId);
+      mix(state.cardsRemainingByPlayerId[player.id] ?? 0);
+      mix(state.roundWins[player.teamId] ?? 0);
+    }
+    return hash & 0x3fffffff;
   }
 }
