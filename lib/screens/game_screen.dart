@@ -162,6 +162,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final Set<String> _forceLowestRequestedPlayerIds = {};
   final Set<int> _aiTeamsConsideredTrucoThisHand = {};
   String? _companionPrivateSignalStatus;
+  Timer? _companionPrivateSignalTimer;
   Random _random = Random();
   final GamePreferencesStore _preferencesStore = const GamePreferencesStore();
   final ZapitiMusicPlayer _musicPlayer = ZapitiMusicPlayer();
@@ -332,6 +333,85 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             player.id != _humanPlayer.id,
       );
 
+  String _localizedPlayerName(Player player) {
+    if (_isMultiplayerMatch && _multiplayerPlayers.isNotEmpty) {
+      return player.name;
+    }
+    switch (player.id) {
+      case 'p1':
+        return context.tr('playerYou');
+      case 'p2':
+        return context.tr('playerRightRival');
+      case 'p3':
+        return context.tr('playerCompanion');
+      case 'p4':
+        return context.tr('playerLeftRival');
+      default:
+        return player.name;
+    }
+  }
+
+  Map<String, String> get _localizedPlayerNames => {
+        for (final player in _players) player.id: _localizedPlayerName(player),
+      };
+
+  String _localizedSignalName(String signal) {
+    switch (signal) {
+      case '4 Bastos':
+        return context.tr('signalCard4Bastos');
+      case '7 Copas':
+        return context.tr('signalCard7Copas');
+      case '7 Oros':
+        return context.tr('signalCard7Oros');
+      case 'As Espadas':
+        return context.tr('signalCardAsEspadas');
+      case 'Treses':
+        return context.tr('signalCardTreses');
+      case 'Doses':
+        return context.tr('signalCardDoses');
+      case 'Ases':
+        return context.tr('signalCardAses');
+      case 'Mala':
+        return context.tr('badHand');
+      default:
+        return signal;
+    }
+  }
+
+  String _localizedActionLabel(String kind, String fallbackLabel) {
+    switch (kind) {
+      case 'voy_a_ti':
+        return context.tr('voyATi');
+      case 'ven_a_mi':
+        return context.tr('comeToMe');
+      case 'mata':
+        return context.tr('kill');
+      default:
+        return fallbackLabel;
+    }
+  }
+
+  void _setCompanionPrivateSignalStatus(
+    String? value, {
+    Duration? clearAfter,
+  }) {
+    _companionPrivateSignalTimer?.cancel();
+    _companionPrivateSignalTimer = null;
+    _companionPrivateSignalStatus = value;
+    if (value == null || clearAfter == null) {
+      return;
+    }
+    _companionPrivateSignalTimer = Timer(clearAfter, () {
+      if (!mounted) return;
+      _updateState(() {
+        if (_companionPrivateSignalStatus == value) {
+          _companionPrivateSignalStatus = null;
+        }
+        _companionPrivateSignalTimer = null;
+      });
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -391,6 +471,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       timer.cancel();
     }
     _playerMessageTimers.clear();
+    _companionPrivateSignalTimer?.cancel();
     _turnCountdownTimer?.cancel();
     _musicPlayer.dispose();
     super.dispose();
@@ -451,7 +532,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
       _status = context.tr(
         'askCompanionComeToMe',
-        params: {'name': _companionPlayer.name},
+        params: {'name': _localizedPlayerName(_companionPlayer)},
       );
     });
     if (_isMultiplayerMatch) {
@@ -481,7 +562,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
       _status = context.tr(
         'askCompanionKill',
-        params: {'name': _companionPlayer.name},
+        params: {'name': _localizedPlayerName(_companionPlayer)},
       );
     });
     if (_isMultiplayerMatch) {
@@ -692,6 +773,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     humanHand: _humanHand,
                                     playedCards: _playedCards,
                                     playerMessages: _playerMessages,
+                                    playerDisplayNames: _localizedPlayerNames,
                                     characterIdsByPlayer: _characterIdsByPlayer,
                                     cardsRemaining: cardsRemaining,
                                     turnSecondsRemaining: _turnSecondsRemaining,
@@ -862,7 +944,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     height: bottomHeight,
                                     child: _LandscapeBottomBoard(
                                       scale: scale,
-                                      playerName: _humanPlayer.name,
+                                      playerName: _localizedPlayerName(
+                                        _humanPlayer,
+                                      ),
                                       cards: _humanHand,
                                       enabled:
                                           canUseGameControls && _isHumanTurn,
@@ -968,6 +1052,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         scoreTeamOne: _score[TeamRules.teamOne]!,
                         scoreTeamTwo: _score[TeamRules.teamTwo]!,
                         onRestart: _restartGame,
+                        playerNameBuilder: _localizedPlayerName,
                       ),
                     if (_showGameOptions)
                       _GameOptionsOverlay(

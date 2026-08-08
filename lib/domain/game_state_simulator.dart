@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'bot_strategy.dart';
+import 'hand_rules.dart';
 import 'played_card.dart';
 import 'player.dart';
 import 'round_result.dart';
@@ -168,13 +169,8 @@ class _MutableSimulatedHandState {
 
   void finishFromExhaustedHands() {
     handFinished = true;
-    final teamOneWins = roundWins[TeamRules.teamOne] ?? 0;
-    final teamTwoWins = roundWins[TeamRules.teamTwo] ?? 0;
-    winningTeamId = teamOneWins > teamTwoWins
-        ? TeamRules.teamOne
-        : teamTwoWins > teamOneWins
-            ? TeamRules.teamTwo
-            : null;
+    final progress = HandRules.resolve(roundHistory);
+    winningTeamId = progress.winningTeamId;
   }
 
   void playCard(Player player, SpanishCard card) {
@@ -195,15 +191,9 @@ class _MutableSimulatedHandState {
   void resolveRound() {
     final result = RoundRules.resolveRound(playedCards);
     roundHistory.add(result);
-    if (result.isTie) {
-      roundWins[TeamRules.teamOne] =
-          ((roundWins[TeamRules.teamOne] ?? 0) + 1).clamp(0, 2);
-      roundWins[TeamRules.teamTwo] =
-          ((roundWins[TeamRules.teamTwo] ?? 0) + 1).clamp(0, 2);
-    } else {
-      final teamId = result.winner!.player.teamId;
-      roundWins[teamId] = ((roundWins[teamId] ?? 0) + 1).clamp(0, 2);
-    }
+    final progress = HandRules.resolve(roundHistory);
+    roundWins[TeamRules.teamOne] = progress.roundWinsFor(TeamRules.teamOne);
+    roundWins[TeamRules.teamTwo] = progress.roundWinsFor(TeamRules.teamTwo);
 
     if (result.isTie) {
       turnIndex = leadIndex;
@@ -213,23 +203,9 @@ class _MutableSimulatedHandState {
       turnIndex = leadIndex;
     }
 
-    final teamOneWins = roundWins[TeamRules.teamOne] ?? 0;
-    final teamTwoWins = roundWins[TeamRules.teamTwo] ?? 0;
-    final noPoints = teamOneWins == 2 && teamTwoWins == 2;
-    final finished =
-        noPoints ||
-        teamOneWins == 2 ||
-        teamTwoWins == 2 ||
-        (roundHistory.length >= 3 && teamOneWins == teamTwoWins);
-    if (finished) {
+    if (progress.isFinished) {
       handFinished = true;
-      winningTeamId = noPoints
-          ? null
-          : teamOneWins == 2
-              ? TeamRules.teamOne
-              : teamTwoWins == 2
-                  ? TeamRules.teamTwo
-                  : null;
+      winningTeamId = progress.winningTeamId;
       return;
     }
 

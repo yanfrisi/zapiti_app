@@ -97,5 +97,145 @@ void main() {
 
       expect(hand, contains(card));
     });
+
+    test('Monte Carlo conserva la carta baja si la mesa ya esta ganada', () {
+      final card = MonteCarloBotPolicy().chooseCard(
+        const BotDecisionContext(
+          difficulty: 5,
+          bot: bot,
+          players: players,
+          hand: hand,
+          hands: {
+            'bot': hand,
+            'rival': [
+              SpanishCard(value: 1, suit: Suit.oros),
+            ],
+            'mate': [
+              SpanishCard(value: 4, suit: Suit.bastos),
+            ],
+            'rear': [
+              SpanishCard(value: 3, suit: Suit.espadas),
+            ],
+          },
+          playedCards: [
+            PlayedCard(
+              player: rival,
+              card: SpanishCard(value: 1, suit: Suit.oros),
+            ),
+            PlayedCard(
+              player: teammate,
+              card: SpanishCard(value: 4, suit: Suit.bastos),
+            ),
+            PlayedCard(
+              player: rearRival,
+              card: SpanishCard(value: 3, suit: Suit.espadas),
+            ),
+          ],
+          teamRoundWins: 0,
+          opponentRoundWins: 0,
+          preserveStrongCards: false,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: false,
+          opponentStillToPlay: false,
+        ),
+      );
+
+      expect(card, const SpanishCard(value: 12, suit: Suit.oros));
+    });
+
+    test('Monte Carlo descarta la baja si no puede ganar la baza', () {
+      final card = MonteCarloBotPolicy().chooseCard(
+        const BotDecisionContext(
+          difficulty: 5,
+          bot: bot,
+          players: players,
+          hand: hand,
+          hands: {
+            'bot': hand,
+            'rival': [
+              SpanishCard(value: 4, suit: Suit.bastos),
+            ],
+            'mate': [
+              SpanishCard(value: 5, suit: Suit.copas),
+            ],
+            'rear': [
+              SpanishCard(value: 6, suit: Suit.espadas),
+            ],
+          },
+          playedCards: [
+            PlayedCard(
+              player: rival,
+              card: SpanishCard(value: 4, suit: Suit.bastos),
+            ),
+            PlayedCard(
+              player: teammate,
+              card: SpanishCard(value: 5, suit: Suit.copas),
+            ),
+            PlayedCard(
+              player: rearRival,
+              card: SpanishCard(value: 6, suit: Suit.espadas),
+            ),
+          ],
+          teamRoundWins: 0,
+          opponentRoundWins: 0,
+          preserveStrongCards: false,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: false,
+          opponentStillToPlay: false,
+        ),
+      );
+
+      expect(card, const SpanishCard(value: 12, suit: Suit.oros));
+    });
+
+    test('Monte Carlo sigue siendo legal cuando el bot es equipo 1', () {
+      const teamOneBot = Player(id: 'bot1', name: 'Bot1', teamId: 1);
+      const teamOneMate = Player(id: 'mate1', name: 'Mate1', teamId: 1);
+      const teamTwoA = Player(id: 'r1', name: 'R1', teamId: 2);
+      const teamTwoB = Player(id: 'r2', name: 'R2', teamId: 2);
+      const teamOneHand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+
+      final card = MonteCarloBotPolicy().chooseCard(
+        const BotDecisionContext(
+          difficulty: 5,
+          bot: teamOneBot,
+          players: [teamOneBot, teamTwoA, teamOneMate, teamTwoB],
+          hand: teamOneHand,
+          hands: {
+            'bot1': teamOneHand,
+            'r1': [
+              SpanishCard(value: 3, suit: Suit.copas),
+              SpanishCard(value: 6, suit: Suit.oros),
+            ],
+            'mate1': [
+              SpanishCard(value: 2, suit: Suit.bastos),
+              SpanishCard(value: 5, suit: Suit.copas),
+            ],
+            'r2': [
+              SpanishCard(value: 7, suit: Suit.copas),
+              SpanishCard(value: 4, suit: Suit.espadas),
+            ],
+          },
+          playedCards: [],
+          teamRoundWins: 1,
+          opponentRoundWins: 0,
+          preserveStrongCards: false,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: true,
+          opponentStillToPlay: true,
+        ),
+      );
+
+      expect(teamOneHand, contains(card));
+    });
   });
 }

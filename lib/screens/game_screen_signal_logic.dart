@@ -18,7 +18,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
       if (socket != null && socket.isConnected && roomId != null) {
         _updateState(() {
           _isRequestingCompanionSignal = true;
-          _companionPrivateSignalStatus = context.tr('companionLooking');
+          _setCompanionPrivateSignalStatus(context.tr('companionLooking'));
           _status = context.tr('askCompanionSignalStatus');
         });
         socket.requestSignal(roomId: roomId, playerId: playerId);
@@ -32,7 +32,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     _updateState(() {
       _isRequestingCompanionSignal = true;
-      _companionPrivateSignalStatus = context.tr('companionLooking');
+      _setCompanionPrivateSignalStatus(context.tr('companionLooking'));
     });
 
     await Future<void>.delayed(const Duration(milliseconds: 450));
@@ -46,24 +46,26 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     if (signal == null) {
       _updateState(() {
-        _companionPrivateSignalStatus = context.tr('companionNoSignal');
+        _setCompanionPrivateSignalStatus(
+          context.tr('companionNoSignal'),
+          clearAfter: _companionNoSignalStatusDuration,
+        );
         _isRequestingCompanionSignal = false;
-      });
-      await Future<void>.delayed(_companionNoSignalStatusDuration);
-      if (!mounted || version != _handVersion) return;
-      _updateState(() {
-        if (_companionPrivateSignalStatus == context.tr('companionNoSignal')) {
-          _companionPrivateSignalStatus = null;
-        }
       });
       return;
     }
 
+    final companionSignalStatus = context.tr(
+      'companionSignal',
+      params: {'signal': _localizedSignalName(signal)},
+    );
     _updateState(() {
       _playersSignaledThisHand.add(companion.id);
-      _playerMessages[companion.id] = 'Seña: $signal';
-      _companionPrivateSignalStatus =
-          context.tr('companionSignal', params: {'signal': signal});
+      _playerMessages[companion.id] = 'SeÃ±a: $signal';
+      _setCompanionPrivateSignalStatus(
+        companionSignalStatus,
+        clearAfter: const Duration(seconds: 2),
+      );
       _teamSignalsByTeam[companion.teamId] = signal;
       _knownSignalsByTeam[companion.teamId] = signal;
       _maybeLetOpponentsSeeSignal(companion.teamId, signal);
@@ -82,12 +84,11 @@ extension _GameScreenSignalLogic on _GameScreenState {
     await Future<void>.delayed(_companionSignalGestureDuration);
     if (!mounted || version != _handVersion) return;
     _updateState(() {
-      if (_playerMessages[companion.id] == 'Seña: $signal') {
+      if (_playerMessages[companion.id] == 'SeÃ±a: $signal') {
         _playerMessages.remove(companion.id);
       }
-      if (_companionPrivateSignalStatus ==
-          context.tr('companionSignal', params: {'signal': signal})) {
-        _companionPrivateSignalStatus = null;
+      if (_companionPrivateSignalStatus == companionSignalStatus) {
+        _setCompanionPrivateSignalStatus(null);
       }
     });
   }
@@ -99,7 +100,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     _updateState(() {
-      _playerMessages[_humanPlayer.id] = 'Seña: $label';
+      _playerMessages[_humanPlayer.id] = 'SeÃ±a: $label';
       _knownSignalsByTeam[_humanPlayer.teamId] = label;
       _teamSignalsByTeam[_humanPlayer.teamId] = label;
       _maybeLetRivalsSeeHumanSignal(label);
@@ -148,7 +149,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
   }
 
   void _endSignal(String label) {
-    if (_playerMessages[_humanPlayer.id] != 'Seña: $label') return;
+    if (_playerMessages[_humanPlayer.id] != 'SeÃ±a: $label') return;
 
     _updateState(() {
       _playerMessages.remove(_humanPlayer.id);

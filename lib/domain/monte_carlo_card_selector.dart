@@ -1,15 +1,19 @@
 import 'dart:math';
 
 import 'bot_strategy.dart';
+import 'bot_table_read.dart';
 import 'monte_carlo_difficulty_config.dart';
 import 'observable_game_state.dart';
+import 'player.dart';
 import 'possible_deal_sampler.dart';
+import 'signal_rules.dart';
 import 'simulation_evaluator.dart';
 import 'simulation_game_engine.dart';
 import 'simulation_game_state.dart';
 import 'simulation_state_factory.dart';
 import 'spanish_card.dart';
 import 'team_rules.dart';
+import 'zapiti_rules.dart';
 
 class ScoredCard {
   final SpanishCard card;
@@ -35,14 +39,13 @@ class MonteCarloCardSelector {
     required ObservableGameState state,
     required MonteCarloDifficultyConfig config,
   }) {
-    final random = Random(
-      _stableSeed(
-        botPlayerId: botPlayerId,
-        state: state,
-        config: config,
-      ),
+    final baseSeed = _stableSeed(
+      botPlayerId: botPlayerId,
+      state: state,
+      config: config,
     );
-    final legalCards = state.botHand.toList();
+    final random = Random(baseSeed);
+    final legalCards = [...state.botHand];
     if (legalCards.isEmpty) {
       return state.botHand.first;
     }
@@ -50,61 +53,315 @@ class MonteCarloCardSelector {
       return legalCards.first;
     }
 
-    final scored = <ScoredCard>[];
-    for (final card in legalCards) {
-      var total = 0.0;
-      for (var i = 0; i < config.simulationsPerMove; i++) {
-        final deal = sampler.sample(state, random);
-        final simState = stateFactory.create(
-          observableState: state,
-          possibleDeal: deal,
-        );
-        final after = _simulateToEnd(simState, botPlayerId, card, config.rolloutDepth);
-        total += evaluator.evaluate(after, botPlayerId);
-      }
-      scored.add(ScoredCard(card, total / config.simulationsPerMove));
+    final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(
+      state.playedCards,
+    );
+    final bot = state.players.firstWhere((player) => player.id == botPlayerId);
+    if (currentWinningTeam == bot.teamId &&
+        state.playedCards.length == state.players.length - 1) {
+      final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
+      return sorted.first;
     }
 
-    scored.sort((a, b) => b.score.compareTo(a.score));
+    final rolloutProfiles = _buildRolloutProfiles(
+      state: state,
+      botPlayerId: botPlayerId,
+      config: config,
+    );
+    final samplerToUse = _samplerForConfig(config);
+    final stageOneSamples = min(
+      config.simulationsPerMove,
+      max(8, legalCards.length * 6),
+    );
+    final stageOneDeals = List.generate(
+      stageOneSamples,
+      (index) => samplerToUse.sample(
+        state,
+        Random(_mixSeed(baseSeed, index)),
+      ),
+      growable: false,
+    );
+    final valueCache = <int, double>{};
+
+    final aggregates = <SpanishCard, _CardAggregate>{
+      for (final card in legalCards)
+        card: _CardAggregate(
+          card: card,
+          prior: _staticCardPrior(
+            botPlayerId: botPlayerId,
+            state: state,
+            card: card,
+          ),
+        ),
+    };
+    _evaluateDeals(
+      deals: stageOneDeals,
+      cards: legalCards,
+      botPlayerId: botPlayerId,
+      state: state,
+      config: config,
+      valueCache: valueCache,
+      rolloutProfiles: rolloutProfiles,
+      aggregates: aggregates,
+    );
+
+    final orderedAfterStageOne = aggregates.values.toList()
+      ..sort((a, b) => b.meanScore.compareTo(a.meanScore));
+    final survivorCount = min(
+      legalCards.length,
+      max(config.topCandidateCount, min(legalCards.length, 2)),
+    );
+    final survivors = orderedAfterStageOne.take(survivorCount).toList();
+    final remainingSamples = config.simulationsPerMove - stageOneSamples;
+
+    if (remainingSamples > 0 && survivors.isNotEmpty) {
+      final survivorCards = [for (final aggregate in survivors) aggregate.card];
+      final stageTwoDeals = List.generate(
+        remainingSamples,
+        (index) => samplerToUse.sample(
+          state,
+          Random(_mixSeed(baseSeed, stageOneSamples + index)),
+        ),
+        growable: false,
+      );
+      _evaluateDeals(
+        deals: stageTwoDeals,
+        cards: survivorCards,
+        botPlayerId: botPlayerId,
+        state: state,
+        config: config,
+        valueCache: valueCache,
+        rolloutProfiles: rolloutProfiles,
+        aggregates: aggregates,
+      );
+    }
+
+    final scored = aggregates.values
+        .map((entry) => ScoredCard(entry.card, entry.meanScore))
+        .toList()
+      ..sort((a, b) => b.score.compareTo(a.score));
     final top = scored.take(config.topCandidateCount).toList();
     return top[random.nextInt(top.length)].card;
   }
 
-  SimulationGameState _simulateToEnd(
-    SimulationGameState state,
-    String botPlayerId,
-    SpanishCard initialCard,
-    int rolloutDepth,
-  ) {
-    var current = engine.playCard(state, botPlayerId, initialCard).nextState;
-    var depth = 0;
-    while (!engine.isTerminal(current) && depth < max(1, rolloutDepth)) {
-      final playerId = current.currentPlayerId;
-      final hand = current.playerState(playerId).hand;
-      if (hand.isEmpty) break;
-      final chosen = _rolloutChoose(current, playerId);
-      current = engine.playCard(current, playerId, chosen).nextState;
-      depth++;
+  PossibleDealSampler _samplerForConfig(MonteCarloDifficultyConfig config) {
+    if (!config.useActionInference &&
+        !config.usePartnerModel &&
+        !config.useOpponentProfiles) {
+      return sampler;
     }
-    return current;
+    return InferenceBiasedPossibleDealSampler(
+      useActionInference: config.useActionInference,
+      usePartnerModel: config.usePartnerModel,
+      useOpponentProfiles: config.useOpponentProfiles,
+    );
   }
 
-  SpanishCard _rolloutChoose(SimulationGameState state, String playerId) {
+  void _evaluateDeals({
+    required List<PossibleDeal> deals,
+    required List<SpanishCard> cards,
+    required String botPlayerId,
+    required ObservableGameState state,
+    required MonteCarloDifficultyConfig config,
+    required Map<int, double> valueCache,
+    required Map<String, _RolloutProfile> rolloutProfiles,
+    required Map<SpanishCard, _CardAggregate> aggregates,
+  }) {
+    for (final card in cards) {
+      final aggregate = aggregates[card]!;
+      for (final deal in deals) {
+        final simState = stateFactory.create(
+          observableState: state,
+          possibleDeal: deal,
+        );
+        final afterInitial = engine.playCard(simState, botPlayerId, card).nextState;
+        final value = _evaluateState(
+          state: afterInitial,
+          botPlayerId: botPlayerId,
+          remainingDepth: max(1, config.rolloutDepth) - 1,
+          valueCache: valueCache,
+          rolloutProfiles: rolloutProfiles,
+        );
+        aggregate.record(value);
+      }
+    }
+  }
+
+  double _evaluateState({
+    required SimulationGameState state,
+    required String botPlayerId,
+    required int remainingDepth,
+    required Map<int, double> valueCache,
+    required Map<String, _RolloutProfile> rolloutProfiles,
+  }) {
+    final cacheKey = _stateCacheKey(
+      state: state,
+      botPlayerId: botPlayerId,
+      remainingDepth: remainingDepth,
+    );
+    final cached = valueCache[cacheKey];
+    if (cached != null) {
+      return cached;
+    }
+
+    if (engine.isTerminal(state) || remainingDepth <= 0) {
+      final score = evaluator.evaluate(state, botPlayerId);
+      valueCache[cacheKey] = score;
+      return score;
+    }
+
+    final playerId = state.currentPlayerId;
+    final hand = state.playerState(playerId).hand;
+    if (hand.isEmpty) {
+      final score = evaluator.evaluate(state, botPlayerId);
+      valueCache[cacheKey] = score;
+      return score;
+    }
+
+    final chosen = _rolloutChoose(
+      state,
+      playerId,
+      rolloutProfiles[playerId] ?? const _RolloutProfile(),
+    );
+    final nextState = engine.playCard(state, playerId, chosen).nextState;
+    final score = _evaluateState(
+      state: nextState,
+      botPlayerId: botPlayerId,
+      remainingDepth: remainingDepth - 1,
+      valueCache: valueCache,
+      rolloutProfiles: rolloutProfiles,
+    );
+    valueCache[cacheKey] = score;
+    return score;
+  }
+
+  SpanishCard _rolloutChoose(
+    SimulationGameState state,
+    String playerId,
+    _RolloutProfile profile,
+  ) {
     final hand = state.playerState(playerId).hand;
     final playedCards = state.playedCards;
     final players = [for (final p in state.players) p.player];
     final player = players.firstWhere((p) => p.id == playerId);
     final teamId = player.teamId;
-    return BotStrategy.chooseCard(
+    final opponentTeamId = TeamRules.opponentOf(teamId);
+    final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(playedCards);
+    final teammateHasStrongSignal = _teamHasStrongSignal(
+      state,
+      teamId,
+      excludePlayerId: playerId,
+    );
+    final opponentHasStrongSignal = _teamHasStrongSignal(state, opponentTeamId);
+    final preserveStrongCards =
+        currentWinningTeam == teamId ||
+        teammateHasStrongSignal ||
+        (state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) ||
+        profile.conservation >= 0.65;
+    final forceWinIfPossible =
+        (state.roundWins[opponentTeamId] ?? 0) > (state.roundWins[teamId] ?? 0) &&
+        (!teammateHasStrongSignal || profile.aggression >= 0.7);
+
+    final baseline = BotStrategy.chooseCard(
       player: player,
       hand: hand,
       playedCards: playedCards,
       teamRoundWins: state.roundWins[teamId] ?? 0,
-      opponentRoundWins: state.roundWins[TeamRules.opponentOf(teamId)] ?? 0,
-      preserveStrongCards: true,
-      teammateStillToPlay: true,
-      opponentStillToPlay: true,
+      opponentRoundWins: state.roundWins[opponentTeamId] ?? 0,
+      preserveStrongCards: preserveStrongCards,
+      teammateHasStrongSignal: teammateHasStrongSignal,
+      opponentHasStrongSignal: opponentHasStrongSignal,
+      forceWinIfPossible: forceWinIfPossible,
+      teammateStillToPlay: _teammateStillToPlay(state, player),
+      opponentStillToPlay: _opponentStillToPlay(state, player),
     );
+    if (hand.length <= 1) {
+      return baseline;
+    }
+
+    final sorted = [...hand]..sort(BotStrategy.compareByStrength);
+    final bestStrength = BotTableRead.bestTableStrength(playedCards) ?? -1;
+    final winningCards = sorted
+        .where((card) => ZapitiRules.strength(card) > bestStrength)
+        .toList(growable: false);
+    final tyingCards = sorted
+        .where((card) => ZapitiRules.strength(card) == bestStrength)
+        .toList(growable: false);
+
+    if (profile.cooperation >= 0.75 &&
+        currentWinningTeam == teamId &&
+        sorted.isNotEmpty) {
+      return sorted.first;
+    }
+    if (profile.aggression >= 0.72 && winningCards.isNotEmpty) {
+      return winningCards.last;
+    }
+    if (profile.conservation >= 0.72) {
+      if (currentWinningTeam == teamId) {
+        return sorted.first;
+      }
+      if (winningCards.isNotEmpty) {
+        return winningCards.first;
+      }
+      if (tyingCards.isNotEmpty) {
+        return tyingCards.first;
+      }
+    }
+    return baseline;
+  }
+
+  Map<String, _RolloutProfile> _buildRolloutProfiles({
+    required ObservableGameState state,
+    required String botPlayerId,
+    required MonteCarloDifficultyConfig config,
+  }) {
+    final botTeamId =
+        state.players.firstWhere((player) => player.id == botPlayerId).teamId;
+    final profiles = <String, _RolloutProfile>{};
+
+    for (final player in state.players) {
+      var aggression = 0.52;
+      var conservation = 0.52;
+      var cooperation = player.teamId == botTeamId ? 0.55 : 0.40;
+
+      final playedByPlayer =
+          state.playedCards.where((played) => played.player.id == player.id).toList();
+      if (config.useActionInference && playedByPlayer.isNotEmpty) {
+        final averageStrength = playedByPlayer
+                .map((entry) => ZapitiRules.strength(entry.card))
+                .fold<int>(0, (sum, value) => sum + value) /
+            playedByPlayer.length;
+        if (averageStrength >= 80) {
+          aggression += 0.18;
+          conservation -= 0.12;
+        } else if (averageStrength <= 35) {
+          aggression -= 0.10;
+          conservation += 0.16;
+        }
+      }
+
+      if (config.usePartnerModel && player.teamId == botTeamId) {
+        cooperation += 0.20;
+        conservation += 0.06;
+      }
+
+      if (config.useOpponentProfiles && player.teamId != botTeamId) {
+        final seatIndex = state.players.indexWhere((entry) => entry.id == player.id);
+        if (seatIndex.isEven) {
+          aggression += 0.06;
+        } else {
+          conservation += 0.06;
+        }
+      }
+
+      profiles[player.id] = _RolloutProfile(
+        aggression: aggression.clamp(0.2, 0.9),
+        conservation: conservation.clamp(0.2, 0.9),
+        cooperation: cooperation.clamp(0.2, 0.95),
+      );
+    }
+
+    return profiles;
   }
 
   int _stableSeed({
@@ -149,4 +406,293 @@ class MonteCarloCardSelector {
     }
     return hash & 0x3fffffff;
   }
+
+  int _mixSeed(int baseSeed, int index) {
+    var hash = baseSeed ^ (index + 1);
+    hash = 0x1fffffff & (hash + ((hash & 0x0007ffff) << 10));
+    hash ^= hash >> 6;
+    hash = 0x1fffffff & (hash + ((hash & 0x03ffffff) << 3));
+    hash ^= hash >> 11;
+    return hash & 0x3fffffff;
+  }
+
+  int _stateCacheKey({
+    required SimulationGameState state,
+    required String botPlayerId,
+    required int remainingDepth,
+  }) {
+    var hash = 0x1fffffff;
+    void mix(int value) {
+      hash = 0x1fffffff & (hash + value);
+      hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+      hash ^= hash >> 6;
+    }
+
+    mix(botPlayerId.hashCode);
+    mix(remainingDepth);
+    mix(state.currentPlayerId.hashCode);
+    mix(state.trickLeaderId.hashCode);
+    mix(state.roundNumber);
+    mix(state.isHandFinished ? 1 : 0);
+    for (final player in state.players) {
+      mix(player.player.id.hashCode);
+      for (final card in player.hand) {
+        mix(card.value);
+        mix(card.suit.index);
+      }
+    }
+    for (final played in state.playedCards) {
+      mix(played.player.id.hashCode);
+      mix(played.card.value);
+      mix(played.card.suit.index);
+    }
+    for (final completed in state.completedTricks) {
+      mix(completed.winningTeamId ?? 0);
+      mix(completed.isTie ? 1 : 0);
+    }
+    return hash & 0x3fffffff;
+  }
+
+  double _staticCardPrior({
+    required String botPlayerId,
+    required ObservableGameState state,
+    required SpanishCard card,
+  }) {
+    return _teamCoordinationBonus(
+          botPlayerId: botPlayerId,
+          state: state,
+          card: card,
+        ) +
+        _tacticalLeadBonus(
+          botPlayerId: botPlayerId,
+          state: state,
+          card: card,
+        );
+  }
+
+  double _teamCoordinationBonus({
+    required String botPlayerId,
+    required ObservableGameState state,
+    required SpanishCard card,
+  }) {
+    final bot = state.players.firstWhere((player) => player.id == botPlayerId);
+    final teamId = bot.teamId;
+    final opponentTeamId = TeamRules.opponentOf(teamId);
+    final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(
+      state.playedCards,
+    );
+    final bestStrength = BotTableRead.bestTableStrength(state.playedCards) ?? 0;
+    final cardStrength = BotStrategy.strengthOf(card);
+    final teammateStillToPlay = _teammateStillToPlayObservable(state, bot);
+    final opponentStillToPlay = _opponentStillToPlayObservable(state, bot);
+    final isLastToPlay = state.playedCards.length == state.players.length - 1;
+    final canBeatTable = cardStrength > bestStrength;
+    final canTieTable = cardStrength == bestStrength;
+
+    if (currentWinningTeam == teamId) {
+      var bonus = 48 - cardStrength * 0.55;
+      if (isLastToPlay) bonus += 10;
+      if (teammateStillToPlay) bonus += 4;
+      return bonus;
+    }
+
+    if (currentWinningTeam == opponentTeamId) {
+      var bonus = (canBeatTable || canTieTable)
+          ? 24 - cardStrength * 0.18
+          : 34 - cardStrength * 0.42;
+      if (isLastToPlay) bonus += 8;
+      if (teammateStillToPlay) bonus += 5;
+      return bonus;
+    }
+
+    var bonus = 0.0;
+    if (teammateStillToPlay) {
+      bonus += 10 - cardStrength * 0.08;
+    }
+    if (opponentStillToPlay) {
+      bonus += 4 - cardStrength * 0.04;
+    }
+    return bonus;
+  }
+
+  double _tacticalLeadBonus({
+    required String botPlayerId,
+    required ObservableGameState state,
+    required SpanishCard card,
+  }) {
+    final bot = state.players.firstWhere((player) => player.id == botPlayerId);
+    final teamId = bot.teamId;
+    final opponentTeamId = TeamRules.opponentOf(teamId);
+    final cardStrength = ZapitiRules.strength(card);
+    final tableStrength = BotTableRead.bestTableStrength(state.playedCards) ?? -1;
+    final canBeat = cardStrength > tableStrength;
+    final canTie = cardStrength == tableStrength;
+
+    var bonus = 0.0;
+    if ((state.roundWins[opponentTeamId] ?? 0) > (state.roundWins[teamId] ?? 0) &&
+        canBeat) {
+      bonus += 18;
+    }
+    if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+        !canBeat &&
+        !canTie) {
+      bonus += 12;
+    }
+    if (state.playedCards.isEmpty) {
+      bonus += max(0, 14 - cardStrength * 0.10);
+    }
+    return bonus;
+  }
+
+  bool _teammateStillToPlay(SimulationGameState state, Player player) {
+    final teammateIndex = state.players.indexWhere(
+      (entry) =>
+          entry.player.teamId == player.teamId && entry.player.id != player.id,
+    );
+    if (teammateIndex < 0) return false;
+
+    final teammateId = state.players[teammateIndex].player.id;
+    if (state.playedCards.any((played) => played.player.id == teammateId)) {
+      return false;
+    }
+
+    final playerIndex = state.players.indexWhere(
+      (entry) => entry.player.id == player.id,
+    );
+    final remainingTurnsAfterPlayer =
+        state.players.length - state.playedCards.length - 1;
+    final turnsUntilTeammate =
+        (teammateIndex - playerIndex) % state.players.length;
+    return turnsUntilTeammate > 0 &&
+        turnsUntilTeammate <= remainingTurnsAfterPlayer;
+  }
+
+  bool _teammateStillToPlayObservable(ObservableGameState state, Player player) {
+    final teammateIndex = state.players.indexWhere(
+      (entry) => entry.teamId == player.teamId && entry.id != player.id,
+    );
+    if (teammateIndex < 0) return false;
+
+    final teammateId = state.players[teammateIndex].id;
+    if (state.playedCards.any((played) => played.player.id == teammateId)) {
+      return false;
+    }
+
+    final playerIndex = state.players.indexWhere(
+      (entry) => entry.id == player.id,
+    );
+    final remainingTurnsAfterPlayer =
+        state.players.length - state.playedCards.length - 1;
+    final turnsUntilTeammate =
+        (teammateIndex - playerIndex) % state.players.length;
+    return turnsUntilTeammate > 0 &&
+        turnsUntilTeammate <= remainingTurnsAfterPlayer;
+  }
+
+  bool _opponentStillToPlay(SimulationGameState state, Player player) {
+    final playerIndex = state.players.indexWhere(
+      (entry) => entry.player.id == player.id,
+    );
+    final remainingTurnsAfterPlayer =
+        state.players.length - state.playedCards.length - 1;
+    if (remainingTurnsAfterPlayer <= 0) return false;
+
+    for (final opponent in state.players.where(
+      (entry) => entry.player.teamId != player.teamId,
+    )) {
+      final opponentId = opponent.player.id;
+      if (state.playedCards.any((played) => played.player.id == opponentId)) {
+        continue;
+      }
+      final opponentIndex = state.players.indexWhere(
+        (entry) => entry.player.id == opponentId,
+      );
+      final turnsUntilOpponent =
+          (opponentIndex - playerIndex) % state.players.length;
+      if (turnsUntilOpponent > 0 &&
+          turnsUntilOpponent <= remainingTurnsAfterPlayer) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _opponentStillToPlayObservable(ObservableGameState state, Player player) {
+    final playerIndex = state.players.indexWhere(
+      (entry) => entry.id == player.id,
+    );
+    final remainingTurnsAfterPlayer =
+        state.players.length - state.playedCards.length - 1;
+    if (remainingTurnsAfterPlayer <= 0) return false;
+
+    for (final opponent in state.players.where(
+      (entry) => entry.teamId != player.teamId,
+    )) {
+      final opponentId = opponent.id;
+      if (state.playedCards.any((played) => played.player.id == opponentId)) {
+        continue;
+      }
+      final opponentIndex = state.players.indexWhere(
+        (entry) => entry.id == opponentId,
+      );
+      final turnsUntilOpponent =
+          (opponentIndex - playerIndex) % state.players.length;
+      if (turnsUntilOpponent > 0 &&
+          turnsUntilOpponent <= remainingTurnsAfterPlayer) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _teamHasStrongSignal(
+    SimulationGameState state,
+    int teamId, {
+    String? excludePlayerId,
+  }) {
+    for (final entry in state.players) {
+      final player = entry.player;
+      if (player.teamId != teamId) continue;
+      if (excludePlayerId != null && player.id == excludePlayerId) continue;
+      if (SignalRules.isStrongSignal(SignalRules.signalForHand(entry.hand))) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+class _CardAggregate {
+  final SpanishCard card;
+  final double prior;
+  double rolloutTotal = 0;
+  int rolloutCount = 0;
+
+  _CardAggregate({
+    required this.card,
+    required this.prior,
+  });
+
+  void record(double value) {
+    rolloutTotal += value;
+    rolloutCount += 1;
+  }
+
+  double get meanScore {
+    if (rolloutCount == 0) return prior;
+    return prior + (rolloutTotal / rolloutCount);
+  }
+}
+
+class _RolloutProfile {
+  final double aggression;
+  final double conservation;
+  final double cooperation;
+
+  const _RolloutProfile({
+    this.aggression = 0.5,
+    this.conservation = 0.5,
+    this.cooperation = 0.5,
+  });
 }

@@ -21,6 +21,13 @@ class BotVoyATiStrategy {
       throw ArgumentError('El bot no puede obedecer voy a ti sin cartas.');
     }
     if (playedCards.isEmpty) return sorted.last;
+    if (_shouldDuckBecauseTeammateAlreadyWins(
+      bot: bot,
+      players: players,
+      playedCards: playedCards,
+    )) {
+      return sorted.first;
+    }
 
     final bestTableStrength = playedCards
         .map((playedCard) => ZapitiRules.strength(playedCard.card))
@@ -63,6 +70,30 @@ class BotVoyATiStrategy {
     }
 
     return cheapestWinningCard;
+  }
+
+  static bool _shouldDuckBecauseTeammateAlreadyWins({
+    required Player bot,
+    required List<Player> players,
+    required List<PlayedCard> playedCards,
+  }) {
+    if (playedCards.length != players.length - 1) {
+      return false;
+    }
+    final winningTeam = BotTableRead.currentWinningTeamOnTable(playedCards);
+    if (winningTeam != bot.teamId) {
+      return false;
+    }
+    final bestStrength = BotTableRead.bestTableStrength(playedCards);
+    if (bestStrength == null) {
+      return false;
+    }
+    return playedCards.any(
+      (playedCard) =>
+          playedCard.player.teamId == bot.teamId &&
+          playedCard.player.id != bot.id &&
+          ZapitiRules.strength(playedCard.card) == bestStrength,
+    );
   }
 
   static double riskThatRivalStillToPlayBeats({

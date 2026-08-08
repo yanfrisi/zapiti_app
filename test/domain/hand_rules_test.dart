@@ -31,7 +31,7 @@ void main() {
       expect(progress.isNoPoints, isFalse);
     });
 
-    test('dos rondas empatadas producen 2-2 y terminan sin puntos', () {
+    test('dos rondas empatadas producen 2-2 y obligan a una tercera', () {
       final progress = HandRules.resolve([
         _tiedRound(),
         _tiedRound(),
@@ -40,8 +40,8 @@ void main() {
       expect(progress.roundWinsFor(1), 2);
       expect(progress.roundWinsFor(2), 2);
       expect(progress.winningTeamId, isNull);
-      expect(progress.isFinished, isTrue);
-      expect(progress.isNoPoints, isTrue);
+      expect(progress.isFinished, isFalse);
+      expect(progress.isNoPoints, isFalse);
     });
 
     test('primera empatada y segunda ganada decide el reparto', () {
@@ -99,15 +99,29 @@ void main() {
       expect(progress.isNoPoints, isTrue);
     });
 
-    test('no procesa mas chicos despues de alcanzar un 2-2', () {
+    test('si las dos primeras empatan, la tercera ganada decide el reparto', () {
+      final progress = HandRules.resolve([
+        _tiedRound(),
+        _tiedRound(),
+        _wonRoundByTeam(1),
+      ]);
+
+      expect(progress.roundWinsFor(1), 3);
+      expect(progress.roundWinsFor(2), 2);
+      expect(progress.winningTeamId, 1);
+      expect(progress.isFinished, isTrue);
+      expect(progress.isNoPoints, isFalse);
+    });
+
+    test('tres empates terminan sin puntos', () {
       final progress = HandRules.resolve([
         _tiedRound(),
         _tiedRound(),
         _tiedRound(),
       ]);
 
-      expect(progress.roundWinsFor(1), 2);
-      expect(progress.roundWinsFor(2), 2);
+      expect(progress.roundWinsFor(1), 3);
+      expect(progress.roundWinsFor(2), 3);
       expect(progress.winningTeamId, isNull);
       expect(progress.isFinished, isTrue);
       expect(progress.isNoPoints, isTrue);

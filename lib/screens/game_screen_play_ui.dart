@@ -1474,6 +1474,7 @@ class _GameFinishedOverlay extends StatelessWidget {
   final int scoreTeamOne;
   final int scoreTeamTwo;
   final VoidCallback onRestart;
+  final String Function(Player) playerNameBuilder;
 
   const _GameFinishedOverlay({
     required this.winningTeamId,
@@ -1481,11 +1482,14 @@ class _GameFinishedOverlay extends StatelessWidget {
     required this.scoreTeamOne,
     required this.scoreTeamTwo,
     required this.onRestart,
+    required this.playerNameBuilder,
   });
 
   @override
   Widget build(BuildContext context) {
-    final names = winningPlayers.map((player) => player.name).join(' y ');
+    final names = winningPlayers
+        .map((player) => playerNameBuilder(player))
+        .join(' y ');
     final titleStyle = Theme.of(context).textTheme.titleLarge?.copyWith(
           color: ZapitiColors.oldGold,
           fontWeight: FontWeight.w900,
@@ -2691,46 +2695,54 @@ class _SignalsBar extends StatelessWidget {
 
   static const List<
       ({
-        String label,
+        String signal,
+        String labelKey,
         SpanishCard? card,
         bool hiddenCard,
       })> _signals = [
     (
-      label: '4 Bastos',
+      signal: '4 Bastos',
+      labelKey: 'signalCard4Bastos',
       card: SpanishCard(value: 4, suit: Suit.bastos),
       hiddenCard: false,
     ),
     (
-      label: '7 Copas',
+      signal: '7 Copas',
+      labelKey: 'signalCard7Copas',
       card: SpanishCard(value: 7, suit: Suit.copas),
       hiddenCard: false,
     ),
     (
-      label: '7 Oros',
+      signal: '7 Oros',
+      labelKey: 'signalCard7Oros',
       card: SpanishCard(value: 7, suit: Suit.oros),
       hiddenCard: false,
     ),
     (
-      label: 'As Espadas',
+      signal: 'As Espadas',
+      labelKey: 'signalCardAsEspadas',
       card: SpanishCard(value: 1, suit: Suit.espadas),
       hiddenCard: false,
     ),
     (
-      label: 'Treses',
+      signal: 'Treses',
+      labelKey: 'signalCardTreses',
       card: SpanishCard(value: 3, suit: Suit.oros),
       hiddenCard: false,
     ),
     (
-      label: 'Doses',
+      signal: 'Doses',
+      labelKey: 'signalCardDoses',
       card: SpanishCard(value: 2, suit: Suit.oros),
       hiddenCard: false,
     ),
     (
-      label: 'Ases',
+      signal: 'Ases',
+      labelKey: 'signalCardAses',
       card: SpanishCard(value: 1, suit: Suit.oros),
       hiddenCard: false,
     ),
-    (label: 'Mala', card: null, hiddenCard: true),
+    (signal: 'Mala', labelKey: 'badHand', card: null, hiddenCard: true),
   ];
 
   @override
@@ -2767,14 +2779,14 @@ class _SignalsBar extends StatelessWidget {
                       for (final signal in _signals)
                         Expanded(
                           child: _SignalHoldButton(
-                            label: signal.label,
+                            label: context.tr(signal.labelKey),
                             card: signal.card,
                             hiddenCard: signal.hiddenCard,
                             enabled: enabled,
                             compact: true,
                             dense: true,
-                            onStart: () => onSignalStart(signal.label),
-                            onEnd: () => onSignalEnd(signal.label),
+                            onStart: () => onSignalStart(signal.signal),
+                            onEnd: () => onSignalEnd(signal.signal),
                           ),
                         ),
                     ],
@@ -2803,7 +2815,8 @@ class _SignalsBar extends StatelessWidget {
           List<Widget> rowButtons(
             List<
                     ({
-                      String label,
+                      String signal,
+                      String labelKey,
                       SpanishCard? card,
                       bool hiddenCard,
                     })>
@@ -2816,14 +2829,14 @@ class _SignalsBar extends StatelessWidget {
                   width: signalSize,
                   height: signalSize,
                   child: _SignalHoldButton(
-                    label: signals[index].label,
+                    label: context.tr(signals[index].labelKey),
                     card: signals[index].card,
                     hiddenCard: signals[index].hiddenCard,
                     enabled: enabled,
                     compact: true,
                     dense: true,
-                    onStart: () => onSignalStart(signals[index].label),
-                    onEnd: () => onSignalEnd(signals[index].label),
+                    onStart: () => onSignalStart(signals[index].signal),
+                    onEnd: () => onSignalEnd(signals[index].signal),
                   ),
                 ),
               ],
@@ -2909,14 +2922,14 @@ class _SignalsBar extends StatelessWidget {
               for (final signal in _signals)
                 Expanded(
                   child: _SignalHoldButton(
-                    label: signal.label,
+                    label: context.tr(signal.labelKey),
                     card: signal.card,
                     hiddenCard: signal.hiddenCard,
                     enabled: enabled,
                     compact: compact,
                     dense: !compact,
-                    onStart: () => onSignalStart(signal.label),
-                    onEnd: () => onSignalEnd(signal.label),
+                    onStart: () => onSignalStart(signal.signal),
+                    onEnd: () => onSignalEnd(signal.signal),
                   ),
                 ),
             ],

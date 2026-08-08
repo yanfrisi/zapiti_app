@@ -97,6 +97,39 @@ void main() {
       expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
     });
 
+    test(
+        'si el companero ya gana la baza y el bot cierra turno, no lo supera',
+        () {
+      const hand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: human,
+          card: SpanishCard(value: 4, suit: Suit.bastos),
+        ),
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: rivalLeft,
+          card: SpanishCard(value: 3, suit: Suit.espadas),
+        ),
+      ];
+
+      final chosen = BotVoyATiStrategy.chooseCard(
+        bot: companion,
+        hand: hand,
+        playedCards: playedCards,
+        players: players,
+        hands: const {'p3': hand},
+      );
+
+      expect(chosen, const SpanishCard(value: 12, suit: Suit.oros));
+    });
+
     test('pide voy a ti al humano si el companero va antes y conviene', () {
       const botHand = [
         SpanishCard(value: 12, suit: Suit.oros),

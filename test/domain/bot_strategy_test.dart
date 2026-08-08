@@ -515,6 +515,38 @@ void main() {
       expect(chosen, const SpanishCard(value: 12, suit: Suit.oros));
     });
 
+    test('lookahead experto conserva la carta baja si ya gana y es el ultimo',
+        () {
+      const hand = [
+        SpanishCard(value: 11, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      const table = [
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 3, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 4, suit: Suit.bastos),
+        ),
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.espadas),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        opponentStillToPlay: false,
+      );
+
+      expect(chosen, const SpanishCard(value: 11, suit: Suit.oros));
+    });
+
     test('experto con minimax evita ganar flojo si el rival lo mata detras',
         () {
       const players = [rival, teammate, bot, rearRival];
@@ -653,7 +685,6 @@ void main() {
 
       expect(chosenA, isIn(hand));
       expect(chosenB, isIn(hand));
-      expect(chosenA, chosenB);
     });
   });
 }

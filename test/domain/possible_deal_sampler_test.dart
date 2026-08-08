@@ -11,6 +11,11 @@ import 'package:zapiti_app/domain/zapiti_players.dart';
 
 void main() {
   const sampler = UniformPossibleDealSampler();
+  const biasedSampler = InferenceBiasedPossibleDealSampler(
+    useActionInference: true,
+    usePartnerModel: true,
+    useOpponentProfiles: true,
+  );
 
   ObservableGameState state() {
     return ObservableGameState(
@@ -68,5 +73,20 @@ void main() {
 
     final allCards = deal1.handsByPlayerId.values.expand((hand) => hand).toList();
     expect(allCards.toSet().length, allCards.length);
+  });
+
+  test('el sampler sesgado mantiene cantidades y unicidad', () {
+    final deal = biasedSampler.sample(state(), Random(7));
+
+    expect(deal.handsByPlayerId['p2'], hasLength(2));
+    expect(deal.handsByPlayerId['p3'], hasLength(2));
+    expect(deal.handsByPlayerId['p4'], hasLength(2));
+
+    final allCards = deal.handsByPlayerId.values.expand((hand) => hand).toList();
+    expect(allCards.toSet().length, allCards.length);
+    expect(
+      allCards,
+      isNot(contains(const SpanishCard(value: 3, suit: Suit.copas))),
+    );
   });
 }

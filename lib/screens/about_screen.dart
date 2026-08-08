@@ -183,14 +183,6 @@ class AboutScreen extends StatelessWidget {
                                       runSpacing: 10,
                                       children: [
                                         _AboutLinkButton(
-                                          label: 'LinkedIn',
-                                          icon: Icons.work_outline,
-                                          onPressed: () => _openLink(
-                                            context,
-                                            AppLinks.linkedIn,
-                                          ),
-                                        ),
-                                        _AboutLinkButton(
                                           label: 'Instagram',
                                           icon: Icons.camera_alt_outlined,
                                           onPressed: () => _openLink(

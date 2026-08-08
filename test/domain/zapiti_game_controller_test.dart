@@ -237,7 +237,7 @@ void main() {
       expect(controller.handFinished, isTrue);
     });
 
-    test('dos empates seguidos terminan 2-2 sin sumar chinos', () {
+    test('dos empates seguidos abren una tercera sin sumar chinos aun', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       )..startNewHand(fixedHands: _twoTiedRoundsHands());
@@ -252,8 +252,28 @@ void main() {
       expect(controller.roundWins[TeamRules.teamTwo], 2);
       expect(controller.score[TeamRules.teamOne], 0);
       expect(controller.score[TeamRules.teamTwo], 0);
+      expect(controller.handFinished, isFalse);
+      expect(controller.isRoundAwaitingContinue, isTrue);
+    });
+
+    test('si las dos primeras empatan, la tercera ganada decide el reparto', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      )..startNewHand(fixedHands: _twoTiesThenTeamOneWinsHands());
+
+      _playFullRound(controller);
+      controller.resolveRound();
+      controller.continueRound();
+      _playFullRound(controller);
+      controller.resolveRound();
+      controller.continueRound();
+      _playFullRound(controller);
+      controller.resolveRound();
+
+      expect(controller.roundWins[TeamRules.teamOne], 3);
+      expect(controller.roundWins[TeamRules.teamTwo], 2);
+      expect(controller.score[TeamRules.teamOne], 1);
       expect(controller.handFinished, isTrue);
-      expect(controller.isRoundAwaitingContinue, isFalse);
     });
 
     test('mano sin truco vale un chino', () {
@@ -1201,6 +1221,31 @@ Map<String, List<SpanishCard>> _teamOneWinsTwoRoundsHands() {
     ZapitiPlayers.leftRival.id: [
       const SpanishCard(value: 4, suit: Suit.espadas),
       const SpanishCard(value: 5, suit: Suit.espadas),
+      const SpanishCard(value: 6, suit: Suit.espadas),
+    ],
+  };
+}
+
+Map<String, List<SpanishCard>> _twoTiesThenTeamOneWinsHands() {
+  return {
+    ZapitiPlayers.human.id: [
+      const SpanishCard(value: 3, suit: Suit.oros),
+      const SpanishCard(value: 2, suit: Suit.oros),
+      const SpanishCard(value: 4, suit: Suit.bastos),
+    ],
+    ZapitiPlayers.rightRival.id: [
+      const SpanishCard(value: 3, suit: Suit.bastos),
+      const SpanishCard(value: 2, suit: Suit.bastos),
+      const SpanishCard(value: 12, suit: Suit.oros),
+    ],
+    ZapitiPlayers.companion.id: [
+      const SpanishCard(value: 12, suit: Suit.copas),
+      const SpanishCard(value: 11, suit: Suit.bastos),
+      const SpanishCard(value: 5, suit: Suit.copas),
+    ],
+    ZapitiPlayers.leftRival.id: [
+      const SpanishCard(value: 10, suit: Suit.copas),
+      const SpanishCard(value: 7, suit: Suit.espadas),
       const SpanishCard(value: 6, suit: Suit.espadas),
     ],
   };

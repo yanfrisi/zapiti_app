@@ -1064,8 +1064,11 @@ extension _GameScreenStateFlow on _GameScreenState {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return _SignalHelpDialog(
-          onClose: () => Navigator.of(dialogContext).pop(),
+        return ZapitiLocalizations(
+          language: _language,
+          child: _SignalHelpDialog(
+            onClose: () => Navigator.of(dialogContext).pop(),
+          ),
         );
       },
     );

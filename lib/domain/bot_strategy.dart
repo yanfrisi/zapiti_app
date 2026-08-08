@@ -161,6 +161,11 @@ class BotStrategy {
       teammateStillToPlay: teammateStillToPlay,
       opponentStillToPlay: opponentStillToPlay,
     );
+    final currentWinningTeam = _currentWinningTeam(playedCards);
+    if (currentWinningTeam == player.teamId &&
+        playedCards.length == 3) {
+      return baseline;
+    }
 
     if (difficulty < 4 || hand.length == 1) return baseline;
 
@@ -625,6 +630,7 @@ class BotStrategy {
   }
 
   static int? _currentWinningTeam(List<PlayedCard> playedCards) {
+    if (playedCards.isEmpty) return null;
     final bestStrength = _bestTableStrength(playedCards);
     final strongestTeams = {
       for (final playedCard in playedCards)
@@ -636,6 +642,7 @@ class BotStrategy {
   }
 
   static int _bestTableStrength(List<PlayedCard> playedCards) {
+    if (playedCards.isEmpty) return 0;
     return playedCards
         .map((playedCard) => ZapitiRules.strength(playedCard.card))
         .reduce((best, current) => current > best ? current : best);

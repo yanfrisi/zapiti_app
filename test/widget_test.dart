@@ -152,7 +152,7 @@ void main() {
       gameState.loadGuidedTutorialScenarioForTesting(5);
     });
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('4 Bastos'));
+    await tester.tap(find.byTooltip('4 de Bastos'));
     await tester.pump(const Duration(milliseconds: 1300));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -639,6 +639,57 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Orden y señas'), findsNothing);
+  });
+
+  testWidgets('ayuda de señas se traduce al cambiar idioma',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PLAY'), findsOneWidget);
+    await tester.tap(find.text('PLAY'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your character'), findsOneWidget);
+    final startButton = find.text('START MATCH');
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose difficulty'), findsOneWidget);
+    final playButton = find.text('PLAY');
+    await tester.ensureVisible(playButton);
+    await tester.tap(playButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SIGNALS HELP'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Order and signals'), findsOneWidget);
+    expect(find.text('4 of Clubs'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Ace of Swords'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Ace of Swords'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Bad hand'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Bad hand'), findsOneWidget);
   });
 
   testWidgets('la mesa no desborda en movil vertical', (tester) async {

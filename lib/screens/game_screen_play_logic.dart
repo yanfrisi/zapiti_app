@@ -194,10 +194,13 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse =
               _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
           _status = _isWaitingHumanTrucoResponse
-              ? context.tr('playerCallsTruco', params: {'name': bot.name})
+              ? context.tr(
+                  'playerCallsTruco',
+                  params: {'name': _localizedPlayerName(bot)},
+                )
               : context.tr(
                   'playerCallsTrucoShort',
-                  params: {'name': bot.name},
+                  params: {'name': _localizedPlayerName(bot)},
                 );
         });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
@@ -213,7 +216,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
       }
 
       _updateState(() {
-        _status = context.tr('botThinking', params: {'name': bot.name});
+        _status = context.tr(
+          'botThinking',
+          params: {'name': _localizedPlayerName(bot)},
+        );
       });
 
       await _botDelay(1150);
@@ -252,12 +258,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
             !_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
           _status = context.tr(
             'waitingForPlayer',
-            params: {'name': _currentPlayer.name},
+            params: {'name': _localizedPlayerName(_currentPlayer)},
           );
         } else if (_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
           _status = context.tr(
             'turnOfPlayer',
-            params: {'name': _currentPlayer.name},
+            params: {'name': _localizedPlayerName(_currentPlayer)},
           );
         }
       }
@@ -272,6 +278,18 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final shouldPlayLowest = _forceLowestRequestedPlayerIds.contains(bot.id);
     if (shouldPlayLowest) {
       _forceLowestRequestedPlayerIds.remove(bot.id);
+      return BotVenAMiStrategy.chooseCard(
+        bot: bot,
+        hand: hand,
+        playedCards: _playedCards,
+        players: _players,
+        hands: _hands,
+      );
+    }
+    if ((shouldObeyVoyATi || shouldPlayHighest) &&
+        _shouldIgnoreAggressiveCompanionCommand(bot)) {
+      _forceWinRequestedPlayerIds.remove(bot.id);
+      _forceHighestRequestedPlayerIds.remove(bot.id);
       return BotVenAMiStrategy.chooseCard(
         bot: bot,
         hand: hand,
@@ -331,6 +349,26 @@ extension _GameScreenPlayLogic on _GameScreenState {
     return _maybeApplyDifficultyCardMistake(bot, hand, strategicCard);
   }
 
+  bool _shouldIgnoreAggressiveCompanionCommand(Player bot) {
+    if (_playedCards.length != _players.length - 1) {
+      return false;
+    }
+    final winningTeam = BotTableRead.currentWinningTeamOnTable(_playedCards);
+    if (winningTeam != bot.teamId) {
+      return false;
+    }
+    final bestStrength = BotTableRead.bestTableStrength(_playedCards);
+    if (bestStrength == null) {
+      return false;
+    }
+    return _playedCards.any(
+      (playedCard) =>
+          playedCard.player.teamId == bot.teamId &&
+          playedCard.player.id != bot.id &&
+          ZapitiRules.strength(playedCard.card) == bestStrength,
+    );
+  }
+
   int _botDifficultyFor(Player bot) {
     if (_isMultiplayerMatch) {
       return _selectedDifficulty;
@@ -368,10 +406,13 @@ extension _GameScreenPlayLogic on _GameScreenState {
       _forceWinRequestedPlayerIds.add(_humanPlayer.id);
       _showTemporaryPlayerMessage(
         bot.id,
-        '¡Voy a ti!',
+        context.tr('voyATi'),
         duration: const Duration(milliseconds: 1300),
       );
-      _status = context.tr('botSendsVoyATi', params: {'name': bot.name});
+      _status = context.tr(
+        'botSendsVoyATi',
+        params: {'name': _localizedPlayerName(bot)},
+      );
     });
     _sendMultiplayerVoyATiIfNeeded(bot);
     return true;
@@ -385,7 +426,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
       socket.signal(
         roomId: roomId,
         playerId: player.id,
-        label: '¡Voy a ti!',
+        label: context.tr('voyATi'),
         kind: 'voy_a_ti',
       );
     }
@@ -567,8 +608,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse =
               _teamNeedsLocalHumanTrucoResponse(respondingTeamId);
           if (_isWaitingHumanTrucoResponse) {
-            _status =
-                context.tr('playerCallsTruco', params: {'name': player.name});
+            _status = context.tr(
+              'playerCallsTruco',
+              params: {'name': _localizedPlayerName(player)},
+            );
           }
         });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
@@ -593,7 +636,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
           if (_isWaitingHumanTrucoResponse) {
             _status = context.tr(
               'playerRaisesTo',
-              params: {'name': player.name, 'value': rawValue},
+              params: {
+                'name': _localizedPlayerName(player),
+                'value': rawValue,
+              },
             );
           }
         });
@@ -616,7 +662,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         _updateState(() {
           _acceptTruco(teamId: player.teamId, actorPlayerId: player.id);
-          _showTemporaryPlayerMessage(player.id, 'Acepto truco.');
+          _showTemporaryPlayerMessage(
+            player.id,
+            context.tr('acceptTrucoSpeech'),
+          );
           _isWaitingHumanTrucoResponse = false;
           _isAutoPlaying = false;
         });
@@ -635,7 +684,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
           return;
         }
         _updateState(() {
-          _showTemporaryPlayerMessage(player.id, 'Paso.');
+          _showTemporaryPlayerMessage(player.id, context.tr('passSpeech'));
           _passTruco(passingTeamId: player.teamId, actorPlayerId: player.id);
           _isWaitingHumanTrucoResponse = false;
           _isAutoPlaying = false;
@@ -662,7 +711,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         _updateState(() {
           _game.passHand(from: player, to: teammate, actorPlayerId: player.id);
-          _showTemporaryPlayerMessage(player.id, 'Paso mano.');
+          _showTemporaryPlayerMessage(player.id, context.tr('passHandSpeech'));
           _isAutoPlaying = false;
         });
         if (_isLocalBotPlayer(_currentPlayer)) {
@@ -677,7 +726,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
           if (_currentPlayer.id == _humanPlayer.id) {
             _status = context.tr('yourTurn');
           } else if (_isLocalBotPlayer(_currentPlayer)) {
-            _status = 'Turno de ${_currentPlayer.name}.';
+            _status = context.tr(
+              'turnOfPlayer',
+              params: {'name': _localizedPlayerName(_currentPlayer)},
+            );
           }
         });
         if (_isLocalBotPlayer(_currentPlayer)) {
@@ -710,11 +762,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
         );
         if (kind == 'voy_a_ti') {
           if (!active) return;
+          final localizedLabel = _localizedActionLabel(kind.toString(), rawLabel);
           _updateState(() {
-            _showTemporaryPlayerMessage(player.id, rawLabel);
+            _showTemporaryPlayerMessage(player.id, localizedLabel);
             if (player.teamId == _humanPlayer.teamId &&
                 player.id != _humanPlayer.id) {
-              _status = '${player.name}: $rawLabel';
+              _status = context.tr(
+                'botSendsVoyATi',
+                params: {'name': _localizedPlayerName(player)},
+              );
             }
             if (player.teamId == _humanPlayer.teamId &&
                 !_controlledHumanPlayerIds.contains(_humanPlayer.id) &&
@@ -727,13 +783,14 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         if (kind == 'ven_a_mi') {
           if (!active) return;
+          final localizedLabel = _localizedActionLabel(kind.toString(), rawLabel);
           _updateState(() {
-            _showTemporaryPlayerMessage(player.id, rawLabel);
+            _showTemporaryPlayerMessage(player.id, localizedLabel);
             if (player.teamId == _humanPlayer.teamId &&
                 player.id != _humanPlayer.id) {
               _status = context.tr(
                 'partnerComeToMeInstruction',
-                params: {'name': player.name},
+                params: {'name': _localizedPlayerName(player)},
               );
             }
             if (player.teamId == _humanPlayer.teamId &&
@@ -747,13 +804,14 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         if (kind == 'mata') {
           if (!active) return;
+          final localizedLabel = _localizedActionLabel(kind.toString(), rawLabel);
           _updateState(() {
-            _showTemporaryPlayerMessage(player.id, rawLabel);
+            _showTemporaryPlayerMessage(player.id, localizedLabel);
             if (player.teamId == _humanPlayer.teamId &&
                 player.id != _humanPlayer.id) {
               _status = context.tr(
                 'askCompanionKill',
-                params: {'name': player.name},
+                params: {'name': _localizedPlayerName(player)},
               );
             }
             if (player.teamId == _humanPlayer.teamId &&
@@ -774,9 +832,17 @@ extension _GameScreenPlayLogic on _GameScreenState {
             if (player.teamId == _humanPlayer.teamId &&
                 player.id != _humanPlayer.id) {
               _isRequestingCompanionSignal = false;
-              _companionPrivateSignalStatus = 'Compa: $rawLabel';
-              _status = context
-                  .tr('signalReceivedFrom', params: {'name': player.name});
+              _setCompanionPrivateSignalStatus(
+                context.tr(
+                  'companionSignal',
+                  params: {'signal': _localizedSignalName(rawLabel)},
+                ),
+                clearAfter: const Duration(seconds: 2),
+              );
+              _status = context.tr(
+                'signalReceivedFrom',
+                params: {'name': _localizedPlayerName(player)},
+              );
             }
           } else if (_playerMessages[player.id] == 'Seña: $rawLabel') {
             _playersSignaledThisHand.remove(player.id);
@@ -792,9 +858,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
             }
             if (player.teamId == _humanPlayer.teamId &&
                 player.id != _humanPlayer.id) {
-              if (_companionPrivateSignalStatus == 'Compa: $rawLabel') {
-                _companionPrivateSignalStatus = null;
-              }
+              _setCompanionPrivateSignalStatus(null);
             }
           }
         });
@@ -812,12 +876,17 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         _updateState(() {
           _isRequestingCompanionSignal = false;
-          _companionPrivateSignalStatus = context.tr(
-            'playerAsksSignalShort',
-            params: {'name': requester.name},
+          _setCompanionPrivateSignalStatus(
+            context.tr(
+              'playerAsksSignalShort',
+              params: {'name': _localizedPlayerName(requester)},
+            ),
+            clearAfter: const Duration(seconds: 2),
           );
-          _status =
-              context.tr('playerAsksSignal', params: {'name': requester.name});
+          _status = context.tr(
+            'playerAsksSignal',
+            params: {'name': _localizedPlayerName(requester)},
+          );
         });
         break;
       case MultiplayerMessageType.roomSnapshot:
@@ -882,7 +951,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (player != null) {
       _updateState(() {
         _isAutoPlaying = true;
-        _status = context.tr('botThinking', params: {'name': player.name});
+        _status = context.tr(
+          'botThinking',
+          params: {'name': _localizedPlayerName(player)},
+        );
       });
     }
 

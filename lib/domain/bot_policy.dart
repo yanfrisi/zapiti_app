@@ -98,8 +98,8 @@ class MonteCarloBotPolicy implements BotPolicy {
       ),
       score: const {1: 0, 2: 0},
       roundWins: {
-        1: context.teamRoundWins,
-        2: context.opponentRoundWins,
+        context.bot.teamId: context.teamRoundWins,
+        3 - context.bot.teamId: context.opponentRoundWins,
       },
       visibleSignals: const [],
     );
