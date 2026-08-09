@@ -347,6 +347,7 @@
   "multiplayerProfileCreateFailed": "Could not create the user. Try again.",
   "multiplayerProfileLoginInProgress": "Signing in...",
   "multiplayerProfileLoginFailed": "Could not sign in. Try again.",
+  "multiplayerProfilePasswordIncorrect": "The password is not correct for that user.",
   "multiplayerProfileReviewCredentials": "Check the user, name and password.",
   "multiplayerCopyInvitationPrompt": "Create or write a room before copying an invitation.",
   "multiplayerInvitationCopied": "Invitation copied: {room}.",

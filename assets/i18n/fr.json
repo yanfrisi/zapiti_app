@@ -332,6 +332,7 @@
   "multiplayerProfileCreateFailed": "Impossible de créer l’utilisateur. Réessaie.",
   "multiplayerProfileLoginInProgress": "Connexion en cours...",
   "multiplayerProfileLoginFailed": "Impossible de se connecter. Réessaie.",
+  "multiplayerProfilePasswordIncorrect": "Le mot de passe n'est pas correct pour cet utilisateur.",
   "multiplayerProfileReviewCredentials": "Vérifie l'utilisateur, le nom et le mot de passe.",
   "multiplayerCopyInvitationPrompt": "Crée ou écris une salle avant de copier une invitation.",
   "multiplayerInvitationCopied": "Invitation copiée : {room}.",

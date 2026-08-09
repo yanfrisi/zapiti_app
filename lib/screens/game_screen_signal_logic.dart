@@ -5,16 +5,52 @@ extension _GameScreenSignalLogic on _GameScreenState {
   static const _companionSignalGestureDuration = Duration(milliseconds: 300);
   static const _companionNoSignalStatusDuration = Duration(milliseconds: 450);
 
+  int get _currentTrickIndex => _roundHistory.length;
+
+  SignalContext _signalContextFor(Player player) {
+    return SignalContext(
+      signals: [
+        for (final signal in _activeStrategicSignals)
+          if (signal.handVersion == _handVersion &&
+              signal.active &&
+              signal.isVisibleToTeam(player.teamId))
+            signal,
+      ],
+    );
+  }
+
+  void _recordStrategicSignal({
+    required StrategicSignalType type,
+    required Player issuer,
+    String? targetPlayerId,
+    String? label,
+    StrategicSignalVisibility visibility = StrategicSignalVisibility.teamOnly,
+  }) {
+    _activeStrategicSignals.add(
+      StrategicSignal(
+        type: type,
+        issuerPlayerId: issuer.id,
+        targetPlayerId: targetPlayerId,
+        teamId: issuer.teamId,
+        handVersion: _handVersion,
+        trickIndex: _currentTrickIndex,
+        visibility: visibility,
+        label: label,
+      ),
+    );
+  }
+
   Future<void> _requestCompanionSignal() async {
-    if (_handFinished || _isGameFinished || _isRequestingCompanionSignal) {
+    if (_handFinished ||
+        _isGameFinished ||
+        (!_isMultiplayerMatch && _isRequestingCompanionSignal)) {
       return;
     }
 
     if (_isMultiplayerMatch) {
       if (!_ensureMultiplayerActionConnection()) return;
       _updateState(() {
-        _isRequestingCompanionSignal = true;
-        _setCompanionPrivateSignalStatus(context.tr('companionLooking'));
+        _isRequestingCompanionSignal = false;
         _status = context.tr('askCompanionSignalStatus');
       });
       _requestMultiplayerCompanionSignal();
@@ -57,6 +93,11 @@ extension _GameScreenSignalLogic on _GameScreenState {
     _updateState(() {
       _playersSignaledThisHand.add(companion.id);
       _playerMessages[companion.id] = '$_signalMessagePrefix$signal';
+      _recordStrategicSignal(
+        type: StrategicSignalType.cardSignal,
+        issuer: companion,
+        label: signal,
+      );
       _setCompanionPrivateSignalStatus(
         companionSignalStatus,
         clearAfter: const Duration(seconds: 2),
@@ -98,6 +139,11 @@ extension _GameScreenSignalLogic on _GameScreenState {
       _playerMessages[_humanPlayer.id] = '$_signalMessagePrefix$label';
       _knownSignalsByTeam[_humanPlayer.teamId] = label;
       _teamSignalsByTeam[_humanPlayer.teamId] = label;
+      _recordStrategicSignal(
+        type: StrategicSignalType.cardSignal,
+        issuer: _humanPlayer,
+        label: label,
+      );
       if (!_isMultiplayerMatch) {
         _maybeLetRivalsSeeHumanSignal(label);
       }

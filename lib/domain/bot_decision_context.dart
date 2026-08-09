@@ -1,5 +1,6 @@
 import 'played_card.dart';
 import 'player.dart';
+import 'signal_context.dart';
 import 'spanish_card.dart';
 
 class BotDecisionContext {
@@ -17,6 +18,9 @@ class BotDecisionContext {
   final bool forceWinIfPossible;
   final bool teammateStillToPlay;
   final bool opponentStillToPlay;
+  final SignalContext signalContext;
+  final int handVersion;
+  final int trickIndex;
 
   const BotDecisionContext({
     required this.difficulty,
@@ -33,5 +37,8 @@ class BotDecisionContext {
     required this.forceWinIfPossible,
     required this.teammateStillToPlay,
     required this.opponentStillToPlay,
+    this.signalContext = SignalContext.empty,
+    this.handVersion = 0,
+    this.trickIndex = 0,
   });
 }

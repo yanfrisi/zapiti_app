@@ -2037,6 +2037,7 @@ class _MainMenuMultiplayerContentState
   bool _ready = false;
   bool _profileReady = false;
   bool _showCreateAccount = false;
+  bool _profileLoginInProgress = false;
   bool _teamModalShownForCurrentRoom = false;
   bool _teamDialogAutoClosed = false;
   bool _allowPassHandForRoom = false;
@@ -2384,7 +2385,9 @@ class _MainMenuMultiplayerContentState
     final localSeat = _localSeatFor(snapshot);
     if (localSeat == null) return;
     final characterId = localSeat.characterId;
-    if (characterId == null || characterId.isEmpty) {
+    if (characterId == null ||
+        characterId.isEmpty ||
+        !CharacterAssets.characterIds.contains(characterId)) {
       setState(() {
         _characterSelectionReleased = true;
         _confirmedCharacterId = null;
@@ -2794,10 +2797,18 @@ class _MainMenuMultiplayerContentState
           final text = message.payload['message']?.toString() ??
               _tr('multiplayerConnectionError');
           if (code == 'profile_not_found') {
-            _profileStatus = _tr('multiplayerProfileRecover');
-            _showCreateAccount = true;
+            if (_profileLoginInProgress) {
+              _profileReady = false;
+              _showCreateAccount = false;
+              _profileStatus = _tr('multiplayerProfilePasswordIncorrect');
+            } else {
+              _profileStatus = _tr('multiplayerProfileRecover');
+              _showCreateAccount = true;
+            }
+            _profileLoginInProgress = false;
           } else if (code == 'auth_failed') {
             _sessionToken = null;
+            _profileLoginInProgress = false;
             unawaited(_clearSavedSessionToken());
             shouldRetryRoomActionWithoutSession = _pendingRoomAction != null &&
                 !_roomActionRetriedWithoutSession &&
@@ -2812,16 +2823,17 @@ class _MainMenuMultiplayerContentState
               _teamsLoaded = false;
               _playerTeams = const [];
               _selectedPairId = null;
-              _profileStatus = _tr('multiplayerRemoteErrorExpired');
+              _profileStatus = _tr('multiplayerProfilePasswordIncorrect');
             }
           } else if (code == 'invalid_payload' && !_profileReady) {
+            _profileLoginInProgress = false;
             _profileStatus = _tr('multiplayerProfileReviewCredentials');
           }
           _status = switch (code) {
             'room_not_found' => _tr('multiplayerJoinFailed'),
             'team_required' => _tr('multiplayerTeamSelectionFailed'),
             'invalid_team_for_room' => _tr('multiplayerRemoteErrorTeamUpdate'),
-            'auth_failed' => _tr('multiplayerRemoteErrorExpired'),
+            'auth_failed' => _tr('multiplayerProfilePasswordIncorrect'),
             'character_taken' => _tr('multiplayerCharacterOccupied',
                 params: {'name': _selectedCharacterId}),
             'player_already_in_room' => _tr('multiplayerJoinFailed'),
@@ -3010,6 +3022,7 @@ class _MainMenuMultiplayerContentState
           _passwordController.clear();
         }
         setState(() {
+          _profileLoginInProgress = false;
           _playerStats = Map<String, dynamic>.from(message.payload);
           _profileReady = _hasUsableSessionOrCredentials();
           _showCreateAccount = false;
@@ -3976,6 +3989,7 @@ class _MainMenuMultiplayerContentState
     ]);
 
     setState(() {
+      _profileLoginInProgress = false;
       _profileStatus = _tr('multiplayerProfileCreatingUser');
       _status = _tr('multiplayerProfileSyncingUser');
     });
@@ -4026,6 +4040,7 @@ class _MainMenuMultiplayerContentState
     if (socket == null) return;
     _profilePasswordFallback = password;
     setState(() {
+      _profileLoginInProgress = true;
       _profileStatus = _tr('multiplayerProfileLoginInProgress');
     });
     try {
@@ -4035,6 +4050,7 @@ class _MainMenuMultiplayerContentState
       );
     } catch (error) {
       setState(() {
+        _profileLoginInProgress = false;
         _profileStatus = _tr('multiplayerProfileLoginFailed');
       });
     }
@@ -4258,7 +4274,8 @@ class _MainMenuMultiplayerContentState
       if (playerId == null ||
           playerId.isEmpty ||
           characterId == null ||
-          characterId.isEmpty) {
+          characterId.isEmpty ||
+          !CharacterAssets.characterIds.contains(characterId)) {
         continue;
       }
       parsed[playerId] = characterId;

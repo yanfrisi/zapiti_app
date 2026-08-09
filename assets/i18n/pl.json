@@ -347,6 +347,7 @@
   "multiplayerProfileCreateFailed": "Nie udało się utworzyć użytkownika. Spróbuj ponownie.",
   "multiplayerProfileLoginInProgress": "Logowanie...",
   "multiplayerProfileLoginFailed": "Nie udało się zalogować. Spróbuj ponownie.",
+  "multiplayerProfilePasswordIncorrect": "Hasło nie jest poprawne dla tego użytkownika.",
   "multiplayerProfileReviewCredentials": "Sprawdź użytkownika, nazwę i hasło.",
   "multiplayerCopyInvitationPrompt": "Utwórz lub wpisz pokój przed skopiowaniem zaproszenia.",
   "multiplayerInvitationCopied": "Zaproszenie skopiowane: {room}.",

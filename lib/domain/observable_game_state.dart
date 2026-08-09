@@ -1,6 +1,7 @@
 import 'bet_state.dart';
 import 'played_card.dart';
 import 'player.dart';
+import 'signal_context.dart';
 import 'spanish_card.dart';
 
 class ObservableGameState {
@@ -16,6 +17,9 @@ class ObservableGameState {
   final Map<int, int> score;
   final Map<int, int> roundWins;
   final List<String> visibleSignals;
+  final SignalContext signalContext;
+  final int handVersion;
+  final int trickIndex;
 
   const ObservableGameState({
     required this.botPlayerId,
@@ -30,6 +34,9 @@ class ObservableGameState {
     required this.score,
     required this.roundWins,
     required this.visibleSignals,
+    this.signalContext = SignalContext.empty,
+    this.handVersion = 0,
+    this.trickIndex = 0,
   });
 
   factory ObservableGameState.fromController({
@@ -43,6 +50,9 @@ class ObservableGameState {
     required String trickLeaderId,
     required BetState betState,
     required List<String> visibleSignals,
+    SignalContext signalContext = SignalContext.empty,
+    int handVersion = 0,
+    int trickIndex = 0,
     Map<String, List<SpanishCard>> publiclyKnownCardsByPlayerId = const {},
   }) {
     return ObservableGameState(
@@ -70,7 +80,9 @@ class ObservableGameState {
       score: Map.unmodifiable(score),
       roundWins: Map.unmodifiable(roundWins),
       visibleSignals: List.unmodifiable(visibleSignals),
+      signalContext: signalContext,
+      handVersion: handVersion,
+      trickIndex: trickIndex,
     );
   }
 }
-

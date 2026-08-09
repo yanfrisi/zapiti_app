@@ -102,6 +102,9 @@ class MonteCarloBotPolicy implements BotPolicy {
         3 - context.bot.teamId: context.opponentRoundWins,
       },
       visibleSignals: const [],
+      signalContext: context.signalContext.visibleToTeam(context.bot.teamId),
+      handVersion: context.handVersion,
+      trickIndex: context.trickIndex,
     );
     return selector.selectCard(
       botPlayerId: context.bot.id,

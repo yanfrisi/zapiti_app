@@ -88,7 +88,7 @@ class MultiplayerSessionStore {
     matchStarted = false;
   }
 
-  void clearAll() {
+  void clearAll({bool closeSocket = true}) {
     ZapitiLogger.info('session_store', 'clear_all_begin', fields: {
       'activeRoomId': activeRoomId,
       'localGamePlayerId': localGamePlayerId,
@@ -99,7 +99,12 @@ class MultiplayerSessionStore {
       'socketConnected': socket?.isConnected,
       'roomSnapshotPhase': roomSnapshot?.phase,
     });
-    socket?.close();
+    if (closeSocket) {
+      socket?.onMessage = null;
+      socket?.onError = null;
+      socket?.onDone = null;
+      socket?.close();
+    }
     socket = null;
     roomSnapshot = null;
     clearReconnectCredentials();

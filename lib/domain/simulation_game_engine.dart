@@ -94,6 +94,9 @@ class DefaultSimulationGameEngine implements SimulationGameEngine {
         roundNumber: state.roundNumber,
         isRoundFinished: false,
         isHandFinished: false,
+        signalContext: state.signalContext,
+        handVersion: state.handVersion,
+        trickIndex: state.trickIndex,
       );
       return GameTransition(previousState: state, nextState: nextState, events: events);
     }
@@ -130,6 +133,9 @@ class DefaultSimulationGameEngine implements SimulationGameEngine {
       roundNumber: state.roundNumber + 1,
       isRoundFinished: isRoundFinished,
       isHandFinished: isHandFinished,
+      signalContext: state.signalContext,
+      handVersion: state.handVersion,
+      trickIndex: state.trickIndex + 1,
     );
     events.add(TrickCompletedEvent(winningTeamId: result.winningTeamId));
     return GameTransition(previousState: state, nextState: nextState, events: events);

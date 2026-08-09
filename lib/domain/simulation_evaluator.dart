@@ -1,5 +1,5 @@
 import 'simulation_game_state.dart';
-import 'signal_rules.dart';
+import 'signal_context.dart';
 import 'team_rules.dart';
 import 'zapiti_rules.dart';
 
@@ -23,8 +23,8 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
     final reserveGap = _reserveStrength(state, botTeam) - _reserveStrength(state, rivalTeam);
     final strongCardGap =
         _strongCardCount(state, botTeam) - _strongCardCount(state, rivalTeam);
-    final signalGap =
-        _strongSignalCount(state, botTeam) - _strongSignalCount(state, rivalTeam);
+    final signalGap = _observedSignalValue(state, botTeam) -
+        _observedSignalValue(state, rivalTeam);
     final tempoGap = _tempoBonus(state, botTeam) - _tempoBonus(state, rivalTeam);
     final trickGap = _currentTrickPressure(state, botTeam) - _currentTrickPressure(state, rivalTeam);
 
@@ -32,10 +32,11 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
         roundGap * 24 +
         reserveGap * 0.32 +
         strongCardGap * 18 +
-        signalGap * 10 +
+        signalGap * 12 +
         tempoGap * 14 +
         trickGap * 0.9 +
-        _teamShapeBonus(state, botTeam);
+        _teamShapeBonus(state, botTeam) +
+        _signalComplianceBonus(state, botPlayerId);
   }
 
   int _reserveStrength(SimulationGameState state, int teamId) {
@@ -53,13 +54,46 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
         .length;
   }
 
-  int _strongSignalCount(SimulationGameState state, int teamId) {
-    return state.players
-        .where((entry) => entry.player.teamId == teamId)
-        .where((entry) => SignalRules.isStrongSignal(
-              SignalRules.signalForHand(entry.hand),
-            ))
-        .length;
+  double _observedSignalValue(SimulationGameState state, int teamId) {
+    var value = 0.0;
+    for (final signal in state.signalContext.signals) {
+      if (!signal.active || signal.teamId != teamId) continue;
+      value += switch (signal.type) {
+        StrategicSignalType.cardSignal => 1.0,
+        StrategicSignalType.venAMi => 0.65,
+        StrategicSignalType.mata => 0.8,
+        StrategicSignalType.voyATi => 0.55,
+      };
+    }
+    return value;
+  }
+
+  double _signalComplianceBonus(SimulationGameState state, String botPlayerId) {
+    if (state.playedCards.isEmpty || state.signalContext.signals.isEmpty) {
+      return 0;
+    }
+    final bot = state.players
+        .firstWhere((entry) => entry.player.id == botPlayerId)
+        .player;
+    var bonus = 0.0;
+    for (final signal in state.signalContext.activeForPlayer(
+      playerId: botPlayerId,
+      playerTeamId: bot.teamId,
+      trickIndex: state.trickIndex,
+    )) {
+      switch (signal.type) {
+        case StrategicSignalType.venAMi:
+        case StrategicSignalType.voyATi:
+          bonus += _currentTrickPressure(state, bot.teamId) >= 0 ? 4 : 10;
+          break;
+        case StrategicSignalType.mata:
+          bonus += _currentTrickPressure(state, bot.teamId) > 0 ? 14 : -10;
+          break;
+        case StrategicSignalType.cardSignal:
+          break;
+      }
+    }
+    return bonus;
   }
 
   double _teamShapeBonus(SimulationGameState state, int botTeamId) {

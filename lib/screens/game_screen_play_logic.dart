@@ -159,6 +159,14 @@ extension _GameScreenPlayLogic on _GameScreenState {
     _updateState(() {
       _playersSignaledThisHand.add(bot.id);
       _playerMessages[bot.id] = 'SENAL: $signal';
+      _recordStrategicSignal(
+        type: StrategicSignalType.cardSignal,
+        issuer: bot,
+        label: signal,
+        visibility: isRivalBot
+            ? StrategicSignalVisibility.observedByOpponents
+            : StrategicSignalVisibility.teamOnly,
+      );
       _teamSignalsByTeam[bot.teamId] = signal;
       _knownSignalsByTeam[bot.teamId] = signal;
     });
@@ -336,17 +344,6 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
     final shouldPlayHighest = _forceHighestRequestedPlayerIds.contains(bot.id);
-    final shouldPlayLowest = _forceLowestRequestedPlayerIds.contains(bot.id);
-    if (shouldPlayLowest) {
-      _forceLowestRequestedPlayerIds.remove(bot.id);
-      return BotVenAMiStrategy.chooseCard(
-        bot: bot,
-        hand: hand,
-        playedCards: _playedCards,
-        players: _players,
-        hands: _hands,
-      );
-    }
     if ((shouldObeyVoyATi || shouldPlayHighest) &&
         _shouldIgnoreAggressiveCompanionCommand(bot)) {
       _forceWinRequestedPlayerIds.remove(bot.id);
@@ -358,13 +355,6 @@ extension _GameScreenPlayLogic on _GameScreenState {
         players: _players,
         hands: _hands,
       );
-    }
-    if (shouldPlayHighest) {
-      _forceHighestRequestedPlayerIds.remove(bot.id);
-      final sorted = [...hand]..sort(
-          (a, b) => ZapitiRules.strength(a).compareTo(ZapitiRules.strength(b)),
-        );
-      return sorted.last;
     }
     final memory = BotMemoryContext.from(
       bot: bot,
@@ -390,23 +380,20 @@ extension _GameScreenPlayLogic on _GameScreenState {
         teammateHasStrongSignal: _isStrongSignal(teamSignal),
         opponentHasStrongSignal:
             _isStrongSignal(opponentSignal) && !memory.tableIsDrained,
-        forceWinIfPossible:
-            shouldObeyVoyATi || _shouldBotForceWin(bot, memory: memory),
+        forceWinIfPossible: shouldObeyVoyATi ||
+            shouldPlayHighest ||
+            _shouldBotForceWin(bot, memory: memory),
         teammateStillToPlay:
             _teammateStillToPlay(bot) && !memory.opponentsWonAnyRound,
         opponentStillToPlay: _opponentStillToPlay(bot),
+        signalContext: _signalContextFor(bot),
+        handVersion: _handVersion,
+        trickIndex: _roundHistory.length,
       ),
     );
     _forceWinRequestedPlayerIds.remove(bot.id);
-    if (shouldObeyVoyATi) {
-      return BotVoyATiStrategy.chooseCard(
-        bot: bot,
-        hand: hand,
-        playedCards: _playedCards,
-        players: _players,
-        hands: _hands,
-      );
-    }
+    _forceHighestRequestedPlayerIds.remove(bot.id);
+    _forceLowestRequestedPlayerIds.remove(bot.id);
     return _maybeApplyDifficultyCardMistake(bot, hand, strategicCard);
   }
 
@@ -434,10 +421,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (_isMultiplayerMatch) {
       return _selectedDifficulty;
     }
-    if (bot.id == _companionPlayer.id) {
-      return 3;
-    }
-    return _selectedDifficulty;
+    return BotAgentDifficulty.forOfflineBot(
+      bot: bot,
+      human: _humanPlayer,
+      companion: _companionPlayer,
+      selectedDifficulty: _selectedDifficulty,
+    );
   }
 
   bool _maybeCompanionBotRequestsHumanVoyATi(Player bot) {
@@ -457,7 +446,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
       teamRoundWins: _roundWins[bot.teamId]!,
       opponentRoundWins: _roundWins[TeamRules.opponentOf(bot.teamId)]!,
       handValue: _handValue,
-      difficulty: _selectedDifficulty,
+      difficulty: _botDifficultyFor(bot),
       roll: _random.nextDouble(),
     );
     if (!shouldAsk) return false;
@@ -465,6 +454,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
     _updateState(() {
       _companionVoyATiPromptedHandVersion = _handVersion;
       _forceWinRequestedPlayerIds.add(_humanPlayer.id);
+      _recordStrategicSignal(
+        type: StrategicSignalType.voyATi,
+        issuer: bot,
+        targetPlayerId: bot.id,
+        label: context.tr('voyATi'),
+      );
       _showTemporaryPlayerMessage(
         bot.id,
         context.tr('voyATi'),
@@ -522,7 +517,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     SpanishCard strategicCard,
   ) {
     return DifficultyStrategy.applyCardMistake(
-      difficulty: _selectedDifficulty,
+      difficulty: _botDifficultyFor(bot),
       random: _random,
       player: bot,
       hand: hand,
@@ -585,6 +580,9 @@ extension _GameScreenPlayLogic on _GameScreenState {
 
     _updateState(() {
       _game.continueRound();
+      _activeStrategicSignals.removeWhere(
+        (signal) => signal.handVersion == _handVersion,
+      );
       _forceWinRequestedPlayerIds.clear();
       _isAutoPlaying = false;
       if (_currentPlayer.id == _humanPlayer.id) {
@@ -598,11 +596,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
   }
 
   void _handleMultiplayerMessage(MultiplayerMessage message) {
-    if (!mounted || !_isMultiplayerMatch) {
-      _logClientIgnore('message_dropped_before_processing', message: message, fields: {
-        'mounted': mounted,
-        'isMultiplayerMatch': _isMultiplayerMatch,
-      });
+    if (!mounted || !_isMultiplayerMatch || !_sessionLifecycle.isActive) {
+      _logClientIgnore('message_dropped_before_processing',
+          message: message,
+          fields: {
+            'mounted': mounted,
+            'isMultiplayerMatch': _isMultiplayerMatch,
+            'sessionId': _sessionLifecycle.generation,
+            'sessionPhase': _sessionLifecycle.phase.name,
+          });
       return;
     }
     _logClientApply('message_received', message: message, fields: {
@@ -626,11 +628,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
         var applied = false;
         _updateState(() {
           if (!_hands[player.id]!.contains(card)) {
-            _logClientIgnore('play_card_not_in_hand', message: message, fields: {
-              'targetPlayerId': player.id,
-              'card': cardToJson(card),
-              'knownHand': [for (final item in _hands[player.id]!) cardToJson(item)],
-            });
+            _logClientIgnore('play_card_not_in_hand',
+                message: message,
+                fields: {
+                  'targetPlayerId': player.id,
+                  'card': cardToJson(card),
+                  'knownHand': [
+                    for (final item in _hands[player.id]!) cardToJson(item)
+                  ],
+                });
             return;
           }
           applied = true;
@@ -758,10 +764,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
           teamId: player.teamId,
           actorPlayerId: player.id,
         )) {
-          _logClientIgnore('accept_truco_rejected_by_local_state', message: message, fields: {
-            'targetPlayerId': player.id,
-            'teamId': player.teamId,
-          });
+          _logClientIgnore('accept_truco_rejected_by_local_state',
+              message: message,
+              fields: {
+                'targetPlayerId': player.id,
+                'teamId': player.teamId,
+              });
           return;
         }
         _updateState(() {
@@ -792,10 +800,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
           passingTeamId: player.teamId,
           actorPlayerId: player.id,
         )) {
-          _logClientIgnore('pass_truco_rejected_by_local_state', message: message, fields: {
-            'targetPlayerId': player.id,
-            'teamId': player.teamId,
-          });
+          _logClientIgnore('pass_truco_rejected_by_local_state',
+              message: message,
+              fields: {
+                'targetPlayerId': player.id,
+                'teamId': player.teamId,
+              });
           return;
         }
         _updateState(() {
@@ -829,10 +839,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
           to: teammate,
           actorPlayerId: player.id,
         )) {
-          _logClientIgnore('pass_hand_rejected_by_local_state', message: message, fields: {
-            'fromPlayerId': player.id,
-            'toPlayerId': teammate.id,
-          });
+          _logClientIgnore('pass_hand_rejected_by_local_state',
+              message: message,
+              fields: {
+                'fromPlayerId': player.id,
+                'toPlayerId': teammate.id,
+              });
           return;
         }
         _updateState(() {
@@ -852,6 +864,9 @@ extension _GameScreenPlayLogic on _GameScreenState {
       case MultiplayerMessageType.continueRound:
         _updateState(() {
           _game.continueRound();
+          _activeStrategicSignals.removeWhere(
+            (signal) => signal.handVersion == _handVersion,
+          );
           _forceWinRequestedPlayerIds.clear();
           _isAutoPlaying = false;
           if (_currentPlayer.id == _humanPlayer.id) {
@@ -912,10 +927,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         _syncMultiplayerSessionFromSnapshot(snapshot);
         if (_shouldDelayMultiplayerBotSnapshot(snapshot)) {
-          _logClientApply('room_snapshot_delayed_for_bot_animation', message: message, fields: {
-            'snapshotPhase': snapshot.phase,
-            'roomId': snapshot.roomId,
-          });
+          _logClientApply('room_snapshot_delayed_for_bot_animation',
+              message: message,
+              fields: {
+                'snapshotPhase': snapshot.phase,
+                'roomId': snapshot.roomId,
+              });
           unawaited(_applyDelayedMultiplayerBotSnapshot(snapshot));
           return;
         }
@@ -962,12 +979,14 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (player == null ||
         player.id == _humanPlayer.id ||
         player.teamId != _humanPlayer.teamId) {
-      _logClientIgnore('signal_ignored_by_player_filter', message: message, fields: {
-        'resolvedPlayerId': player?.id,
-        'resolvedTeamId': player?.teamId,
-        'humanPlayerId': _humanPlayer.id,
-        'humanTeamId': _humanPlayer.teamId,
-      });
+      _logClientIgnore('signal_ignored_by_player_filter',
+          message: message,
+          fields: {
+            'resolvedPlayerId': player?.id,
+            'resolvedTeamId': player?.teamId,
+            'humanPlayerId': _humanPlayer.id,
+            'humanTeamId': _humanPlayer.teamId,
+          });
       return;
     }
 
@@ -1060,23 +1079,56 @@ extension _GameScreenPlayLogic on _GameScreenState {
 
   void _handleIncomingMultiplayerSignalRequest(MultiplayerMessage message) {
     final requester = _multiplayerPlayerById(message.playerId);
-    if (requester == null ||
-        requester.id == _humanPlayer.id ||
-        requester.teamId != _humanPlayer.teamId) {
-      _logClientIgnore('signal_request_ignored_by_player_filter', message: message, fields: {
-        'resolvedPlayerId': requester?.id,
-        'resolvedTeamId': requester?.teamId,
-      });
+    final localPlayerId =
+        MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
+    final localPlayer = _multiplayerPlayerById(localPlayerId) ?? _humanPlayer;
+    final receiverPlayerId = message.payload['receiverPlayerId']?.toString();
+    final requestId = message.payload['requestId']?.toString() ??
+        message.messageId ??
+        message.correlationId ??
+        '${message.playerId}-${DateTime.now().microsecondsSinceEpoch}';
+    final isRequestedLocalPlayer = requester != null &&
+        requester.id != localPlayer.id &&
+        requester.teamId == localPlayer.teamId &&
+        (receiverPlayerId == null ||
+            receiverPlayerId.isEmpty ||
+            receiverPlayerId == localPlayer.id);
+    ZapitiLogger.info('client_receive', 'signal_request_receive', fields: {
+      'sessionId': _sessionLifecycle.generation,
+      'roomId': message.roomId,
+      'senderPlayerId': message.playerId,
+      'receiverPlayerId': receiverPlayerId,
+      'localPlayerId': localPlayer.id,
+      'eventType': message.type.wireName,
+      'requestId': requestId,
+      'ts': DateTime.now().toIso8601String(),
+      'statusBefore': _companionPrivateSignalStatus,
+      'requestStatusBefore': _companionPrivateSignalRequestId,
+      'willShow': isRequestedLocalPlayer,
+    });
+    if (!isRequestedLocalPlayer) {
+      _logClientIgnore('signal_request_ignored_by_player_filter',
+          message: message,
+          fields: {
+            'resolvedPlayerId': requester?.id,
+            'resolvedTeamId': requester?.teamId,
+            'localPlayerId': localPlayer.id,
+            'localTeamId': localPlayer.teamId,
+            'receiverPlayerId': receiverPlayerId,
+            'requestId': requestId,
+          });
       return;
     }
 
     _updateState(() {
+      _isRequestingCompanionSignal = false;
       _setCompanionPrivateSignalStatus(
         context.tr(
           'playerAsksSignalShort',
           params: {'name': _localizedPlayerName(requester)},
         ),
         clearAfter: const Duration(seconds: 2),
+        requestId: requestId,
       );
       _status = context.tr(
         'playerAsksSignal',
@@ -1085,6 +1137,8 @@ extension _GameScreenPlayLogic on _GameScreenState {
     });
     _logClientApply('signal_request_applied', message: message, fields: {
       'requesterPlayerId': requester.id,
+      'receiverPlayerId': localPlayer.id,
+      'requestId': requestId,
       'stateAfter': _clientMatchStateFields(),
     });
   }
@@ -1163,6 +1217,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
   }
 
   void _applyMultiplayerRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
+    if (!_isMultiplayerMatch || !_sessionLifecycle.isActive) {
+      ZapitiLogger.warn('match', 'snapshot_ignored_stale_session', fields: {
+        'sessionId': _sessionLifecycle.generation,
+        'sessionPhase': _sessionLifecycle.phase.name,
+        'roomId': snapshot.roomId,
+        'phase': snapshot.phase,
+      });
+      return;
+    }
     _multiplayerSnapshotDelayGeneration += 1;
     MultiplayerSessionStore.instance.roomSnapshot = snapshot;
     final hasMatchData = snapshot.match != null;

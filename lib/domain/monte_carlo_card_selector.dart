@@ -6,7 +6,7 @@ import 'monte_carlo_difficulty_config.dart';
 import 'observable_game_state.dart';
 import 'player.dart';
 import 'possible_deal_sampler.dart';
-import 'signal_rules.dart';
+import 'signal_context.dart';
 import 'simulation_evaluator.dart';
 import 'simulation_game_engine.dart';
 import 'simulation_game_state.dart';
@@ -22,6 +22,11 @@ class ScoredCard {
 }
 
 class MonteCarloCardSelector {
+  static const _expectedValueWeight = 1.0;
+  static const _robustnessWeight = 0.24;
+  static const _riskPenaltyWeight = 0.18;
+  static const _opportunityCostWeight = 0.12;
+
   final PossibleDealSampler sampler;
   final SimulationStateFactory stateFactory;
   final SimulationGameEngine engine;
@@ -140,8 +145,46 @@ class MonteCarloCardSelector {
         .map((entry) => ScoredCard(entry.card, entry.meanScore))
         .toList()
       ..sort((a, b) => b.score.compareTo(a.score));
+    final orderAware = _orderAwareChoice(
+      botPlayerId: botPlayerId,
+      state: state,
+      scored: scored,
+    );
+    if (orderAware != null) return orderAware;
     final top = scored.take(config.topCandidateCount).toList();
     return top[random.nextInt(top.length)].card;
+  }
+
+  SpanishCard? _orderAwareChoice({
+    required String botPlayerId,
+    required ObservableGameState state,
+    required List<ScoredCard> scored,
+  }) {
+    if (scored.isEmpty) return null;
+    final bot = state.players.firstWhere((player) => player.id == botPlayerId);
+    final signalBias = _observableSignalBiasForPlayer(state, bot);
+    final bestScore = scored.first.score;
+    final tableStrength = BotTableRead.bestTableStrength(state.playedCards) ?? -1;
+
+    if (signalBias.mustWin) {
+      final winning = scored
+          .where((entry) => ZapitiRules.strength(entry.card) > tableStrength)
+          .toList()
+        ..sort((a, b) => BotStrategy.compareByStrength(a.card, b.card));
+      if (winning.isNotEmpty && winning.first.score >= bestScore - 60) {
+        return winning.first.card;
+      }
+    }
+
+    if (signalBias.conserveResources) {
+      final conservative = [...scored]
+        ..sort((a, b) => BotStrategy.compareByStrength(a.card, b.card));
+      if (conservative.first.score >= bestScore - 70) {
+        return conservative.first.card;
+      }
+    }
+
+    return null;
   }
 
   PossibleDealSampler _samplerForConfig(MonteCarloDifficultyConfig config) {
@@ -247,20 +290,23 @@ class MonteCarloCardSelector {
     final teamId = player.teamId;
     final opponentTeamId = TeamRules.opponentOf(teamId);
     final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(playedCards);
-    final teammateHasStrongSignal = _teamHasStrongSignal(
-      state,
-      teamId,
-      excludePlayerId: playerId,
-    );
-    final opponentHasStrongSignal = _teamHasStrongSignal(state, opponentTeamId);
+    final teammateHasStrongSignal = state.signalContext
+        .visibleToTeam(teamId)
+        .teamHasObservedStrongCardSignal(teamId);
+    final opponentHasStrongSignal = state.signalContext
+        .visibleToTeam(teamId)
+        .teamHasObservedStrongCardSignal(opponentTeamId);
+    final signalBias = _signalBiasForPlayer(state, player);
     final preserveStrongCards =
         currentWinningTeam == teamId ||
         teammateHasStrongSignal ||
+        signalBias.conserveResources ||
         (state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) ||
         profile.conservation >= 0.65;
     final forceWinIfPossible =
         (state.roundWins[opponentTeamId] ?? 0) > (state.roundWins[teamId] ?? 0) &&
-        (!teammateHasStrongSignal || profile.aggression >= 0.7);
+        (!teammateHasStrongSignal || profile.aggression >= 0.7) ||
+        signalBias.mustWin;
 
     final baseline = BotStrategy.chooseCard(
       player: player,
@@ -288,6 +334,12 @@ class MonteCarloCardSelector {
         .where((card) => ZapitiRules.strength(card) == bestStrength)
         .toList(growable: false);
 
+    if (signalBias.conserveResources && currentWinningTeam == teamId) {
+      return sorted.first;
+    }
+    if (signalBias.mustWin && winningCards.isNotEmpty) {
+      return winningCards.first;
+    }
     if (profile.cooperation >= 0.75 &&
         currentWinningTeam == teamId &&
         sorted.isNotEmpty) {
@@ -404,6 +456,15 @@ class MonteCarloCardSelector {
       mix(state.cardsRemainingByPlayerId[player.id] ?? 0);
       mix(state.roundWins[player.teamId] ?? 0);
     }
+    mix(state.trickIndex);
+    for (final signal in state.signalContext.signals) {
+      mix(signal.type.index);
+      mix(signal.issuerPlayerId.hashCode);
+      mix(signal.targetPlayerId?.hashCode ?? 0);
+      mix(signal.teamId);
+      mix(signal.trickIndex);
+      mix(signal.active ? 1 : 0);
+    }
     return hash & 0x3fffffff;
   }
 
@@ -433,7 +494,16 @@ class MonteCarloCardSelector {
     mix(state.currentPlayerId.hashCode);
     mix(state.trickLeaderId.hashCode);
     mix(state.roundNumber);
+    mix(state.trickIndex);
     mix(state.isHandFinished ? 1 : 0);
+    for (final signal in state.signalContext.signals) {
+      mix(signal.type.index);
+      mix(signal.issuerPlayerId.hashCode);
+      mix(signal.targetPlayerId?.hashCode ?? 0);
+      mix(signal.teamId);
+      mix(signal.trickIndex);
+      mix(signal.active ? 1 : 0);
+    }
     for (final player in state.players) {
       mix(player.player.id.hashCode);
       for (final card in player.hand) {
@@ -488,11 +558,13 @@ class MonteCarloCardSelector {
     final isLastToPlay = state.playedCards.length == state.players.length - 1;
     final canBeatTable = cardStrength > bestStrength;
     final canTieTable = cardStrength == bestStrength;
+    final signalBias = _observableSignalBiasForPlayer(state, bot);
 
     if (currentWinningTeam == teamId) {
       var bonus = 48 - cardStrength * 0.55;
       if (isLastToPlay) bonus += 10;
       if (teammateStillToPlay) bonus += 4;
+      if (signalBias.conserveResources) bonus += 34 - cardStrength * 0.35;
       return bonus;
     }
 
@@ -502,10 +574,21 @@ class MonteCarloCardSelector {
           : 34 - cardStrength * 0.42;
       if (isLastToPlay) bonus += 8;
       if (teammateStillToPlay) bonus += 5;
+      if (signalBias.mustWin && canBeatTable) {
+        bonus += 116 - cardStrength * 0.72;
+      } else if (signalBias.conserveResources) {
+        bonus += canBeatTable ? -cardStrength * 0.34 : 22;
+      }
       return bonus;
     }
 
     var bonus = 0.0;
+    if (signalBias.conserveResources) {
+      bonus += 22 - cardStrength * 0.24;
+    }
+    if (signalBias.mustWin && canBeatTable) {
+      bonus += 80 - cardStrength * 0.48;
+    }
     if (teammateStillToPlay) {
       bonus += 10 - cardStrength * 0.08;
     }
@@ -646,20 +729,53 @@ class MonteCarloCardSelector {
     return false;
   }
 
-  bool _teamHasStrongSignal(
-    SimulationGameState state,
-    int teamId, {
-    String? excludePlayerId,
+  _SignalBias _signalBiasForPlayer(SimulationGameState state, Player player) {
+    return _signalBiasFromContext(
+      state.signalContext,
+      player: player,
+      trickIndex: state.trickIndex,
+    );
+  }
+
+  _SignalBias _observableSignalBiasForPlayer(
+    ObservableGameState state,
+    Player player,
+  ) {
+    return _signalBiasFromContext(
+      state.signalContext,
+      player: player,
+      trickIndex: state.trickIndex,
+    );
+  }
+
+  _SignalBias _signalBiasFromContext(
+    SignalContext signalContext, {
+    required Player player,
+    required int trickIndex,
   }) {
-    for (final entry in state.players) {
-      final player = entry.player;
-      if (player.teamId != teamId) continue;
-      if (excludePlayerId != null && player.id == excludePlayerId) continue;
-      if (SignalRules.isStrongSignal(SignalRules.signalForHand(entry.hand))) {
-        return true;
+    var conserve = false;
+    var mustWin = false;
+    for (final signal in signalContext.activeForPlayer(
+      playerId: player.id,
+      playerTeamId: player.teamId,
+      trickIndex: trickIndex,
+    )) {
+      switch (signal.type) {
+        case StrategicSignalType.venAMi:
+        case StrategicSignalType.voyATi:
+          conserve = true;
+          break;
+        case StrategicSignalType.mata:
+          mustWin = true;
+          break;
+        case StrategicSignalType.cardSignal:
+          break;
       }
     }
-    return false;
+    return _SignalBias(
+      conserveResources: conserve,
+      mustWin: mustWin,
+    );
   }
 }
 
@@ -677,11 +793,37 @@ class _CardAggregate {
   void record(double value) {
     rolloutTotal += value;
     rolloutCount += 1;
+    if (value < worstScore) worstScore = value;
+    if (value > bestScore) bestScore = value;
+    values.add(value);
   }
 
   double get meanScore {
     if (rolloutCount == 0) return prior;
-    return prior + (rolloutTotal / rolloutCount);
+    final mean = rolloutTotal / rolloutCount;
+    final variance = values.fold<double>(
+          0,
+          (sum, value) => sum + (value - mean) * (value - mean),
+        ) /
+        rolloutCount;
+    final robustFloor = percentile(0.25);
+    final opportunityCost = BotStrategy.strengthOf(card).toDouble();
+    return prior +
+        mean * MonteCarloCardSelector._expectedValueWeight +
+        robustFloor * MonteCarloCardSelector._robustnessWeight -
+        variance.sqrt() * MonteCarloCardSelector._riskPenaltyWeight -
+        opportunityCost * MonteCarloCardSelector._opportunityCostWeight;
+  }
+
+  double worstScore = double.infinity;
+  double bestScore = double.negativeInfinity;
+  final List<double> values = [];
+
+  double percentile(double ratio) {
+    if (values.isEmpty) return 0;
+    final sorted = [...values]..sort();
+    final index = ((sorted.length - 1) * ratio).round();
+    return sorted[index];
   }
 }
 
@@ -694,5 +836,21 @@ class _RolloutProfile {
     this.aggression = 0.5,
     this.conservation = 0.5,
     this.cooperation = 0.5,
+  });
+}
+
+extension on double {
+  double sqrt() => sqrtValue(this);
+}
+
+double sqrtValue(double value) => value <= 0 ? 0 : sqrt(value);
+
+class _SignalBias {
+  final bool conserveResources;
+  final bool mustWin;
+
+  const _SignalBias({
+    required this.conserveResources,
+    required this.mustWin,
   });
 }

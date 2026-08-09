@@ -101,6 +101,102 @@ void main() {
     expect(gameState.gameController.humanPlayerId, 'p1');
   });
 
+  testWidgets(
+      'multijugador remoto al salir no contamina manos de la partida offline',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.simulateActiveRemoteMultiplayerMatchForTesting();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EMPEZAR PARTIDA'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['isMultiplayerMatch'], isFalse);
+    expect(snapshot['players'], ['p1', 'p2', 'p3', 'p4']);
+    expect(snapshot['controllerPlayers'], ['p1', 'p2', 'p3', 'p4']);
+    expect(snapshot['humanPlayerId'], 'p1');
+    expect(snapshot['roomId'], isNull);
+    expect(snapshot['localGamePlayerId'], isNull);
+    expect(snapshot['hasSocket'], isFalse);
+    expect(snapshot['controlledPlayerIds'], ['p1']);
+    expect(snapshot['activeSignals'], 0);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['cardsRemaining'], {
+      'p1': 3,
+      'p2': 3,
+      'p3': 3,
+      'p4': 3,
+    });
+    expect(
+      (snapshot['hands'] as Map).keys.any(
+            (key) => key.toString().startsWith('player_remote_'),
+          ),
+      isFalse,
+    );
+  });
+
+  testWidgets('pedir senas multijugador es privado y repetible',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareMultiplayerSignalRequestScenarioForTesting(
+      localPlayerId: 'player_b',
+    );
+    await tester.pump();
+
+    for (var i = 1; i <= 5; i += 1) {
+      final requestId = 'req_$i';
+      gameState.simulateIncomingSignalRequestForTesting(
+        senderPlayerId: 'player_a',
+        receiverPlayerId: 'player_b',
+        requestId: requestId,
+      );
+      await tester.pump();
+
+      expect(gameState.companionPrivateSignalStatusForTesting,
+          'Jugador A te pide seña');
+      expect(gameState.companionPrivateSignalRequestIdForTesting, requestId);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+    }
+
+    gameState.prepareMultiplayerSignalRequestScenarioForTesting(
+      localPlayerId: 'player_a',
+    );
+    gameState.simulateIncomingSignalRequestForTesting(
+      senderPlayerId: 'player_a',
+      receiverPlayerId: 'player_b',
+      requestId: 'sender_should_ignore',
+    );
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+
+    gameState.prepareMultiplayerSignalRequestScenarioForTesting(
+      localPlayerId: 'player_c',
+    );
+    gameState.simulateIncomingSignalRequestForTesting(
+      senderPlayerId: 'player_a',
+      receiverPlayerId: 'player_b',
+      requestId: 'rival_should_ignore',
+    );
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+  });
+
   testWidgets('menu principal abre tutorial y opciones', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
@@ -919,6 +1015,37 @@ void main() {
     expect(find.text('TUTORIAL'), findsOneWidget);
     expect(find.text('OPCIONES'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dialogo de salir de partida usa el idioma seleccionado',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('PLAY'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('START MATCH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PLAY'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('BACK'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Leave match'), findsOneWidget);
+    expect(find.text('Salir de la partida'), findsNothing);
+    expect(find.text('CANCEL'), findsOneWidget);
+    expect(find.text('EXIT'), findsWidgets);
   });
 
   testWidgets('muestra la decision al ver para el equipo humano',

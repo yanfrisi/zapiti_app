@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/bot_al_ver_strategy.dart';
+import '../domain/bot_agent_difficulty.dart';
 import '../domain/bot_bluff_strategy.dart';
 import '../domain/bot_table_read.dart';
 import '../domain/bot_truco_raise_strategy.dart';
@@ -25,6 +26,7 @@ import '../domain/limited_history.dart';
 import '../domain/played_card.dart';
 import '../domain/player.dart';
 import '../domain/round_result.dart';
+import '../domain/signal_context.dart';
 import '../domain/signal_rules.dart';
 import '../domain/spanish_card.dart';
 import '../domain/suit.dart';
@@ -38,6 +40,7 @@ import '../l10n/zapiti_localizations.dart';
 import '../services/app_version_check_service.dart';
 import '../services/account_privacy_service.dart';
 import '../services/game_preferences_store.dart';
+import '../services/game_session_lifecycle.dart';
 import '../services/multiplayer_session_store.dart';
 import '../services/zapiti_game_socket.dart';
 import '../services/zapiti_logger.dart';
@@ -157,15 +160,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final Map<int, String> _knownSignalsByTeam = {};
   final Map<int, String> _teamSignalsByTeam = {};
   final Map<int, String> _opponentSignalsSeenByTeam = {};
+  final List<StrategicSignal> _activeStrategicSignals = [];
   final Set<String> _playersSignaledThisHand = {};
   final Set<String> _forceWinRequestedPlayerIds = {};
   final Set<String> _forceHighestRequestedPlayerIds = {};
   final Set<String> _forceLowestRequestedPlayerIds = {};
   final Set<int> _aiTeamsConsideredTrucoThisHand = {};
   String? _companionPrivateSignalStatus;
+  String? _companionPrivateSignalRequestId;
+  int _localSignalRequestSequence = 0;
   Timer? _companionPrivateSignalTimer;
   Random _random = Random();
   final GamePreferencesStore _preferencesStore = const GamePreferencesStore();
+  final GameSessionLifecycle _sessionLifecycle = GameSessionLifecycle();
   final ZapitiMusicPlayer _musicPlayer = ZapitiMusicPlayer();
   final Map<String, String> _characterIdsByPlayer = {
     for (final player in _defaultPlayers) player.id: player.id,
@@ -282,6 +289,113 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @visibleForTesting
+  void simulateActiveRemoteMultiplayerMatchForTesting() {
+    const remotePlayers = [
+      Player(id: 'player_remote_a', name: 'Remoto A', teamId: 1),
+      Player(id: 'player_remote_b', name: 'Remoto B', teamId: 2),
+      Player(id: 'player_remote_c', name: 'Remoto C', teamId: 1),
+      Player(id: 'player_remote_d', name: 'Remoto D', teamId: 2),
+    ];
+    _updateState(() {
+      _isMultiplayerMatch = true;
+      _multiplayerPlayers = remotePlayers;
+      _controlledHumanPlayerIds = {'player_remote_a'};
+      _game = ZapitiGameController(
+        targetScore: _targetScore,
+        players: remotePlayers,
+        humanPlayerId: 'player_remote_a',
+        authorizedTrucoPlayerIds: remotePlayers.map((player) => player.id),
+        autoStart: false,
+      );
+      _startNewHand();
+      _showMainMenu = true;
+      _showCharacterSelection = false;
+      _showDifficultySelection = false;
+      _multiplayerMatchCanceled = false;
+    });
+  }
+
+  @visibleForTesting
+  Map<String, Object?> offlineRuntimeSnapshotForTesting() {
+    return {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'players': _players.map((player) => player.id).toList(),
+      'controllerPlayers': _game.players.map((player) => player.id).toList(),
+      'humanPlayerId': _game.humanPlayer.id,
+      'hands': {
+        for (final entry in _game.hands.entries) entry.key: entry.value.length,
+      },
+      'cardsRemaining': {
+        for (final player in _players) player.id: _hands[player.id]?.length ?? 0,
+      },
+      'roomId': MultiplayerSessionStore.instance.activeRoomId,
+      'localGamePlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'hasSocket': MultiplayerSessionStore.instance.socket != null,
+      'controlledPlayerIds': _controlledHumanPlayerIds.toList(),
+      'activeSignals': _activeStrategicSignals.length,
+      'pendingOrders': _forceWinRequestedPlayerIds.length +
+          _forceHighestRequestedPlayerIds.length +
+          _forceLowestRequestedPlayerIds.length,
+    };
+  }
+
+  @visibleForTesting
+  void prepareMultiplayerSignalRequestScenarioForTesting({
+    required String localPlayerId,
+  }) {
+    const players = [
+      Player(id: 'player_a', name: 'Jugador A', teamId: 1),
+      Player(id: 'player_b', name: 'Jugador B', teamId: 1),
+      Player(id: 'player_c', name: 'Rival C', teamId: 2),
+      Player(id: 'player_d', name: 'Rival D', teamId: 2),
+    ];
+    MultiplayerSessionStore.instance.localGamePlayerId = localPlayerId;
+    MultiplayerSessionStore.instance.reconnectRoomId = 'ROOM_TEST';
+    _updateState(() {
+      _isMultiplayerMatch = true;
+      _multiplayerPlayers = players;
+      _controlledHumanPlayerIds = {localPlayerId};
+      _game = ZapitiGameController(
+        targetScore: _targetScore,
+        players: players,
+        humanPlayerId: localPlayerId,
+        authorizedTrucoPlayerIds: players.map((player) => player.id),
+        autoStart: false,
+      );
+      _beginGameSession('multiplayer');
+      _startNewHand();
+    });
+  }
+
+  @visibleForTesting
+  void simulateIncomingSignalRequestForTesting({
+    required String senderPlayerId,
+    String? receiverPlayerId,
+    required String requestId,
+  }) {
+    _handleIncomingMultiplayerSignalRequest(
+      MultiplayerMessage(
+        type: MultiplayerMessageType.requestSignal,
+        roomId: 'ROOM_TEST',
+        playerId: senderPlayerId,
+        messageId: requestId,
+        payload: {
+          'requestId': requestId,
+          if (receiverPlayerId != null) 'receiverPlayerId': receiverPlayerId,
+        },
+      ),
+    );
+  }
+
+  @visibleForTesting
+  String? get companionPrivateSignalStatusForTesting =>
+      _companionPrivateSignalStatus;
+
+  @visibleForTesting
+  String? get companionPrivateSignalRequestIdForTesting =>
+      _companionPrivateSignalRequestId;
+
+  @visibleForTesting
   Future<void> showAlVerDecisionDialogForTesting() async {
     final teamId = _game.alVerTeamId;
     if (teamId == null) return;
@@ -385,18 +499,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _setCompanionPrivateSignalStatus(
     String? value, {
     Duration? clearAfter,
+    String? requestId,
   }) {
     _companionPrivateSignalTimer?.cancel();
     _companionPrivateSignalTimer = null;
     _companionPrivateSignalStatus = value;
+    _companionPrivateSignalRequestId = requestId;
     if (value == null || clearAfter == null) {
       return;
     }
     _companionPrivateSignalTimer = Timer(clearAfter, () {
       if (!mounted) return;
       _updateState(() {
-        if (_companionPrivateSignalStatus == value) {
+        if (_companionPrivateSignalStatus == value &&
+            _companionPrivateSignalRequestId == requestId) {
           _companionPrivateSignalStatus = null;
+          _companionPrivateSignalRequestId = null;
         }
         _companionPrivateSignalTimer = null;
       });
@@ -434,7 +552,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
     if (socket == null || !socket.isConnected || roomId == null) return;
 
-    socket.requestSignal(roomId: roomId, playerId: playerId);
+    final requestId =
+        '${_sessionLifecycle.generation}-${++_localSignalRequestSequence}';
+    ZapitiLogger.info('client_send', 'signal_request_send', fields: {
+      'sessionId': _sessionLifecycle.generation,
+      'roomId': roomId,
+      'senderPlayerId': playerId,
+      'receiverPlayerId': _companionPlayer.id,
+      'eventType': MultiplayerMessageType.requestSignal.wireName,
+      'requestId': requestId,
+      'ts': DateTime.now().toIso8601String(),
+      'isRequestingBefore': _isRequestingCompanionSignal,
+    });
+    socket.requestSignal(
+      roomId: roomId,
+      playerId: playerId,
+      requestId: requestId,
+      receiverPlayerId: _companionPlayer.id,
+    );
   }
 
   @override
@@ -492,12 +627,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final timer in _playerMessageTimers.values) {
-      timer.cancel();
-    }
-    _playerMessageTimers.clear();
-    _companionPrivateSignalTimer?.cancel();
-    _turnCountdownTimer?.cancel();
+    _endCurrentGameSession(reason: 'game_screen_dispose', notifyLeave: false);
     _musicPlayer.dispose();
     super.dispose();
   }
@@ -526,6 +656,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final label = context.tr('voyATi');
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, label);
+      _recordStrategicSignal(
+        type: StrategicSignalType.voyATi,
+        issuer: _humanPlayer,
+        targetPlayerId: _humanPlayer.id,
+        label: label,
+      );
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceWinRequestedPlayerIds.add(_companionPlayer.id);
@@ -540,6 +676,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final label = context.tr('comeToMe');
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, label);
+      _recordStrategicSignal(
+        type: StrategicSignalType.venAMi,
+        issuer: _humanPlayer,
+        targetPlayerId: _companionPlayer.id,
+        label: label,
+      );
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceLowestRequestedPlayerIds.add(_companionPlayer.id);
@@ -558,9 +700,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final label = context.tr('kill');
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, label);
+      _recordStrategicSignal(
+        type: StrategicSignalType.mata,
+        issuer: _humanPlayer,
+        targetPlayerId: _companionPlayer.id,
+        label: label,
+      );
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
-        _forceHighestRequestedPlayerIds.add(_companionPlayer.id);
+        _forceWinRequestedPlayerIds.add(_companionPlayer.id);
       }
       _status = context.tr(
         'askCompanionKill',

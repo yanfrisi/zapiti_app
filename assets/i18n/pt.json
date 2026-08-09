@@ -332,6 +332,7 @@
   "multiplayerProfileCreateFailed": "Não foi possível criar o utilizador. Tenta novamente.",
   "multiplayerProfileLoginInProgress": "A iniciar sessão...",
   "multiplayerProfileLoginFailed": "Não foi possível iniciar sessão. Tenta novamente.",
+  "multiplayerProfilePasswordIncorrect": "A palavra-passe não está correta para esse utilizador.",
   "multiplayerProfileReviewCredentials": "Revê o utilizador, o nome e a palavra-passe.",
   "multiplayerCopyInvitationPrompt": "Cria ou escreve uma sala antes de copiar uma convocatória.",
   "multiplayerInvitationCopied": "Convocatória copiada: {room}.",

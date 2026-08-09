@@ -73,6 +73,9 @@ class DefaultSimulationStateFactory implements SimulationStateFactory {
       roundNumber: 1,
       isRoundFinished: false,
       isHandFinished: false,
+      signalContext: observableState.signalContext,
+      handVersion: observableState.handVersion,
+      trickIndex: observableState.trickIndex,
     );
   }
 }

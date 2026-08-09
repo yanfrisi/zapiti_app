@@ -549,16 +549,25 @@ class GameSocket {
   void requestSignal({
     required String roomId,
     required String playerId,
+    required String requestId,
+    String? receiverPlayerId,
   }) {
     send(MultiplayerMessage(
       type: MultiplayerMessageType.requestSignal,
       roomId: roomId,
       playerId: playerId,
+      payload: {
+        'requestId': requestId,
+        if (receiverPlayerId != null) 'receiverPlayerId': receiverPlayerId,
+      },
     ));
   }
 
   void close() {
     ZapitiLogger.info('socket', 'close', fields: {'url': url});
+    onMessage = null;
+    onError = null;
+    onDone = null;
     _subscription?.cancel();
     _subscription = null;
     _channel?.sink.close();

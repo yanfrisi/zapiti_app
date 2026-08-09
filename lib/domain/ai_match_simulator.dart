@@ -75,6 +75,7 @@ class AiSimulationSummary {
   final int totalVenAMiProtectedRounds;
   final int totalTeamOneScore;
   final int totalTeamTwoScore;
+  final List<int> decisionMicros;
 
   const AiSimulationSummary({
     required this.config,
@@ -96,6 +97,7 @@ class AiSimulationSummary {
     required this.totalVenAMiProtectedRounds,
     required this.totalTeamOneScore,
     required this.totalTeamTwoScore,
+    this.decisionMicros = const [],
   });
 
   int get playedMatches => teamOneWins + teamTwoWins;
@@ -119,6 +121,13 @@ class AiSimulationSummary {
       playedMatches == 0 ? 0 : totalTeamOneScore / playedMatches;
   double get averageFinalScoreTeamTwo =>
       playedMatches == 0 ? 0 : totalTeamTwoScore / playedMatches;
+  double get averageDecisionMicros => decisionMicros.isEmpty
+      ? 0
+      : decisionMicros.fold<int>(0, (sum, value) => sum + value) /
+          decisionMicros.length;
+  int get p50DecisionMicros => _percentileDecisionMicros(0.50);
+  int get p95DecisionMicros => _percentileDecisionMicros(0.95);
+  int get p99DecisionMicros => _percentileDecisionMicros(0.99);
   double get signalGiveRate => totalSignalOpportunities == 0
       ? 0
       : totalSignalsGiven / totalSignalOpportunities;
@@ -127,6 +136,13 @@ class AiSimulationSummary {
   double get venAMiProtectionRate => totalVenAMiOrders == 0
       ? 0
       : totalVenAMiProtectedRounds / totalVenAMiOrders;
+
+  int _percentileDecisionMicros(double ratio) {
+    if (decisionMicros.isEmpty) return 0;
+    final sorted = [...decisionMicros]..sort();
+    final index = ((sorted.length - 1) * ratio).round();
+    return sorted[index];
+  }
 
   static AiSimulationSummary combine(
     AiSimulationConfig config,
@@ -150,6 +166,7 @@ class AiSimulationSummary {
     var totalVenAMiProtectedRounds = 0;
     var totalTeamOneScore = 0;
     var totalTeamTwoScore = 0;
+    final decisionMicros = <int>[];
 
     for (final summary in summaries) {
       teamOneWins += summary.teamOneWins;
@@ -170,6 +187,7 @@ class AiSimulationSummary {
       totalVenAMiProtectedRounds += summary.totalVenAMiProtectedRounds;
       totalTeamOneScore += summary.totalTeamOneScore;
       totalTeamTwoScore += summary.totalTeamTwoScore;
+      decisionMicros.addAll(summary.decisionMicros);
     }
 
     return AiSimulationSummary(
@@ -192,6 +210,7 @@ class AiSimulationSummary {
       totalVenAMiProtectedRounds: totalVenAMiProtectedRounds,
       totalTeamOneScore: totalTeamOneScore,
       totalTeamTwoScore: totalTeamTwoScore,
+      decisionMicros: List.unmodifiable(decisionMicros),
     );
   }
 }
@@ -218,6 +237,7 @@ class AiMatchSimulator {
     var totalVenAMiProtectedRounds = 0;
     var totalTeamOneScore = 0;
     var totalTeamTwoScore = 0;
+    final decisionMicros = <int>[];
 
     for (var index = 0; index < config.matches; index++) {
       final result = _runMatch(
@@ -248,6 +268,7 @@ class AiMatchSimulator {
       totalVenAMiProtectedRounds += result.venAMiProtectedRounds;
       totalTeamOneScore += result.finalScoreTeamOne;
       totalTeamTwoScore += result.finalScoreTeamTwo;
+      decisionMicros.addAll(result.decisionMicros);
     }
 
     return AiSimulationSummary(
@@ -270,6 +291,7 @@ class AiMatchSimulator {
       totalVenAMiProtectedRounds: totalVenAMiProtectedRounds,
       totalTeamOneScore: totalTeamOneScore,
       totalTeamTwoScore: totalTeamTwoScore,
+      decisionMicros: List.unmodifiable(decisionMicros),
     );
   }
 
@@ -320,6 +342,7 @@ class AiMatchSimulator {
       voyATiRequests: metrics.voyATiRequests,
       venAMiOrders: metrics.venAMiOrders,
       venAMiProtectedRounds: metrics.venAMiProtectedRounds,
+      decisionMicros: List.unmodifiable(metrics.decisionMicros),
     );
   }
 
@@ -352,7 +375,10 @@ class AiMatchSimulator {
         continue;
       }
 
+      final watch = Stopwatch()..start();
       final card = _chooseCard(controller, config, random, player, metrics);
+      watch.stop();
+      metrics.decisionMicros.add(watch.elapsedMicroseconds);
       final roundCompleted = controller.playCard(player, card);
       if (roundCompleted) {
         controller.resolveRound();
@@ -874,6 +900,7 @@ class _SimulationMetrics {
   int voyATiRequests = 0;
   int venAMiOrders = 0;
   int venAMiProtectedRounds = 0;
+  final List<int> decisionMicros = [];
 }
 
 class _SimulatedMatchResult {
@@ -894,6 +921,7 @@ class _SimulatedMatchResult {
   final int voyATiRequests;
   final int venAMiOrders;
   final int venAMiProtectedRounds;
+  final List<int> decisionMicros;
 
   const _SimulatedMatchResult({
     required this.winningTeamId,
@@ -913,5 +941,6 @@ class _SimulatedMatchResult {
     required this.voyATiRequests,
     required this.venAMiOrders,
     required this.venAMiProtectedRounds,
+    required this.decisionMicros,
   });
 }

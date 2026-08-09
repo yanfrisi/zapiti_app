@@ -2,6 +2,7 @@ import 'bet_state.dart';
 import 'played_card.dart';
 import 'player.dart';
 import 'round_result.dart';
+import 'signal_context.dart';
 import 'spanish_card.dart';
 
 class SimulationPlayerState {
@@ -24,6 +25,9 @@ class SimulationGameState {
   final int roundNumber;
   final bool isRoundFinished;
   final bool isHandFinished;
+  final SignalContext signalContext;
+  final int handVersion;
+  final int trickIndex;
 
   const SimulationGameState({
     required this.players,
@@ -38,6 +42,9 @@ class SimulationGameState {
     required this.roundNumber,
     required this.isRoundFinished,
     required this.isHandFinished,
+    this.signalContext = SignalContext.empty,
+    this.handVersion = 0,
+    this.trickIndex = 0,
   });
 
   SimulationPlayerState playerState(String playerId) => players.firstWhere(
