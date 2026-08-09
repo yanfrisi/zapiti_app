@@ -4,12 +4,14 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../domain/spanish_card.dart';
+import 'zapiti_logger.dart';
 import 'zapiti_multiplayer_protocol.dart';
 
 class GameSocket {
   final String url;
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
+  int _messageCounter = 0;
 
   void Function(MultiplayerMessage message)? onMessage;
   void Function(Object error)? onError;
@@ -22,39 +24,137 @@ class GameSocket {
   Future<void> connect({
     Duration timeout = const Duration(seconds: 20),
   }) async {
+    ZapitiLogger.info('socket', 'connect_attempt', fields: {
+      'url': url,
+      'timeoutMs': timeout.inMilliseconds,
+    });
     final channel = WebSocketChannel.connect(Uri.parse(url));
     try {
       await channel.ready.timeout(timeout);
       _channel = channel;
+      ZapitiLogger.info('socket', 'connect_success', fields: {'url': url});
       _subscription = channel.stream.listen(
         (event) {
-          final payload =
-              jsonDecode(event is String ? event : event.toString());
-          if (payload is Map<String, dynamic>) {
-            onMessage?.call(MultiplayerMessage.fromJson(payload));
+          try {
+            final rawEvent = event is String ? event : event.toString();
+            ZapitiLogger.debug('socket', 'message_raw_in', fields: {
+              'url': url,
+              'size': rawEvent.length,
+              'preview': rawEvent.length > 400
+                  ? '${rawEvent.substring(0, 400)}...'
+                  : rawEvent,
+            });
+            final payload = jsonDecode(rawEvent);
+            if (payload is Map<String, dynamic>) {
+              final message = MultiplayerMessage.fromJson(payload);
+              ZapitiLogger.info('socket', 'message_parsed_in', fields: {
+                'url': url,
+                'type': message.type.wireName,
+                'roomId': message.roomId,
+                'playerId': message.playerId,
+                'messageId': message.messageId,
+                'correlationId': message.correlationId,
+                'payload': message.payload,
+                'payloadKeys': message.payload.keys.toList(),
+              });
+              onMessage?.call(message);
+            }
+          } catch (error, stackTrace) {
+            ZapitiLogger.error(
+              'socket',
+              'message_decode_failed',
+              error: error,
+              stackTrace: stackTrace,
+              fields: {'url': url},
+            );
+            onError?.call(error);
           }
         },
         onError: (error) {
+          ZapitiLogger.error(
+            'socket',
+            'stream_error',
+            error: error,
+            fields: {'url': url},
+          );
           onError?.call(error);
           _channel = null;
         },
         onDone: () {
+          ZapitiLogger.warn('socket', 'stream_done', fields: {'url': url});
           onDone?.call();
           _channel = null;
         },
         cancelOnError: true,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ZapitiLogger.error(
+        'socket',
+        'connect_failed',
+        error: error,
+        stackTrace: stackTrace,
+        fields: {'url': url},
+      );
       await channel.sink.close();
       rethrow;
     }
   }
 
   void send(MultiplayerMessage message) {
+    final normalizedMessage = _ensureMessageIds(message);
     if (_channel == null) {
-      throw StateError('No hay conexión con la partida.');
+      ZapitiLogger.warn('socket', 'send_without_connection', fields: {
+        'type': normalizedMessage.type.wireName,
+        'roomId': normalizedMessage.roomId,
+        'playerId': normalizedMessage.playerId,
+        'messageId': normalizedMessage.messageId,
+        'correlationId': normalizedMessage.correlationId,
+      });
+      throw StateError('No hay conexion con la partida.');
     }
-    _channel!.sink.add(jsonEncode(message.toJson()));
+    try {
+      final encoded = jsonEncode(normalizedMessage.toJson());
+      ZapitiLogger.info('socket', 'message_out', fields: {
+        'url': url,
+        'type': normalizedMessage.type.wireName,
+        'roomId': normalizedMessage.roomId,
+        'playerId': normalizedMessage.playerId,
+        'messageId': normalizedMessage.messageId,
+        'correlationId': normalizedMessage.correlationId,
+        'payload': normalizedMessage.payload,
+        'payloadKeys': normalizedMessage.payload.keys.toList(),
+        'size': encoded.length,
+      });
+      _channel!.sink.add(encoded);
+    } catch (error, stackTrace) {
+      ZapitiLogger.error(
+        'socket',
+        'send_failed',
+        error: error,
+        stackTrace: stackTrace,
+        fields: {
+          'url': url,
+          'type': normalizedMessage.type.wireName,
+          'roomId': normalizedMessage.roomId,
+          'playerId': normalizedMessage.playerId,
+          'messageId': normalizedMessage.messageId,
+          'correlationId': normalizedMessage.correlationId,
+        },
+      );
+      _channel = null;
+      onError?.call(error);
+    }
+  }
+
+  MultiplayerMessage _ensureMessageIds(MultiplayerMessage message) {
+    final messageId =
+        message.messageId ??
+        'cli_${DateTime.now().microsecondsSinceEpoch}_${_messageCounter++}';
+    final correlationId = message.correlationId ?? messageId;
+    return message.copyWith(
+      messageId: messageId,
+      correlationId: correlationId,
+    );
   }
 
   void createRoom({
@@ -458,6 +558,7 @@ class GameSocket {
   }
 
   void close() {
+    ZapitiLogger.info('socket', 'close', fields: {'url': url});
     _subscription?.cancel();
     _subscription = null;
     _channel?.sink.close();

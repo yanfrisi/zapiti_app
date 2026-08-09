@@ -234,7 +234,7 @@
   "guidedScenario8Instruction": "Te cantan truco y no tienes con qué pelear. Pasa para perder menos.",
   "guidedScenario8Success": "Correcto: pasar a tiempo también es jugar bien.",
   "multiplayerLobbyTitle": "Lobby multijugador",
-  "multiplayerLobbyBody": "Crea una sala o únete con un código. Cuando haya cuatro jugadores listos, empieza la partida.",
+  "multiplayerLobbyBody": "Crea una sala o únete con un código. Cuando haya al menos dos jugadores listos, la partida puede empezar y completar la mesa con bots si hace falta.",
   "defaultPlayerName": "Jugador",
   "multiplayerReadyToConnect": "Prepara una sala para conectar a amigos.",
   "multiplayerProfileSetup": "Configura tu perfil multijugador.",

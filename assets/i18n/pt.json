@@ -219,7 +219,7 @@
   "tutorialCorrect": "Correto",
   "tutorialWrong": "Quase",
   "multiplayerLobbyTitle": "Lobby multijogador",
-  "multiplayerLobbyBody": "Cria uma sala ou entra com um código. Quando houver quatro jogadores prontos, a partida começa.",
+  "multiplayerLobbyBody": "Cria uma sala ou entra com um código. Quando houver pelo menos dois jogadores prontos, a partida pode começar e os bots podem completar os lugares em falta, se preciso.",
   "defaultPlayerName": "Jogador",
   "multiplayerReadyToConnect": "Prepara uma sala para te ligares a amigos.",
   "multiplayerProfileSetup": "Configura o teu perfil multijogador.",

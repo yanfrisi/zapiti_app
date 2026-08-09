@@ -1,6 +1,67 @@
 part of 'game_screen.dart';
 
 extension _GameScreenPlayLogic on _GameScreenState {
+  Map<String, Object?> _multiplayerMessageFields(MultiplayerMessage message) {
+    return {
+      'type': message.type.wireName,
+      'roomId': message.roomId,
+      'playerId': message.playerId,
+      'messageId': message.messageId,
+      'correlationId': message.correlationId,
+      'payload': message.payload,
+      'stateVersion': _multiplayerStateVersion,
+      'handSequence': _multiplayerServerHandSequence,
+      'currentPlayerId': _currentPlayer.id,
+    };
+  }
+
+  Map<String, Object?> _clientMatchStateFields() {
+    return {
+      'stateVersion': _multiplayerStateVersion,
+      'handSequence': _multiplayerServerHandSequence,
+      'turnIndex': _game.turnIndex,
+      'leadIndex': _game.leadIndex,
+      'nextLeadIndex': _game.nextLeadIndex,
+      'currentPlayerId': _currentPlayer.id,
+      'playedCards': [
+        for (final played in _playedCards)
+          {
+            'playerId': played.player.id,
+            'card': cardToJson(played.card),
+          },
+      ],
+      'score': _score,
+      'roundWins': _roundWins,
+      'handValue': _handValue,
+      'pendingTrucoValue': _pendingTrucoValue,
+      'isRoundAwaitingContinue': _isRoundAwaitingContinue,
+      'handFinished': _handFinished,
+      'status': _status,
+    };
+  }
+
+  void _logClientIgnore(
+    String event, {
+    MultiplayerMessage? message,
+    Map<String, Object?> fields = const {},
+  }) {
+    ZapitiLogger.warn('client_ignore', event, fields: {
+      if (message != null) ..._multiplayerMessageFields(message),
+      ...fields,
+    });
+  }
+
+  void _logClientApply(
+    String event, {
+    MultiplayerMessage? message,
+    Map<String, Object?> fields = const {},
+  }) {
+    ZapitiLogger.info('client_apply', event, fields: {
+      if (message != null) ..._multiplayerMessageFields(message),
+      ...fields,
+    });
+  }
+
   void _playHumanCard(SpanishCard card) {
     unawaited(_playHumanCardAfterConfirmation(card));
   }
@@ -20,7 +81,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     });
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -97,7 +158,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
 
     _updateState(() {
       _playersSignaledThisHand.add(bot.id);
-      _playerMessages[bot.id] = 'Seña: $signal';
+      _playerMessages[bot.id] = 'SENAL: $signal';
       _teamSignalsByTeam[bot.teamId] = signal;
       _knownSignalsByTeam[bot.teamId] = signal;
     });
@@ -110,7 +171,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     await Future<void>.delayed(revealDuration);
     if (!mounted || version != _handVersion) return;
     _updateState(() {
-      if (_playerMessages[bot.id] == 'Seña: $signal') {
+      if (_playerMessages[bot.id] == 'SENAL: $signal') {
         _playerMessages.remove(bot.id);
       }
     });
@@ -128,7 +189,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (!_isMultiplayerMatch) return;
     if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
-    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    final roomId = MultiplayerSessionStore.instance.activeRoomId;
     if (socket != null && socket.isConnected && roomId != null) {
       socket.playCard(
         roomId: roomId,
@@ -143,7 +204,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (!_isMultiplayerMatch) return;
     if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
-    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    final roomId = MultiplayerSessionStore.instance.activeRoomId;
     if (socket != null && socket.isConnected && roomId != null) {
       socket.callTruco(
         roomId: roomId,
@@ -414,22 +475,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
         params: {'name': _localizedPlayerName(bot)},
       );
     });
-    _sendMultiplayerVoyATiIfNeeded(bot);
     return true;
-  }
-
-  void _sendMultiplayerVoyATiIfNeeded(Player player) {
-    if (!_isMultiplayerMatch) return;
-    final socket = MultiplayerSessionStore.instance.socket;
-    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-    if (socket != null && socket.isConnected && roomId != null) {
-      socket.signal(
-        roomId: roomId,
-        playerId: player.id,
-        label: context.tr('voyATi'),
-        kind: 'voy_a_ti',
-      );
-    }
   }
 
   bool _teammateStillToPlay(Player bot) {
@@ -525,7 +571,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     if (_isMultiplayerMatch) {
       if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -552,13 +598,25 @@ extension _GameScreenPlayLogic on _GameScreenState {
   }
 
   void _handleMultiplayerMessage(MultiplayerMessage message) {
-    if (!mounted || !_isMultiplayerMatch) return;
+    if (!mounted || !_isMultiplayerMatch) {
+      _logClientIgnore('message_dropped_before_processing', message: message, fields: {
+        'mounted': mounted,
+        'isMultiplayerMatch': _isMultiplayerMatch,
+      });
+      return;
+    }
+    _logClientApply('message_received', message: message, fields: {
+      'stateBefore': _clientMatchStateFields(),
+    });
 
     switch (message.type) {
       case MultiplayerMessageType.playCard:
         final playerId = message.playerId;
         final rawCard = message.payload['card'];
-        if (playerId == null || rawCard is! Map<String, dynamic>) return;
+        if (playerId == null || rawCard is! Map<String, dynamic>) {
+          _logClientIgnore('play_card_invalid_payload', message: message);
+          return;
+        }
         final player = _players.firstWhere(
           (candidate) => candidate.id == playerId,
           orElse: () => _players.first,
@@ -568,12 +626,23 @@ extension _GameScreenPlayLogic on _GameScreenState {
         var applied = false;
         _updateState(() {
           if (!_hands[player.id]!.contains(card)) {
+            _logClientIgnore('play_card_not_in_hand', message: message, fields: {
+              'targetPlayerId': player.id,
+              'card': cardToJson(card),
+              'knownHand': [for (final item in _hands[player.id]!) cardToJson(item)],
+            });
             return;
           }
           applied = true;
           roundCompleted = _playCard(player, card);
         });
         if (!applied) return;
+        _logClientApply('play_card_applied', message: message, fields: {
+          'targetPlayerId': player.id,
+          'card': cardToJson(card),
+          'roundCompleted': roundCompleted,
+          'stateAfter': _clientMatchStateFields(),
+        });
         if (roundCompleted) {
           _updateState(() {
             _status = context.tr('waitingMatchResolution');
@@ -595,12 +664,21 @@ extension _GameScreenPlayLogic on _GameScreenState {
       case MultiplayerMessageType.callTruco:
         final playerId = message.playerId;
         final rawValue = message.payload['value'];
-        if (playerId == null || rawValue is! int) return;
+        if (playerId == null || rawValue is! int) {
+          _logClientIgnore('call_truco_invalid_payload', message: message);
+          return;
+        }
         final player = _players.firstWhere(
           (candidate) => candidate.id == playerId,
           orElse: () => _players.first,
         );
-        if (!_isLegalTrucoCall(player, rawValue)) return;
+        if (!_isLegalTrucoCall(player, rawValue)) {
+          _logClientIgnore('call_truco_illegal', message: message, fields: {
+            'targetPlayerId': player.id,
+            'value': rawValue,
+          });
+          return;
+        }
         _updateState(() {
           _callTruco(player, value: rawValue, actorPlayerId: player.id);
           _isAutoPlaying = false;
@@ -614,6 +692,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
             );
           }
         });
+        _logClientApply('call_truco_applied', message: message, fields: {
+          'targetPlayerId': player.id,
+          'value': rawValue,
+          'stateAfter': _clientMatchStateFields(),
+        });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
           _resolveBotResponseToTruco();
         }
@@ -621,12 +704,21 @@ extension _GameScreenPlayLogic on _GameScreenState {
       case MultiplayerMessageType.raiseTruco:
         final playerId = message.playerId;
         final rawValue = message.payload['value'];
-        if (playerId == null || rawValue is! int) return;
+        if (playerId == null || rawValue is! int) {
+          _logClientIgnore('raise_truco_invalid_payload', message: message);
+          return;
+        }
         final player = _players.firstWhere(
           (candidate) => candidate.id == playerId,
           orElse: () => _players.first,
         );
-        if (!_isLegalTrucoCall(player, rawValue)) return;
+        if (!_isLegalTrucoCall(player, rawValue)) {
+          _logClientIgnore('raise_truco_illegal', message: message, fields: {
+            'targetPlayerId': player.id,
+            'value': rawValue,
+          });
+          return;
+        }
         _updateState(() {
           _raiseTruco(player, value: rawValue, actorPlayerId: player.id);
           _isAutoPlaying = false;
@@ -643,13 +735,21 @@ extension _GameScreenPlayLogic on _GameScreenState {
             );
           }
         });
+        _logClientApply('raise_truco_applied', message: message, fields: {
+          'targetPlayerId': player.id,
+          'value': rawValue,
+          'stateAfter': _clientMatchStateFields(),
+        });
         if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
           _resolveBotResponseToTruco();
         }
         break;
       case MultiplayerMessageType.acceptTruco:
         final playerId = message.playerId;
-        if (playerId == null) return;
+        if (playerId == null) {
+          _logClientIgnore('accept_truco_missing_player', message: message);
+          return;
+        }
         final player = _players.firstWhere(
           (candidate) => candidate.id == playerId,
           orElse: () => _players.first,
@@ -658,6 +758,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
           teamId: player.teamId,
           actorPlayerId: player.id,
         )) {
+          _logClientIgnore('accept_truco_rejected_by_local_state', message: message, fields: {
+            'targetPlayerId': player.id,
+            'teamId': player.teamId,
+          });
           return;
         }
         _updateState(() {
@@ -669,10 +773,17 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse = false;
           _isAutoPlaying = false;
         });
+        _logClientApply('accept_truco_applied', message: message, fields: {
+          'targetPlayerId': player.id,
+          'stateAfter': _clientMatchStateFields(),
+        });
         break;
       case MultiplayerMessageType.passTruco:
         final playerId = message.playerId;
-        if (playerId == null) return;
+        if (playerId == null) {
+          _logClientIgnore('pass_truco_missing_player', message: message);
+          return;
+        }
         final player = _players.firstWhere(
           (candidate) => candidate.id == playerId,
           orElse: () => _players.first,
@@ -681,6 +792,10 @@ extension _GameScreenPlayLogic on _GameScreenState {
           passingTeamId: player.teamId,
           actorPlayerId: player.id,
         )) {
+          _logClientIgnore('pass_truco_rejected_by_local_state', message: message, fields: {
+            'targetPlayerId': player.id,
+            'teamId': player.teamId,
+          });
           return;
         }
         _updateState(() {
@@ -689,11 +804,18 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _isWaitingHumanTrucoResponse = false;
           _isAutoPlaying = false;
         });
+        _logClientApply('pass_truco_applied', message: message, fields: {
+          'targetPlayerId': player.id,
+          'stateAfter': _clientMatchStateFields(),
+        });
         break;
       case MultiplayerMessageType.passHand:
         final playerId = message.playerId;
         final toPlayerId = message.payload['toPlayerId']?.toString();
-        if (playerId == null || toPlayerId == null) return;
+        if (playerId == null || toPlayerId == null) {
+          _logClientIgnore('pass_hand_invalid_payload', message: message);
+          return;
+        }
         final player = _players.firstWhere(
           (candidate) => candidate.id == playerId,
           orElse: () => _players.first,
@@ -707,12 +829,21 @@ extension _GameScreenPlayLogic on _GameScreenState {
           to: teammate,
           actorPlayerId: player.id,
         )) {
+          _logClientIgnore('pass_hand_rejected_by_local_state', message: message, fields: {
+            'fromPlayerId': player.id,
+            'toPlayerId': teammate.id,
+          });
           return;
         }
         _updateState(() {
           _game.passHand(from: player, to: teammate, actorPlayerId: player.id);
           _showTemporaryPlayerMessage(player.id, context.tr('passHandSpeech'));
           _isAutoPlaying = false;
+        });
+        _logClientApply('pass_hand_applied', message: message, fields: {
+          'fromPlayerId': player.id,
+          'toPlayerId': teammate.id,
+          'stateAfter': _clientMatchStateFields(),
         });
         if (_isLocalBotPlayer(_currentPlayer)) {
           _advanceBots();
@@ -732,6 +863,9 @@ extension _GameScreenPlayLogic on _GameScreenState {
             );
           }
         });
+        _logClientApply('continue_round_applied', message: message, fields: {
+          'stateAfter': _clientMatchStateFields(),
+        });
         if (_isLocalBotPlayer(_currentPlayer)) {
           _advanceBots();
         }
@@ -741,166 +875,68 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _resetMultiplayerHandState(clearSummary: false);
           _status = context.tr('newHandSynced');
         });
+        _logClientApply('new_hand_applied', message: message, fields: {
+          'stateAfter': _clientMatchStateFields(),
+        });
         break;
       case MultiplayerMessageType.restartGame:
         _updateState(() {
           _resetMultiplayerHandState(clearSummary: true);
           _status = context.tr('newMatchSynced');
         });
+        _logClientApply('restart_game_applied', message: message, fields: {
+          'stateAfter': _clientMatchStateFields(),
+        });
         break;
       case MultiplayerMessageType.signal:
-        final playerId = message.playerId;
-        final rawLabel = message.payload['label'];
-        final kind = message.payload['kind'];
-        final active = message.payload['active'] as bool? ?? true;
-        if (playerId == null || rawLabel is! String || rawLabel.isEmpty) {
-          return;
-        }
-        final player = _players.firstWhere(
-          (candidate) => candidate.id == playerId,
-          orElse: () => _players.first,
-        );
-        if (kind == 'voy_a_ti') {
-          if (!active) return;
-          final localizedLabel = _localizedActionLabel(kind.toString(), rawLabel);
-          _updateState(() {
-            _showTemporaryPlayerMessage(player.id, localizedLabel);
-            if (player.teamId == _humanPlayer.teamId &&
-                player.id != _humanPlayer.id) {
-              _status = context.tr(
-                'botSendsVoyATi',
-                params: {'name': _localizedPlayerName(player)},
-              );
-            }
-            if (player.teamId == _humanPlayer.teamId &&
-                !_controlledHumanPlayerIds.contains(_humanPlayer.id) &&
-                !_playedCards
-                    .any((card) => card.player.id == _humanPlayer.id)) {
-              _forceWinRequestedPlayerIds.add(_humanPlayer.id);
-            }
-          });
-          return;
-        }
-        if (kind == 'ven_a_mi') {
-          if (!active) return;
-          final localizedLabel = _localizedActionLabel(kind.toString(), rawLabel);
-          _updateState(() {
-            _showTemporaryPlayerMessage(player.id, localizedLabel);
-            if (player.teamId == _humanPlayer.teamId &&
-                player.id != _humanPlayer.id) {
-              _status = context.tr(
-                'partnerComeToMeInstruction',
-                params: {'name': _localizedPlayerName(player)},
-              );
-            }
-            if (player.teamId == _humanPlayer.teamId &&
-                !_controlledHumanPlayerIds.contains(_humanPlayer.id) &&
-                !_playedCards
-                    .any((card) => card.player.id == _humanPlayer.id)) {
-              _forceLowestRequestedPlayerIds.add(_humanPlayer.id);
-            }
-          });
-          return;
-        }
-        if (kind == 'mata') {
-          if (!active) return;
-          final localizedLabel = _localizedActionLabel(kind.toString(), rawLabel);
-          _updateState(() {
-            _showTemporaryPlayerMessage(player.id, localizedLabel);
-            if (player.teamId == _humanPlayer.teamId &&
-                player.id != _humanPlayer.id) {
-              _status = context.tr(
-                'askCompanionKill',
-                params: {'name': _localizedPlayerName(player)},
-              );
-            }
-            if (player.teamId == _humanPlayer.teamId &&
-                !_controlledHumanPlayerIds.contains(_humanPlayer.id) &&
-                !_playedCards
-                    .any((card) => card.player.id == _humanPlayer.id)) {
-              _forceHighestRequestedPlayerIds.add(_humanPlayer.id);
-            }
-          });
-          return;
-        }
-        _updateState(() {
-          if (active) {
-            _playersSignaledThisHand.add(player.id);
-            _playerMessages[player.id] = 'Seña: $rawLabel';
-            _teamSignalsByTeam[player.teamId] = rawLabel;
-            _knownSignalsByTeam[player.teamId] = rawLabel;
-            if (player.teamId == _humanPlayer.teamId &&
-                player.id != _humanPlayer.id) {
-              _isRequestingCompanionSignal = false;
-              _setCompanionPrivateSignalStatus(
-                context.tr(
-                  'companionSignal',
-                  params: {'signal': _localizedSignalName(rawLabel)},
-                ),
-                clearAfter: const Duration(seconds: 2),
-              );
-              _status = context.tr(
-                'signalReceivedFrom',
-                params: {'name': _localizedPlayerName(player)},
-              );
-            }
-          } else if (_playerMessages[player.id] == 'Seña: $rawLabel') {
-            _playersSignaledThisHand.remove(player.id);
-            _playerMessages.remove(player.id);
-            if (_teamSignalsByTeam[player.teamId] == rawLabel) {
-              _teamSignalsByTeam.remove(player.teamId);
-            }
-            if (_knownSignalsByTeam[player.teamId] == rawLabel) {
-              _knownSignalsByTeam.remove(player.teamId);
-            }
-            if (_opponentSignalsSeenByTeam[player.teamId] == rawLabel) {
-              _opponentSignalsSeenByTeam.remove(player.teamId);
-            }
-            if (player.teamId == _humanPlayer.teamId &&
-                player.id != _humanPlayer.id) {
-              _setCompanionPrivateSignalStatus(null);
-            }
-          }
-        });
+        _handleIncomingMultiplayerSignal(message);
         break;
       case MultiplayerMessageType.requestSignal:
-        final playerId = message.playerId;
-        if (playerId == null) return;
-        final requester = _players.firstWhere(
-          (candidate) => candidate.id == playerId,
-          orElse: () => _players.first,
-        );
-        if (requester.teamId != _humanPlayer.teamId ||
-            requester.id == _humanPlayer.id) {
-          return;
-        }
-        _updateState(() {
-          _isRequestingCompanionSignal = false;
-          _setCompanionPrivateSignalStatus(
-            context.tr(
-              'playerAsksSignalShort',
-              params: {'name': _localizedPlayerName(requester)},
-            ),
-            clearAfter: const Duration(seconds: 2),
-          );
-          _status = context.tr(
-            'playerAsksSignal',
-            params: {'name': _localizedPlayerName(requester)},
-          );
-        });
+        _handleIncomingMultiplayerSignalRequest(message);
         break;
       case MultiplayerMessageType.roomSnapshot:
         final snapshot = MultiplayerRoomSnapshot.fromJson(message.payload);
-        MultiplayerSessionStore.instance.roomSnapshot = snapshot;
+        if (!_isMultiplayerMatch &&
+            snapshot.phase != 'playing' &&
+            snapshot.phase != 'starting' &&
+            snapshot.match == null) {
+          _logClientIgnore(
+            'room_snapshot_ignored_outside_multiplayer_match',
+            message: message,
+            fields: {
+              'snapshotPhase': snapshot.phase,
+              'roomId': snapshot.roomId,
+            },
+          );
+          return;
+        }
+        _syncMultiplayerSessionFromSnapshot(snapshot);
         if (_shouldDelayMultiplayerBotSnapshot(snapshot)) {
+          _logClientApply('room_snapshot_delayed_for_bot_animation', message: message, fields: {
+            'snapshotPhase': snapshot.phase,
+            'roomId': snapshot.roomId,
+          });
           unawaited(_applyDelayedMultiplayerBotSnapshot(snapshot));
           return;
         }
+        if ((snapshot.phase == 'playing' || snapshot.match != null) &&
+            !_isMultiplayerMatch &&
+            mounted) {
+          _enterMultiplayerMatch();
+        }
         _applyMultiplayerRoomSnapshot(snapshot);
+        _logClientApply('room_snapshot_applied', message: message, fields: {
+          'snapshotPhase': snapshot.phase,
+          'roomId': snapshot.roomId,
+          'stateAfter': _clientMatchStateFields(),
+        });
         break;
       case MultiplayerMessageType.startGame:
         _updateState(() {
           _status = 'La partida online ha comenzado.';
+        });
+        _logClientApply('start_game_received', message: message, fields: {
+          'stateAfter': _clientMatchStateFields(),
         });
         break;
       case MultiplayerMessageType.error:
@@ -911,11 +947,170 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _multiplayerMatchCanceled = false;
           _status = context.tr('onlineMatchSyncError');
         });
+        _logClientApply('server_error_received', message: message, fields: {
+          'stateAfter': _clientMatchStateFields(),
+        });
         break;
       default:
+        _logClientIgnore('message_type_not_handled', message: message);
         break;
     }
   }
+
+  void _handleIncomingMultiplayerSignal(MultiplayerMessage message) {
+    final player = _multiplayerPlayerById(message.playerId);
+    if (player == null ||
+        player.id == _humanPlayer.id ||
+        player.teamId != _humanPlayer.teamId) {
+      _logClientIgnore('signal_ignored_by_player_filter', message: message, fields: {
+        'resolvedPlayerId': player?.id,
+        'resolvedTeamId': player?.teamId,
+        'humanPlayerId': _humanPlayer.id,
+        'humanTeamId': _humanPlayer.teamId,
+      });
+      return;
+    }
+
+    final rawLabel = message.payload['label'];
+    final label = rawLabel is String ? rawLabel : null;
+    if (label == null || label.isEmpty) {
+      _logClientIgnore('signal_invalid_label', message: message);
+      return;
+    }
+
+    final kind = message.payload['kind']?.toString();
+    final active = message.payload['active'] as bool? ?? true;
+    final displayLabel = _multiplayerSignalDisplayLabel(kind, label);
+
+    if (!active) {
+      _updateState(() {
+        if (_playerMessages[player.id] == displayLabel ||
+            _playerMessages[player.id] == _signalBubbleText(label)) {
+          _playerMessages.remove(player.id);
+        }
+      });
+      _logClientApply('signal_cleared', message: message, fields: {
+        'targetPlayerId': player.id,
+        'displayLabel': displayLabel,
+      });
+      return;
+    }
+
+    _updateState(() {
+      _isRequestingCompanionSignal = false;
+      _showTemporaryPlayerMessage(
+        player.id,
+        kind == null ? _signalBubbleText(label) : displayLabel,
+        duration: const Duration(milliseconds: 1300),
+      );
+
+      switch (kind) {
+        case 'voy_a_ti':
+          if (!_playedCards.any((card) => card.player.id == _humanPlayer.id)) {
+            _forceWinRequestedPlayerIds.add(_humanPlayer.id);
+          }
+          _status = context.tr(
+            'botSendsVoyATi',
+            params: {'name': _localizedPlayerName(player)},
+          );
+          break;
+        case 'ven_a_mi':
+          if (!_playedCards.any((card) => card.player.id == _humanPlayer.id)) {
+            _forceLowestRequestedPlayerIds.add(_humanPlayer.id);
+          }
+          _status = context.tr(
+            'partnerComeToMeInstruction',
+            params: {'name': _localizedPlayerName(player)},
+          );
+          break;
+        case 'mata':
+          if (!_playedCards.any((card) => card.player.id == _humanPlayer.id)) {
+            _forceHighestRequestedPlayerIds.add(_humanPlayer.id);
+          }
+          _status = context.tr(
+            'askCompanionKill',
+            params: {'name': _localizedPlayerName(player)},
+          );
+          break;
+        default:
+          _playersSignaledThisHand.add(player.id);
+          _teamSignalsByTeam[player.teamId] = label;
+          _knownSignalsByTeam[player.teamId] = label;
+          _setCompanionPrivateSignalStatus(
+            context.tr(
+              'companionSignal',
+              params: {'signal': _localizedSignalName(label)},
+            ),
+            clearAfter: const Duration(seconds: 2),
+          );
+          _status = context.tr(
+            'signalReceivedFrom',
+            params: {'name': _localizedPlayerName(player)},
+          );
+      }
+    });
+    _logClientApply('signal_applied', message: message, fields: {
+      'targetPlayerId': player.id,
+      'label': label,
+      'kind': kind,
+      'active': active,
+      'stateAfter': _clientMatchStateFields(),
+    });
+  }
+
+  void _handleIncomingMultiplayerSignalRequest(MultiplayerMessage message) {
+    final requester = _multiplayerPlayerById(message.playerId);
+    if (requester == null ||
+        requester.id == _humanPlayer.id ||
+        requester.teamId != _humanPlayer.teamId) {
+      _logClientIgnore('signal_request_ignored_by_player_filter', message: message, fields: {
+        'resolvedPlayerId': requester?.id,
+        'resolvedTeamId': requester?.teamId,
+      });
+      return;
+    }
+
+    _updateState(() {
+      _setCompanionPrivateSignalStatus(
+        context.tr(
+          'playerAsksSignalShort',
+          params: {'name': _localizedPlayerName(requester)},
+        ),
+        clearAfter: const Duration(seconds: 2),
+      );
+      _status = context.tr(
+        'playerAsksSignal',
+        params: {'name': _localizedPlayerName(requester)},
+      );
+    });
+    _logClientApply('signal_request_applied', message: message, fields: {
+      'requesterPlayerId': requester.id,
+      'stateAfter': _clientMatchStateFields(),
+    });
+  }
+
+  Player? _multiplayerPlayerById(String? playerId) {
+    if (playerId == null || playerId.isEmpty) return null;
+    for (final player in _players) {
+      if (player.id == playerId) return player;
+    }
+    return null;
+  }
+
+  String _multiplayerSignalDisplayLabel(String? kind, String fallbackLabel) {
+    switch (kind) {
+      case 'voy_a_ti':
+        return context.tr('voyATi');
+      case 'ven_a_mi':
+        return context.tr('comeToMe');
+      case 'mata':
+        return context.tr('kill');
+      default:
+        return fallbackLabel;
+    }
+  }
+
+  String _signalBubbleText(String label) => 'SENAL: $label';
 
   bool _shouldDelayMultiplayerBotSnapshot(MultiplayerRoomSnapshot snapshot) {
     if (snapshot.phase != 'playing' || snapshot.match == null) return false;
@@ -970,7 +1165,22 @@ extension _GameScreenPlayLogic on _GameScreenState {
   void _applyMultiplayerRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
     _multiplayerSnapshotDelayGeneration += 1;
     MultiplayerSessionStore.instance.roomSnapshot = snapshot;
-    if (snapshot.phase != 'playing' || snapshot.match == null) {
+    final hasMatchData = snapshot.match != null;
+    if (snapshot.phase == 'starting' && !hasMatchData) {
+      _updateState(() {
+        _isRecoveringMultiplayerConnection = false;
+        _isAwaitingMultiplayerResync = false;
+        _multiplayerConnectionFailed = false;
+        _multiplayerMatchCanceled = false;
+        _isAutoPlaying = false;
+        _isWaitingHumanTrucoResponse = false;
+        _isRequestingCompanionSignal = false;
+        _status = context.tr('multiplayerReadyToStart');
+      });
+      return;
+    }
+    if ((snapshot.phase != 'playing' && snapshot.phase != 'starting') ||
+        snapshot.match == null) {
       _updateState(() {
         _isRecoveringMultiplayerConnection = false;
         _isAwaitingMultiplayerResync = false;

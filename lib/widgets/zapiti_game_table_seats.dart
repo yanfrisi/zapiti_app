@@ -1,4 +1,4 @@
-part of 'zapiti_game_table.dart';
+﻿part of 'zapiti_game_table.dart';
 
 enum _BubblePosition { above, right }
 
@@ -8,7 +8,7 @@ double _bubbleScaleForAvatarHeight(double avatarHeight) {
 
 String? _extractSignalMessage(String? message) {
   if (message == null) return null;
-  const prefix = 'SeÃ±a: ';
+  const prefix = 'SENAL: ';
   if (message.startsWith(prefix)) {
     return message.substring(prefix.length);
   }

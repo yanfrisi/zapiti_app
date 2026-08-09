@@ -1,4 +1,4 @@
-part of 'game_screen.dart';
+﻿part of 'game_screen.dart';
 
 String _difficultyLabel(BuildContext context, int level) {
   return switch (level) {
@@ -2138,7 +2138,7 @@ class _LandscapeHumanPanel extends StatelessWidget {
     if (value.startsWith('Compa')) return value;
     if (value == 'Mirando...') return context.tr('companionLooking');
     if (value == 'No llevo seña.') return context.tr('companionNoSignal');
-    const signalPrefix = 'Seña: ';
+    const signalPrefix = 'SENAL: ';
     if (value.startsWith(signalPrefix)) {
       return context.tr('companionSignal',
           params: {'signal': value.substring(signalPrefix.length)});
@@ -2359,7 +2359,7 @@ class _LandscapeAvatarSlot extends StatelessWidget {
   }
 
   String? _signalFromMessage(String? message) {
-    const prefix = 'Seña: ';
+    const prefix = 'SENAL: ';
 
     if (message == null || !message.startsWith(prefix)) {
       return null;

@@ -15,9 +15,15 @@ class CharacterAssets {
     required List<String> playerIds,
     required String humanCharacterId,
   }) {
+    if (playerIds.isEmpty) {
+      return const {};
+    }
     final safeHumanCharacterId = characterIds.contains(humanCharacterId)
         ? humanCharacterId
         : characterIds.first;
+    final effectiveHumanPlayerId = playerIds.contains(humanPlayerId)
+        ? humanPlayerId
+        : playerIds.first;
     final remainingCharacters = characterIds
         .where((characterId) => characterId != safeHumanCharacterId)
         .toList();
@@ -25,7 +31,7 @@ class CharacterAssets {
 
     return {
       for (final playerId in playerIds)
-        playerId: playerId == humanPlayerId
+        playerId: playerId == effectiveHumanPlayerId
             ? safeHumanCharacterId
             : remainingCharacters[nextCharacterIndex++],
     };

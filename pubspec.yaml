@@ -1,7 +1,7 @@
 name: zapiti_app
 description: Juego de Zápiti en Flutter.
 publish_to: 'none'
-version: 0.3.0+4
+version: 0.3.2+6
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

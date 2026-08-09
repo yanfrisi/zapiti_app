@@ -695,7 +695,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (_isMultiplayerMatch) {
       if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -743,7 +743,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (_isMultiplayerMatch) {
       if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -770,7 +770,7 @@ extension _GameScreenStateFlow on _GameScreenState {
   void _restartGame() {
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -865,7 +865,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (!_isMultiplayerMatch) return;
     final session = MultiplayerSessionStore.instance;
     final socket = session.socket;
-    final roomId = session.roomSnapshot?.roomId ?? session.reconnectRoomId;
+    final roomId = session.activeRoomId;
     final playerId = session.localGamePlayerId;
     if (socket == null ||
         !socket.isConnected ||
@@ -955,7 +955,9 @@ extension _GameScreenStateFlow on _GameScreenState {
   void _selectHumanCharacter(String characterId) {
     _updateState(() {
       if (!_isMultiplayerMatch &&
-          (_showMainMenu || _showCharacterSelection || _showDifficultySelection)) {
+          (_showMainMenu ||
+              _showCharacterSelection ||
+              _showDifficultySelection)) {
         _resetMultiplayerStateForLocalMode();
       }
       _selectedHumanCharacterId = characterId;
@@ -993,12 +995,33 @@ extension _GameScreenStateFlow on _GameScreenState {
   }
 
   void _continueToDifficultySelection() {
+    ZapitiLogger.info('offline_flow', 'continue_to_difficulty_begin', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+      'multiplayerRoomId': MultiplayerSessionStore.instance.activeRoomId,
+      'multiplayerPlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'multiplayerMatchStarted': MultiplayerSessionStore.instance.matchStarted,
+      'selectedHumanCharacterId': _selectedHumanCharacterId,
+      'status': _status,
+    });
     _updateState(() {
       _resetMultiplayerStateForLocalMode();
       _applyCharacterSelection(_selectedHumanCharacterId);
       _showMainMenu = false;
       _showCharacterSelection = false;
       _showDifficultySelection = true;
+    });
+    ZapitiLogger.info('offline_flow', 'continue_to_difficulty_done', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+      'multiplayerRoomId': MultiplayerSessionStore.instance.activeRoomId,
+      'multiplayerPlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'multiplayerMatchStarted': MultiplayerSessionStore.instance.matchStarted,
+      'selectedHumanCharacterId': _selectedHumanCharacterId,
     });
     unawaited(_syncMusic());
   }
@@ -1023,6 +1046,16 @@ extension _GameScreenStateFlow on _GameScreenState {
   }
 
   void _startFromMainMenu() {
+    ZapitiLogger.info('offline_flow', 'start_from_main_menu_begin', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+      'multiplayerRoomId': MultiplayerSessionStore.instance.activeRoomId,
+      'multiplayerPlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'multiplayerMatchStarted': MultiplayerSessionStore.instance.matchStarted,
+      'status': _status,
+    });
     _updateState(() {
       _resetMultiplayerStateForLocalMode();
       _showMainMenu = false;
@@ -1031,6 +1064,15 @@ extension _GameScreenStateFlow on _GameScreenState {
       _isGuidedTutorialMatch = false;
       _guidedTutorialCompleted = false;
       _mainMenuPanel = _MainMenuPanel.home;
+    });
+    ZapitiLogger.info('offline_flow', 'start_from_main_menu_done', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+      'multiplayerRoomId': MultiplayerSessionStore.instance.activeRoomId,
+      'multiplayerPlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'multiplayerMatchStarted': MultiplayerSessionStore.instance.matchStarted,
     });
     unawaited(_syncMusic());
   }
@@ -1098,10 +1140,14 @@ extension _GameScreenStateFlow on _GameScreenState {
   void _enterMultiplayerMatch() {
     final session = MultiplayerSessionStore.instance;
     final socket = session.socket;
+    final snapshot = session.roomSnapshot;
+    if (snapshot != null) {
+      _syncMultiplayerSessionFromSnapshot(snapshot);
+    }
     final snapshotMatch = session.roomSnapshot?.match;
     if (!session.matchStarted ||
         session.localGamePlayerId == null ||
-        session.players.isEmpty) {
+        session.players.length < 2) {
       _updateState(() {
         _status = context.tr('matchNotReady');
       });
@@ -1109,9 +1155,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     }
 
     final localGamePlayerId = session.localGamePlayerId!;
-    final multiplayerPlayers = session.players.isNotEmpty
-        ? session.players
-        : _GameScreenState._defaultPlayers;
+    final multiplayerPlayers = List<Player>.unmodifiable(session.players);
     _updateState(() {
       _isMultiplayerMatch = true;
       _isRecoveringMultiplayerConnection = false;
@@ -1176,6 +1220,90 @@ extension _GameScreenStateFlow on _GameScreenState {
     unawaited(_syncMusic());
   }
 
+  void _syncMultiplayerSessionFromSnapshot(MultiplayerRoomSnapshot snapshot) {
+    final session = MultiplayerSessionStore.instance;
+    final snapshotMatchPlayers =
+        _parseMultiplayerPlayers(snapshot.match?['players']);
+    if (snapshotMatchPlayers.isNotEmpty &&
+        (session.players.isEmpty ||
+            snapshotMatchPlayers.length > session.players.length)) {
+      session.players = _multiplayerPlayersStartingWithLocal(
+        snapshotMatchPlayers,
+      );
+      final snapshotCharacterIds =
+          _parseMultiplayerCharacterIds(snapshot.match?['players']);
+      if (snapshotCharacterIds.isNotEmpty) {
+        session.characterIdsByPlayer = snapshotCharacterIds;
+      }
+    } else if (session.players.isEmpty && snapshot.seats.isNotEmpty) {
+      session.players = [
+        for (final seat in snapshot.seats)
+          Player(
+            id: seat.playerId,
+            name: seat.name,
+            teamId: seat.teamId ??
+                (seat.seatIndex.isEven ? TeamRules.teamOne : TeamRules.teamTwo),
+          ),
+      ];
+    }
+    if (session.controlledPlayerIds.isEmpty) {
+      final localPlayerId = session.localGamePlayerId;
+      session.controlledPlayerIds =
+          localPlayerId == null ? const [] : [localPlayerId];
+    }
+    session.matchStarted = snapshot.phase == 'playing' ||
+        snapshot.match != null ||
+        session.matchStarted;
+    session.roomSnapshot = snapshot;
+  }
+
+  List<Player> _multiplayerPlayersStartingWithLocal(List<Player> players) {
+    final localPlayerId = MultiplayerSessionStore.instance.localGamePlayerId;
+    if (localPlayerId == null || localPlayerId.isEmpty) {
+      return List<Player>.unmodifiable(players);
+    }
+    final localIndex =
+        players.indexWhere((player) => player.id == localPlayerId);
+    if (localIndex <= 0) {
+      return List<Player>.unmodifiable(players);
+    }
+    return List<Player>.unmodifiable([
+      ...players.skip(localIndex),
+      ...players.take(localIndex),
+    ]);
+  }
+
+  List<Player> _parseMultiplayerPlayers(dynamic rawPlayers) {
+    if (rawPlayers is! List) return const [];
+    return [
+      for (final rawPlayer in rawPlayers)
+        if (rawPlayer is Map)
+          Player(
+            id: rawPlayer['playerId']?.toString() ?? '',
+            name: rawPlayer['name']?.toString() ?? 'Jugador',
+            teamId: rawPlayer['teamId'] as int? ?? 1,
+          ),
+    ].where((player) => player.id.isNotEmpty).toList();
+  }
+
+  Map<String, String> _parseMultiplayerCharacterIds(dynamic rawPlayers) {
+    if (rawPlayers is! List) return const {};
+    final parsed = <String, String>{};
+    for (final rawPlayer in rawPlayers) {
+      if (rawPlayer is! Map) continue;
+      final playerId = rawPlayer['playerId']?.toString();
+      final characterId = rawPlayer['characterId']?.toString();
+      if (playerId == null ||
+          playerId.isEmpty ||
+          characterId == null ||
+          characterId.isEmpty) {
+        continue;
+      }
+      parsed[playerId] = characterId;
+    }
+    return parsed;
+  }
+
   bool get _canSendMultiplayerAction {
     if (!_isMultiplayerMatch ||
         _isRecoveringMultiplayerConnection ||
@@ -1201,6 +1329,12 @@ extension _GameScreenStateFlow on _GameScreenState {
   }
 
   void _handleMultiplayerSocketDropped() {
+    ZapitiLogger.warn('match', 'socket_dropped', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'isRecovering': _isRecoveringMultiplayerConnection,
+      'roomId': MultiplayerSessionStore.instance.activeRoomId,
+      'playerId': MultiplayerSessionStore.instance.localGamePlayerId,
+    });
     if (!mounted ||
         !_isMultiplayerMatch ||
         _isRecoveringMultiplayerConnection) {
@@ -1213,9 +1347,19 @@ extension _GameScreenStateFlow on _GameScreenState {
     if (!mounted || !_isMultiplayerMatch) return;
 
     final session = MultiplayerSessionStore.instance;
-    final roomId = session.reconnectRoomId ?? session.roomSnapshot?.roomId;
+    final roomId = session.activeRoomId;
     final playerId = session.localGamePlayerId;
+    ZapitiLogger.info('match', 'recover_connection_begin', fields: {
+      'roomId': roomId,
+      'playerId': playerId,
+      'canReconnect': session.canReconnectMatch,
+    });
     if (!session.canReconnectMatch || roomId == null || playerId == null) {
+      ZapitiLogger.warn('match', 'recover_connection_impossible', fields: {
+        'roomId': roomId,
+        'playerId': playerId,
+        'canReconnect': session.canReconnectMatch,
+      });
       _updateState(() {
         _isRecoveringMultiplayerConnection = false;
         _isAwaitingMultiplayerResync = false;
@@ -1257,6 +1401,13 @@ extension _GameScreenStateFlow on _GameScreenState {
       }
 
       final delay = attemptDelays[attempt];
+      ZapitiLogger.info('match', 'recover_connection_attempt_begin', fields: {
+        'attempt': attempt + 1,
+        'roomId': roomId,
+        'playerId': playerId,
+        'delayMs': delay.inMilliseconds,
+        'generation': generation,
+      });
       if (delay > Duration.zero) {
         await Future<void>.delayed(delay);
         if (!mounted ||
@@ -1296,6 +1447,12 @@ extension _GameScreenStateFlow on _GameScreenState {
           return;
         }
         session.socket = nextSocket;
+        ZapitiLogger.info('match', 'recover_connection_socket_ready', fields: {
+          'attempt': attempt + 1,
+          'roomId': roomId,
+          'playerId': playerId,
+          'generation': generation,
+        });
         nextSocket.joinRoom(
           roomId: roomId,
           playerId: playerId,
@@ -1316,7 +1473,19 @@ extension _GameScreenStateFlow on _GameScreenState {
           _status = context.tr('multiplayerRecoveringConnection');
         });
         return;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        ZapitiLogger.error(
+          'match',
+          'recover_connection_attempt_failed',
+          error: error,
+          stackTrace: stackTrace,
+          fields: {
+            'attempt': attempt + 1,
+            'roomId': roomId,
+            'playerId': playerId,
+            'generation': generation,
+          },
+        );
         nextSocket.close();
       }
     }
@@ -1331,6 +1500,11 @@ extension _GameScreenStateFlow on _GameScreenState {
       _isAwaitingMultiplayerResync = false;
       _multiplayerConnectionFailed = true;
       _status = context.tr('connectionLostMatch');
+    });
+    ZapitiLogger.warn('match', 'recover_connection_exhausted', fields: {
+      'roomId': roomId,
+      'playerId': playerId,
+      'generation': generation,
     });
   }
 
@@ -1386,6 +1560,20 @@ extension _GameScreenStateFlow on _GameScreenState {
     final shouldResetForNewHand = serverHandSequence != null &&
             serverHandSequence != _multiplayerServerHandSequence ||
         (_multiplayerServerHandSequence == null && serverHandSequence != null);
+    ZapitiLogger.info('match', 'snapshot_apply_begin', fields: {
+      'roomId': MultiplayerSessionStore.instance.activeRoomId,
+      'serverHandSequence': serverHandSequence,
+      'previousHandSequence': _multiplayerServerHandSequence,
+      'serverStateVersion': serverStateVersion,
+      'previousStateVersion': _multiplayerStateVersion,
+      'currentPlayerId': currentPlayerId,
+      'leadPlayerId': leadPlayerId,
+      'nextLeadPlayerId': nextLeadPlayerId,
+      'playedCards': parsedPlayedCards.length,
+      'playersWithHands': parsedHands.length,
+      'shouldResetForNewHand': shouldResetForNewHand,
+      'status': match['status']?.toString(),
+    });
     if (shouldResetForNewHand) {
       final shouldClearSummary = (_score[1] != 0 ||
               _score[2] != 0 ||
@@ -1487,6 +1675,19 @@ extension _GameScreenStateFlow on _GameScreenState {
         _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
     _isAutoPlaying = false;
     _syncTurnCountdownTimer();
+    ZapitiLogger.info('match', 'snapshot_apply_done', fields: {
+      'roomId': MultiplayerSessionStore.instance.activeRoomId,
+      'stateVersion': _multiplayerStateVersion,
+      'handSequence': _multiplayerServerHandSequence,
+      'turnIndex': _game.turnIndex,
+      'leadIndex': _game.leadIndex,
+      'nextLeadIndex': _game.nextLeadIndex,
+      'handValue': _handValue,
+      'pendingTrucoValue': _pendingTrucoValue,
+      'winningTeamId': _winningTeamId,
+      'turnDeadlineAt': _turnDeadlineAt,
+      'turnSecondsRemaining': _turnSecondsRemaining,
+    });
   }
 
   void _syncPassedHandFromMatch(Map<String, dynamic> match) {
@@ -1650,6 +1851,18 @@ extension _GameScreenStateFlow on _GameScreenState {
   }
 
   void _startWithSelectedSettings() {
+    ZapitiLogger.info('offline_flow', 'start_with_selected_settings_begin', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+      'multiplayerRoomId': MultiplayerSessionStore.instance.activeRoomId,
+      'multiplayerPlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'multiplayerMatchStarted': MultiplayerSessionStore.instance.matchStarted,
+      'selectedHumanCharacterId': _selectedHumanCharacterId,
+      'selectedDifficulty': _selectedDifficulty,
+      'status': _status,
+    });
     _updateState(() {
       _resetMultiplayerStateForLocalMode();
       _applyCharacterSelection(_selectedHumanCharacterId);
@@ -1666,6 +1879,19 @@ extension _GameScreenStateFlow on _GameScreenState {
       _winningTeamId = null;
       _startNewHand();
     });
+    ZapitiLogger.info('offline_flow', 'start_with_selected_settings_done', fields: {
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+      'multiplayerRoomId': MultiplayerSessionStore.instance.activeRoomId,
+      'multiplayerPlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
+      'multiplayerMatchStarted': MultiplayerSessionStore.instance.matchStarted,
+      'selectedHumanCharacterId': _selectedHumanCharacterId,
+      'selectedDifficulty': _selectedDifficulty,
+      'humanPlayerId': _humanPlayer.id,
+      'players': _players.map((player) => player.id).toList(),
+    });
     if (!_isHumanTurn) {
       _advanceBots();
     }
@@ -1674,7 +1900,21 @@ extension _GameScreenStateFlow on _GameScreenState {
   }
 
   void _resetMultiplayerStateForLocalMode() {
-    MultiplayerSessionStore.instance.clearAll();
+    final session = MultiplayerSessionStore.instance;
+    final socket = session.socket;
+    ZapitiLogger.info('offline_flow', 'reset_multiplayer_state_for_local_mode_begin', fields: {
+      'activeRoomId': session.activeRoomId,
+      'localGamePlayerId': session.localGamePlayerId,
+      'matchStarted': session.matchStarted,
+      'players': session.players.map((player) => player.id).toList(),
+      'controlledPlayerIds': session.controlledPlayerIds,
+      'hasSocket': socket != null,
+      'socketConnected': socket?.isConnected,
+      'roomSnapshotPhase': session.roomSnapshot?.phase,
+    });
+    socket?.onMessage = null;
+    socket?.onError = null;
+    socket?.onDone = null;
     _isMultiplayerMatch = false;
     _multiplayerPlayers = const [];
     _multiplayerServerHandSequence = null;
@@ -1684,9 +1924,37 @@ extension _GameScreenStateFlow on _GameScreenState {
     _multiplayerConnectionFailed = false;
     _multiplayerMatchCanceled = false;
     _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
+    _alVerDecisionPromptedKey = null;
+    _isWaitingHumanTrucoResponse = false;
+    _isRequestingCompanionSignal = false;
+    _companionPrivateSignalStatus = null;
+    _showGameOptions = false;
+    _playerMessages.clear();
+    _knownSignalsByTeam.clear();
+    _teamSignalsByTeam.clear();
+    _opponentSignalsSeenByTeam.clear();
+    _forceWinRequestedPlayerIds.clear();
+    _forceHighestRequestedPlayerIds.clear();
+    _forceLowestRequestedPlayerIds.clear();
+    _playersSignaledThisHand.clear();
+    _aiTeamsConsideredTrucoThisHand.clear();
     _turnDeadlineAt = null;
     _turnSecondsRemaining = null;
     _syncTurnCountdownTimer();
+    session.clearAll();
+    ZapitiLogger.info('offline_flow', 'reset_multiplayer_state_for_local_mode_done', fields: {
+      'activeRoomId': session.activeRoomId,
+      'localGamePlayerId': session.localGamePlayerId,
+      'matchStarted': session.matchStarted,
+      'players': session.players.map((player) => player.id).toList(),
+      'controlledPlayerIds': session.controlledPlayerIds,
+      'hasSocket': session.socket != null,
+      'roomSnapshotPhase': session.roomSnapshot?.phase,
+      'isMultiplayerMatch': _isMultiplayerMatch,
+      'showMainMenu': _showMainMenu,
+      'showCharacterSelection': _showCharacterSelection,
+      'showDifficultySelection': _showDifficultySelection,
+    });
   }
 
   Future<void> _saveSelectedSettings() {

@@ -234,7 +234,7 @@
   "guidedScenario8Instruction": "They call truco and you have nothing to fight with. Pass to lose less.",
   "guidedScenario8Success": "Correct: passing in time is also good play.",
   "multiplayerLobbyTitle": "Multiplayer lobby",
-  "multiplayerLobbyBody": "Create a room or join with a code. When four players are ready, the match starts.",
+  "multiplayerLobbyBody": "Create a room or join with a code. When at least two players are ready, the match can start and bots can fill the missing seats if needed.",
   "defaultPlayerName": "Player",
   "multiplayerReadyToConnect": "Prepare a room to connect with friends.",
   "multiplayerProfileSetup": "Set up your multiplayer profile.",

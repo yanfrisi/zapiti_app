@@ -33,7 +33,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     }
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -79,7 +79,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     });
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -124,7 +124,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     }
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -170,7 +170,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     if (!didRaise) return;
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = MultiplayerSessionStore.instance.activeRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {
@@ -578,7 +578,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     if (!_isMultiplayerMatch) return;
     if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
-    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    final roomId = MultiplayerSessionStore.instance.activeRoomId;
     if (socket != null && socket.isConnected && roomId != null) {
       socket.acceptTruco(
         roomId: roomId,
@@ -592,7 +592,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     if (!_isMultiplayerMatch) return;
     if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
-    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    final roomId = MultiplayerSessionStore.instance.activeRoomId;
     if (socket != null && socket.isConnected && roomId != null) {
       socket.passTruco(
         roomId: roomId,
@@ -606,7 +606,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     if (!_isMultiplayerMatch) return;
     if (!_canSendMultiplayerAction) return;
     final socket = MultiplayerSessionStore.instance.socket;
-    final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+    final roomId = MultiplayerSessionStore.instance.activeRoomId;
     if (socket != null && socket.isConnected && roomId != null) {
       socket.raiseTruco(
         roomId: roomId,

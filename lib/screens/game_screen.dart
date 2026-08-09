@@ -40,6 +40,7 @@ import '../services/account_privacy_service.dart';
 import '../services/game_preferences_store.dart';
 import '../services/multiplayer_session_store.dart';
 import '../services/zapiti_game_socket.dart';
+import '../services/zapiti_logger.dart';
 import '../services/zapiti_multiplayer_protocol.dart';
 import '../services/zapiti_music_player.dart';
 import '../theme/zapiti_theme.dart';
@@ -218,6 +219,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ? _multiplayerPlayers
           : _defaultPlayers;
 
+  String? get _multiplayerRoomId =>
+      MultiplayerSessionStore.instance.activeRoomId;
+
   Map<int, int> get _score => _game.score;
   Map<int, int> get _roundWins => _game.roundWins;
   LimitedHistory get _handSummaries => _game.handSummaries;
@@ -378,19 +382,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
-  String _localizedActionLabel(String kind, String fallbackLabel) {
-    switch (kind) {
-      case 'voy_a_ti':
-        return context.tr('voyATi');
-      case 'ven_a_mi':
-        return context.tr('comeToMe');
-      case 'mata':
-        return context.tr('kill');
-      default:
-        return fallbackLabel;
-    }
-  }
-
   void _setCompanionPrivateSignalStatus(
     String? value, {
     Duration? clearAfter,
@@ -410,6 +401,40 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _companionPrivateSignalTimer = null;
       });
     });
+  }
+
+  void _sendMultiplayerSignalToCompanion({
+    required String label,
+    String? kind,
+    bool active = true,
+  }) {
+    if (!_isMultiplayerMatch || !_canSendMultiplayerAction) return;
+
+    final socket = MultiplayerSessionStore.instance.socket;
+    final roomId = _multiplayerRoomId;
+    final playerId =
+        MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
+    if (socket == null || !socket.isConnected || roomId == null) return;
+
+    socket.signal(
+      roomId: roomId,
+      playerId: playerId,
+      label: label,
+      active: active,
+      kind: kind,
+    );
+  }
+
+  void _requestMultiplayerCompanionSignal() {
+    if (!_isMultiplayerMatch || !_canSendMultiplayerAction) return;
+
+    final socket = MultiplayerSessionStore.instance.socket;
+    final roomId = _multiplayerRoomId;
+    final playerId =
+        MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
+    if (socket == null || !socket.isConnected || roomId == null) return;
+
+    socket.requestSignal(roomId: roomId, playerId: playerId);
   }
 
   @override
@@ -498,34 +523,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _humanVoyATi() {
     if (_handFinished || _isGameFinished) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
+    final label = context.tr('voyATi');
     _updateState(() {
-      _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('voyATi'));
+      _showTemporaryPlayerMessage(_humanPlayer.id, label);
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceWinRequestedPlayerIds.add(_companionPlayer.id);
       }
     });
-    if (_isMultiplayerMatch) {
-      final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId =
-          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
-      if (socket != null && socket.isConnected && roomId != null) {
-        socket.signal(
-          roomId: roomId,
-          playerId: playerId,
-          label: context.tr('voyATi'),
-          kind: 'voy_a_ti',
-        );
-      }
-    }
+    _sendMultiplayerSignalToCompanion(label: label, kind: 'voy_a_ti');
   }
 
   void _humanVenAMi() {
     if (_handFinished || _isGameFinished) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
+    final label = context.tr('comeToMe');
     _updateState(() {
-      _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('comeToMe'));
+      _showTemporaryPlayerMessage(_humanPlayer.id, label);
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceLowestRequestedPlayerIds.add(_companionPlayer.id);
@@ -535,27 +549,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         params: {'name': _localizedPlayerName(_companionPlayer)},
       );
     });
-    if (_isMultiplayerMatch) {
-      final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId =
-          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
-      if (socket != null && socket.isConnected && roomId != null) {
-        socket.signal(
-          roomId: roomId,
-          playerId: playerId,
-          label: context.tr('comeToMe'),
-          kind: 'ven_a_mi',
-        );
-      }
-    }
+    _sendMultiplayerSignalToCompanion(label: label, kind: 'ven_a_mi');
   }
 
   void _humanMata() {
     if (_handFinished || _isGameFinished) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
+    final label = context.tr('kill');
     _updateState(() {
-      _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('kill'));
+      _showTemporaryPlayerMessage(_humanPlayer.id, label);
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceHighestRequestedPlayerIds.add(_companionPlayer.id);
@@ -565,20 +567,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         params: {'name': _localizedPlayerName(_companionPlayer)},
       );
     });
-    if (_isMultiplayerMatch) {
-      final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId =
-          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
-      if (socket != null && socket.isConnected && roomId != null) {
-        socket.signal(
-          roomId: roomId,
-          playerId: playerId,
-          label: context.tr('kill'),
-          kind: 'mata',
-        );
-      }
-    }
+    _sendMultiplayerSignalToCompanion(label: label, kind: 'mata');
   }
 
   void _humanPassHand() {
@@ -586,7 +575,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (_isMultiplayerMatch) {
       if (!_ensureMultiplayerActionConnection()) return;
       final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
+      final roomId = _multiplayerRoomId;
       final playerId =
           MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
       if (socket != null && socket.isConnected && roomId != null) {

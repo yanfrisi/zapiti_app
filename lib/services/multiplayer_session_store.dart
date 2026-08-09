@@ -2,6 +2,7 @@ import '../domain/spanish_card.dart';
 import '../domain/player.dart';
 import 'zapiti_game_socket.dart';
 import 'zapiti_multiplayer_protocol.dart';
+import 'zapiti_logger.dart';
 
 class MultiplayerSessionStore {
   MultiplayerSessionStore._();
@@ -28,8 +29,10 @@ class MultiplayerSessionStore {
   bool allowPassHand = false;
   bool matchStarted = false;
 
+  String? get activeRoomId => roomSnapshot?.roomId ?? reconnectRoomId;
+
   bool get canReconnectMatch {
-    return (reconnectRoomId ?? roomSnapshot?.roomId)?.isNotEmpty == true &&
+    return activeRoomId?.isNotEmpty == true &&
         localGamePlayerId?.isNotEmpty == true &&
         reconnectUsername?.isNotEmpty == true &&
         reconnectPlayerName?.isNotEmpty == true &&
@@ -86,10 +89,29 @@ class MultiplayerSessionStore {
   }
 
   void clearAll() {
+    ZapitiLogger.info('session_store', 'clear_all_begin', fields: {
+      'activeRoomId': activeRoomId,
+      'localGamePlayerId': localGamePlayerId,
+      'matchStarted': matchStarted,
+      'players': players.map((player) => player.id).toList(),
+      'controlledPlayerIds': controlledPlayerIds,
+      'hasSocket': socket != null,
+      'socketConnected': socket?.isConnected,
+      'roomSnapshotPhase': roomSnapshot?.phase,
+    });
     socket?.close();
     socket = null;
     roomSnapshot = null;
     clearReconnectCredentials();
     clearMatchData();
+    ZapitiLogger.info('session_store', 'clear_all_done', fields: {
+      'activeRoomId': activeRoomId,
+      'localGamePlayerId': localGamePlayerId,
+      'matchStarted': matchStarted,
+      'players': players.map((player) => player.id).toList(),
+      'controlledPlayerIds': controlledPlayerIds,
+      'hasSocket': socket != null,
+      'roomSnapshotPhase': roomSnapshot?.phase,
+    });
   }
 }

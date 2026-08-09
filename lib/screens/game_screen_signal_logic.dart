@@ -1,6 +1,7 @@
 part of 'game_screen.dart';
 
 extension _GameScreenSignalLogic on _GameScreenState {
+  static const _signalMessagePrefix = 'SENAL: ';
   static const _companionSignalGestureDuration = Duration(milliseconds: 300);
   static const _companionNoSignalStatusDuration = Duration(milliseconds: 450);
 
@@ -11,19 +12,13 @@ extension _GameScreenSignalLogic on _GameScreenState {
 
     if (_isMultiplayerMatch) {
       if (!_ensureMultiplayerActionConnection()) return;
-      final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId =
-          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
-      if (socket != null && socket.isConnected && roomId != null) {
-        _updateState(() {
-          _isRequestingCompanionSignal = true;
-          _setCompanionPrivateSignalStatus(context.tr('companionLooking'));
-          _status = context.tr('askCompanionSignalStatus');
-        });
-        socket.requestSignal(roomId: roomId, playerId: playerId);
-        return;
-      }
+      _updateState(() {
+        _isRequestingCompanionSignal = true;
+        _setCompanionPrivateSignalStatus(context.tr('companionLooking'));
+        _status = context.tr('askCompanionSignalStatus');
+      });
+      _requestMultiplayerCompanionSignal();
+      return;
     }
 
     final version = _handVersion;
@@ -61,7 +56,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     );
     _updateState(() {
       _playersSignaledThisHand.add(companion.id);
-      _playerMessages[companion.id] = 'SeÃ±a: $signal';
+      _playerMessages[companion.id] = '$_signalMessagePrefix$signal';
       _setCompanionPrivateSignalStatus(
         companionSignalStatus,
         clearAfter: const Duration(seconds: 2),
@@ -84,7 +79,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
     await Future<void>.delayed(_companionSignalGestureDuration);
     if (!mounted || version != _handVersion) return;
     _updateState(() {
-      if (_playerMessages[companion.id] == 'SeÃ±a: $signal') {
+      if (_playerMessages[companion.id] == '$_signalMessagePrefix$signal') {
         _playerMessages.remove(companion.id);
       }
       if (_companionPrivateSignalStatus == companionSignalStatus) {
@@ -100,17 +95,19 @@ extension _GameScreenSignalLogic on _GameScreenState {
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
     _updateState(() {
-      _playerMessages[_humanPlayer.id] = 'SeÃ±a: $label';
+      _playerMessages[_humanPlayer.id] = '$_signalMessagePrefix$label';
       _knownSignalsByTeam[_humanPlayer.teamId] = label;
       _teamSignalsByTeam[_humanPlayer.teamId] = label;
-      _maybeLetRivalsSeeHumanSignal(label);
+      if (!_isMultiplayerMatch) {
+        _maybeLetRivalsSeeHumanSignal(label);
+      }
     });
+    _sendMultiplayerSignalToCompanion(label: label);
     if (_isGuidedTutorialMatch) {
       final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
-      final correct =
-          scenario.expectedAction == _TutorialScenarioAction.giveSignal &&
-              (scenario.expectedSignal == null ||
-                  scenario.expectedSignal == label);
+      final correct = scenario.expectedAction ==
+              _TutorialScenarioAction.giveSignal &&
+          (scenario.expectedSignal == null || scenario.expectedSignal == label);
       unawaited(_advanceGuidedTutorialAfterSuccess(
         correct: correct,
         fallbackMessage: scenario.expectedSignal == null
@@ -120,20 +117,6 @@ extension _GameScreenSignalLogic on _GameScreenState {
                 params: {'signal': scenario.expectedSignal},
               ),
       ));
-    }
-    if (_isMultiplayerMatch) {
-      if (!_canSendMultiplayerAction) return;
-      final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId =
-          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
-      if (socket != null && socket.isConnected && roomId != null) {
-        socket.signal(
-          roomId: roomId,
-          playerId: playerId,
-          label: label,
-        );
-      }
     }
   }
 
@@ -149,25 +132,21 @@ extension _GameScreenSignalLogic on _GameScreenState {
   }
 
   void _endSignal(String label) {
-    if (_playerMessages[_humanPlayer.id] != 'SeÃ±a: $label') return;
+    if (_isMultiplayerMatch) {
+      if (_playerMessages[_humanPlayer.id] == '$_signalMessagePrefix$label') {
+        _updateState(() {
+          _playerMessages.remove(_humanPlayer.id);
+        });
+      }
+      _sendMultiplayerSignalToCompanion(label: label, active: false);
+      return;
+    }
+    if (_playerMessages[_humanPlayer.id] != '$_signalMessagePrefix$label') {
+      return;
+    }
 
     _updateState(() {
       _playerMessages.remove(_humanPlayer.id);
     });
-    if (_isMultiplayerMatch) {
-      if (!_canSendMultiplayerAction) return;
-      final socket = MultiplayerSessionStore.instance.socket;
-      final roomId = MultiplayerSessionStore.instance.roomSnapshot?.roomId;
-      final playerId =
-          MultiplayerSessionStore.instance.localGamePlayerId ?? _humanPlayer.id;
-      if (socket != null && socket.isConnected && roomId != null) {
-        socket.signal(
-          roomId: roomId,
-          playerId: playerId,
-          label: label,
-          active: false,
-        );
-      }
-    }
   }
 }
