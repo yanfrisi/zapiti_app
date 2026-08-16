@@ -355,6 +355,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
         playedCards: _playedCards,
         players: _players,
         hands: _hands,
+        legalCards: _game.legalCardsForPlayer(bot),
       );
     }
     if ((shouldObeyVoyATi || shouldPlayHighest) &&
@@ -367,6 +368,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
         playedCards: _playedCards,
         players: _players,
         hands: _hands,
+        legalCards: _game.legalCardsForPlayer(bot),
       );
     }
     final memory = BotMemoryContext.from(

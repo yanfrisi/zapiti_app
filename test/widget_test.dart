@@ -958,7 +958,49 @@ void main() {
     await tester.pump();
 
     final chosenCard = gameState.chooseCurrentBotCardForTesting();
-    expect(chosenCard.toString(), isNot('4 de Bastos'));
+    expect(chosenCard, const SpanishCard(value: 5, suit: Suit.espadas));
+    expect(gameState.offlineRuntimeSnapshotForTesting()['pendingOrders'], 0);
+  });
+
+  testWidgets('sin ven a mi el bot mantiene su politica normal',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareComeToMeScenarioForTesting(issueOrder: false);
+    await tester.pump();
+
+    final chosenCard = gameState.chooseCurrentBotCardForTesting();
+    expect(chosenCard, const SpanishCard(value: 4, suit: Suit.bastos));
+  });
+
+  testWidgets('ven a mi manda tirar bajo en easy normal y hard',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    for (final difficulty in [1, 3, 4]) {
+      gameState.setDifficultyForTesting(difficulty);
+      gameState.prepareComeToMeScenarioForTesting();
+      await tester.pump();
+
+      final chosenCard = gameState.chooseCurrentBotCardForTesting();
+      expect(
+        chosenCard,
+        const SpanishCard(value: 5, suit: Suit.espadas),
+        reason: 'difficulty=$difficulty',
+      );
+    }
   });
 
   testWidgets('pasar mano no aparece si la regla esta desactivada',

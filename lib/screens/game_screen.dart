@@ -420,7 +420,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @visibleForTesting
-  void prepareComeToMeScenarioForTesting() {
+  void setDifficultyForTesting(int difficulty) {
+    _selectedDifficulty = difficulty;
+  }
+
+  @visibleForTesting
+  void prepareComeToMeScenarioForTesting({bool issueOrder = true}) {
     _isGuidedTutorialMatch = false;
     _guidedTutorialCompleted = false;
     _updateState(() {
@@ -467,9 +472,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _game.leadIndex = 0;
       _game.isRoundAwaitingContinue = false;
       _game.handFinished = false;
-      _forceLowestRequestedPlayerIds
-        ..clear()
-        ..add(ZapitiPlayers.companion.id);
+      _forceLowestRequestedPlayerIds.clear();
+      if (issueOrder) {
+        _forceLowestRequestedPlayerIds.add(ZapitiPlayers.companion.id);
+      }
       _forceWinRequestedPlayerIds.clear();
       _forceHighestRequestedPlayerIds.clear();
       _isAutoPlaying = false;

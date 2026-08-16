@@ -334,6 +334,24 @@ void main() {
       expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
     });
 
+    test('sin ven a mi mantiene la politica normal de dificultad', () {
+      const hand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 5, suit: Suit.copas),
+      ];
+
+      final chosen = BotStrategy.chooseCard(
+        player: bot,
+        hand: hand,
+        playedCards: const [],
+        preserveStrongCards: true,
+        opponentRoundWins: 1,
+      );
+
+      expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
+    });
+
     test('con seña fuerte del compañero evita gastar carta al inicio', () {
       const hand = [
         SpanishCard(value: 2, suit: Suit.copas),
