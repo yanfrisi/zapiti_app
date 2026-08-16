@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zapiti_app/domain/al_ver_rules.dart';
+import 'package:zapiti_app/domain/bet_state.dart';
 import 'package:zapiti_app/domain/debug_deals.dart';
+import 'package:zapiti_app/domain/legal_actions.dart';
 import 'package:zapiti_app/domain/played_card.dart';
 import 'package:zapiti_app/domain/spanish_card.dart';
 import 'package:zapiti_app/domain/suit.dart';
@@ -102,6 +104,22 @@ void main() {
       expect(controller.lastTrucoRaiserTeamId, TeamRules.teamOne);
     });
 
+    test('aceptar truco no cambia el ultimo equipo que subio', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      controller.callTruco(ZapitiPlayers.human, value: 3);
+      final lastRaisingTeamBeforeAccept = controller.lastTrucoRaiserTeamId;
+
+      controller.acceptTruco(teamId: TeamRules.teamTwo);
+
+      expect(controller.lastTrucoRaiserTeamId, lastRaisingTeamBeforeAccept);
+      expect(controller.betState.lastRaisingTeam, TeamRules.teamOne);
+      expect(controller.betState.proposingTeam, isNull);
+      expect(controller.betState.responsePending, isFalse);
+    });
+
     test('tras aceptar el mismo equipo no puede volver a subir enseguida', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
@@ -141,18 +159,13 @@ void main() {
       expect(controller.trucoCallerTeamId, TeamRules.teamOne);
     });
 
-    test('una vez aceptado el rival puede subir al siguiente nivel en su turno',
-        () {
+    test('una vez aceptado el rival puede subir al siguiente nivel', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
 
       controller.callTruco(ZapitiPlayers.human, value: 3);
       controller.acceptTruco(teamId: TeamRules.teamTwo);
-      controller.playCard(
-        ZapitiPlayers.human,
-        controller.hands[ZapitiPlayers.human.id]!.first,
-      );
 
       expect(
         controller.canCallTruco(
@@ -171,31 +184,133 @@ void main() {
       expect(controller.pendingTrucoValue, 6);
     });
 
-    test('las subidas solo pueden hacerse mientras el truco esta pendiente',
-        () {
+    test('el equipo que canta seis no puede cantar nueve inmediatamente', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
 
       controller.callTruco(ZapitiPlayers.human, value: 3);
-      controller.callTruco(
-        ZapitiPlayers.rightRival,
-        value: 6,
-        actorPlayerId: ZapitiPlayers.human.id,
-      );
+      controller.acceptTruco(teamId: TeamRules.teamTwo);
+      controller.callTruco(ZapitiPlayers.rightRival, value: 6);
 
       expect(controller.pendingTrucoValue, 6);
       expect(controller.trucoCallerTeamId, TeamRules.teamTwo);
-
-      controller.acceptTruco(teamId: TeamRules.teamOne);
       expect(
-        () => controller.callTruco(
-          ZapitiPlayers.companion,
+        controller.canCallTruco(
+          ZapitiPlayers.rightRival,
           value: 9,
-          actorPlayerId: ZapitiPlayers.human.id,
         ),
-        throwsArgumentError,
+        isFalse,
       );
+    });
+
+    test('despues de seis el equipo rival puede cantar nueve', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      controller.callTruco(ZapitiPlayers.human, value: 3);
+      controller.acceptTruco(teamId: TeamRules.teamTwo);
+      controller.callTruco(ZapitiPlayers.rightRival, value: 6);
+
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.human,
+          value: 9,
+        ),
+        isTrue,
+      );
+    });
+
+    test('marcador 26-20 no bloquea subir a seis tras aceptar truco', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      controller.score
+        ..[TeamRules.teamOne] = 26
+        ..[TeamRules.teamTwo] = 20;
+
+      controller.callTruco(ZapitiPlayers.human, value: 3);
+      controller.acceptTruco(teamId: TeamRules.teamTwo);
+
+      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamTwo), 10);
+      expect(
+        controller.canCallTruco(ZapitiPlayers.rightRival, value: 6),
+        isTrue,
+      );
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
+        contains(const BetAction.call(6)),
+      );
+    });
+
+    test('responder una apuesta pendiente no depende del turno de carta', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      expect(controller.currentPlayer, ZapitiPlayers.human);
+
+      controller.callTruco(ZapitiPlayers.human, value: 3);
+
+      expect(
+        controller.canAcceptTruco(
+          teamId: TeamRules.teamTwo,
+          actorPlayerId: ZapitiPlayers.rightRival.id,
+        ),
+        isTrue,
+      );
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
+        contains(const BetAction.accept()),
+      );
+    });
+
+    test('la escalera completa alterna equipos hasta ahorrisi', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+
+      controller.callTruco(ZapitiPlayers.human, value: 3);
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 6), isFalse);
+      expect(
+        controller.canCallTruco(ZapitiPlayers.rightRival, value: 6),
+        isTrue,
+      );
+
+      controller.callTruco(ZapitiPlayers.rightRival, value: 6);
+      expect(
+        controller.canCallTruco(ZapitiPlayers.rightRival, value: 9),
+        isFalse,
+      );
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 9), isTrue);
+
+      controller.callTruco(ZapitiPlayers.human, value: 9);
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 12), isFalse);
+      expect(
+        controller.canCallTruco(ZapitiPlayers.rightRival, value: 12),
+        isTrue,
+      );
+
+      controller.callTruco(ZapitiPlayers.rightRival, value: 12);
+      expect(
+        controller.canCallTruco(ZapitiPlayers.rightRival, value: 15),
+        isFalse,
+      );
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 15), isTrue);
+
+      controller.callTruco(ZapitiPlayers.human, value: 15);
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 18), isFalse);
+      expect(
+        controller.canCallTruco(ZapitiPlayers.rightRival, value: 18),
+        isTrue,
+      );
+
+      controller.callTruco(ZapitiPlayers.rightRival, value: 18);
+
+      expect(controller.pendingTrucoValue, 18);
+      expect(controller.betState.proposedLevel, BetLevel.ahorrisi);
     });
 
     test('empate de maxima produce 1-1 sin sumar chinos ni repartir de nuevo',
@@ -274,6 +389,34 @@ void main() {
       expect(controller.roundWins[TeamRules.teamOne], 3);
       expect(controller.roundWins[TeamRules.teamTwo], 2);
       expect(controller.score[TeamRules.teamOne], 1);
+      expect(controller.handFinished, isTrue);
+    });
+
+    test('tercera empatada tras 1-1 finaliza y suma puntos una sola vez', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      )..startNewHand(fixedHands: _teamOneThenTeamTwoThenTieHands());
+
+      _playFullRound(controller);
+      controller.resolveRound();
+      controller.continueRound();
+      _playFullRound(controller);
+      controller.resolveRound();
+      controller.continueRound();
+      _playFullRound(controller);
+      controller.resolveRound();
+
+      expect(controller.roundWins[TeamRules.teamOne], 2);
+      expect(controller.roundWins[TeamRules.teamTwo], 2);
+      expect(controller.score[TeamRules.teamOne], 1);
+      expect(controller.score[TeamRules.teamTwo], 0);
+      expect(controller.handFinished, isTrue);
+      expect(controller.isRoundAwaitingContinue, isFalse);
+
+      controller.resolveRound();
+
+      expect(controller.score[TeamRules.teamOne], 1);
+      expect(controller.score[TeamRules.teamTwo], 0);
       expect(controller.handFinished, isTrue);
     });
 
@@ -1336,6 +1479,31 @@ Map<String, List<SpanishCard>> _twoTiesThenTeamOneWinsHands() {
     ZapitiPlayers.leftRival.id: [
       const SpanishCard(value: 10, suit: Suit.copas),
       const SpanishCard(value: 7, suit: Suit.espadas),
+      const SpanishCard(value: 6, suit: Suit.espadas),
+    ],
+  };
+}
+
+Map<String, List<SpanishCard>> _teamOneThenTeamTwoThenTieHands() {
+  return {
+    ZapitiPlayers.human.id: [
+      const SpanishCard(value: 4, suit: Suit.bastos),
+      const SpanishCard(value: 12, suit: Suit.copas),
+      const SpanishCard(value: 5, suit: Suit.copas),
+    ],
+    ZapitiPlayers.rightRival.id: [
+      const SpanishCard(value: 12, suit: Suit.oros),
+      const SpanishCard(value: 7, suit: Suit.copas),
+      const SpanishCard(value: 3, suit: Suit.bastos),
+    ],
+    ZapitiPlayers.companion.id: [
+      const SpanishCard(value: 10, suit: Suit.bastos),
+      const SpanishCard(value: 11, suit: Suit.bastos),
+      const SpanishCard(value: 3, suit: Suit.oros),
+    ],
+    ZapitiPlayers.leftRival.id: [
+      const SpanishCard(value: 4, suit: Suit.espadas),
+      const SpanishCard(value: 5, suit: Suit.espadas),
       const SpanishCard(value: 6, suit: Suit.espadas),
     ],
   };

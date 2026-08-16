@@ -80,6 +80,11 @@ class HandRules {
       return null;
     }
 
-    return rounds[2].winningTeamId;
+    final third = rounds[2];
+    if (third.isTie && !first.isTie) {
+      return first.winningTeamId;
+    }
+
+    return third.winningTeamId;
   }
 }

@@ -84,7 +84,7 @@ void main() {
       );
     });
 
-    test('tras aceptar no quedan acciones de apuesta abiertas', () {
+    test('tras aceptar el equipo rival puede ver la subida legal', () {
       final controller = ZapitiGameController(players: ZapitiPlayers.tableOrder);
       controller.callTruco(
         ZapitiPlayers.human,
@@ -102,7 +102,7 @@ void main() {
       );
       expect(
         controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
-        isEmpty,
+        contains(const BetAction.call(6)),
       );
     });
   });

@@ -150,8 +150,8 @@ class ZapitiGameController {
         maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
       );
     }
-    if (currentPlayer.id != player.id) return null;
     if (trucoState == TrucoNegotiationState.notStarted) {
+      if (currentPlayer.id != player.id) return null;
       return TrucoRules.firstTrucoValue <=
               maxAllowedTrucoValueForTeam(player.teamId)
           ? TrucoRules.firstTrucoValue
@@ -476,8 +476,8 @@ class ZapitiGameController {
       return raiseOptionsForTeam(player.teamId).contains(value);
     }
 
-    if (currentPlayer.id != player.id) return false;
     if (trucoState == TrucoNegotiationState.notStarted) {
+      if (currentPlayer.id != player.id) return false;
       return TrucoRules.isOpeningValue(value);
     }
     if (trucoState == TrucoNegotiationState.acceptedClosed) {
