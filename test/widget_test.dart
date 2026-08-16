@@ -476,17 +476,25 @@ void main() {
     await tester.tap(find.text('TUTORIAL'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Gastar alta'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Gastar alta'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Casi'), findsOneWidget);
 
+    await tester.ensureVisible(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Siguiente').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Guardar fuerza'), findsOneWidget);
     expect(find.text('Gastar alta'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Guardar fuerza'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Guardar fuerza'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Siguiente').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Siguiente').last);
     await tester.pumpAndSettle();
