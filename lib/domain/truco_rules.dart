@@ -3,39 +3,30 @@ class TrucoRules {
 
   static const int firstTrucoValue = 3;
   static const int raiseStep = 3;
+  static const int maxTrucoValue = 18;
 
   /// Devuelve el valor máximo que puede proponer un equipo concreto.
   ///
-  /// Se usa para impedir que un equipo que ya está demasiado cerca del final
-  /// sea quien fuerce una apuesta que le daría la partida directamente.
+  /// La escalera oficial no se recorta por marcador: Truco, Seis, Nueve,
+  /// Doce, Quince y Ahorrisi.
   static int maxAllowedValueForTeam({
     required int teamScore,
     required int targetScore,
     required int currentAcceptedValue,
   }) {
-    final maxValue = targetScore - teamScore;
-    return maxValue < currentAcceptedValue ? currentAcceptedValue : maxValue;
+    return maxTrucoValue;
   }
 
   /// Devuelve el valor máximo al que puede quedar apostado el reparto.
   ///
-  /// El truco base siempre debe estar disponible mientras la partida siga
-  /// viva. Las subidas quedan capadas para no forzar escalones por encima del
-  /// margen restante de cualquiera de los equipos.
+  /// Ahorrisi es el último nivel oficial de la escalera.
   static int maxAllowedValue({
     required int scoreTeamOne,
     required int scoreTeamTwo,
     required int targetScore,
     required int currentAcceptedValue,
   }) {
-    final maxForTeamOne = targetScore - scoreTeamOne;
-    final maxForTeamTwo = targetScore - scoreTeamTwo;
-    final maxValue =
-        maxForTeamOne > maxForTeamTwo ? maxForTeamOne : maxForTeamTwo;
-    final minimumValue = currentAcceptedValue < firstTrucoValue
-        ? firstTrucoValue
-        : currentAcceptedValue;
-    return maxValue < minimumValue ? minimumValue : maxValue;
+    return maxTrucoValue;
   }
 
   /// Lista de subidas disponibles para quien debe responder al truco.
@@ -47,10 +38,10 @@ class TrucoRules {
     required int maxAllowedValue,
   }) {
     final nextValue = pendingValue + raiseStep;
-    final adjustedRaise =
-        nextValue > maxAllowedValue ? maxAllowedValue : nextValue;
-    if (adjustedRaise <= pendingValue) return const [];
-    return [adjustedRaise];
+    if (nextValue > maxAllowedValue || nextValue > maxTrucoValue) {
+      return const [];
+    }
+    return [nextValue];
   }
 
   static int? nextRaiseValue({

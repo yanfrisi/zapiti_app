@@ -230,17 +230,19 @@ void main() {
       controller.score
         ..[TeamRules.teamOne] = 26
         ..[TeamRules.teamTwo] = 20;
+      controller.startNewHand();
 
-      controller.callTruco(ZapitiPlayers.human, value: 3);
-      controller.acceptTruco(teamId: TeamRules.teamTwo);
+      controller.callTruco(ZapitiPlayers.rightRival, value: 3);
+      controller.acceptTruco(teamId: TeamRules.teamOne);
 
-      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamTwo), 10);
+      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne), 18);
+      expect(controller.lastTrucoRaiserTeamId, TeamRules.teamTwo);
       expect(
-        controller.canCallTruco(ZapitiPlayers.rightRival, value: 6),
+        controller.canCallTruco(ZapitiPlayers.human, value: 6),
         isTrue,
       );
       expect(
-        controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
+        controller.legalBetActionsForPlayer(ZapitiPlayers.human),
         contains(const BetAction.call(6)),
       );
     });
@@ -696,12 +698,10 @@ void main() {
         throwsArgumentError,
       );
 
-      controller.score[TeamRules.teamOne] = 26;
-      controller.score[TeamRules.teamTwo] = 26;
       expect(
         () => controller.raiseTruco(
           ZapitiPlayers.rightRival,
-          value: 6,
+          value: 21,
           actorPlayerId: ZapitiPlayers.human.id,
         ),
         throwsArgumentError,
@@ -749,16 +749,15 @@ void main() {
       );
     });
 
-    test('ajusta la siguiente subida de truco al margen exacto hasta 30', () {
+    test('la siguiente subida de truco sigue la escalera oficial', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
       for (final score in [24, 25, 26, 27, 28, 29]) {
         controller.score[TeamRules.teamOne] = score;
-        final expected = ZapitiGameController.defaultTargetScore - score;
         expect(
           controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne),
-          expected,
+          18,
           reason: 'score=$score',
         );
       }
@@ -772,10 +771,10 @@ void main() {
       expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), [6]);
 
       controller.score[TeamRules.teamTwo] = 25;
-      expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), [5]);
+      expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), [6]);
     });
 
-    test('permite subidas ajustadas cerca de 30 en 24 a 29 chinos', () {
+    test('permite subidas oficiales cerca de 30 en 24 a 29 chinos', () {
       for (final score in [24, 25, 26, 27, 28, 29]) {
         final controller = ZapitiGameController(
           players: ZapitiPlayers.tableOrder,
@@ -783,41 +782,29 @@ void main() {
         controller.score[TeamRules.teamOne] = score;
         controller.score[TeamRules.teamTwo] = score;
 
-        final canOpen = score <= 27;
         expect(
           controller.canCallTruco(
             ZapitiPlayers.human,
             value: 3,
             actorPlayerId: ZapitiPlayers.human.id,
           ),
-          canOpen,
+          isTrue,
           reason: 'score=$score',
         );
-
-        if (!canOpen) {
-          expect(
-            controller.nextTrucoValueForPlayer(ZapitiPlayers.human),
-            isNull,
-            reason: 'score=$score',
-          );
-          continue;
-        }
 
         controller.callTruco(
           ZapitiPlayers.human,
           value: 3,
           actorPlayerId: ZapitiPlayers.human.id,
         );
-        final remaining = ZapitiGameController.defaultTargetScore - score;
-        final expectedRaise = remaining > 3 ? remaining : null;
         expect(
           controller.nextTrucoValueForPlayer(ZapitiPlayers.rightRival),
-          expectedRaise,
+          6,
           reason: 'score=$score',
         );
         expect(
           controller.raiseOptionsForTeam(TeamRules.teamTwo),
-          expectedRaise == null ? isEmpty : [expectedRaise],
+          [6],
           reason: 'score=$score',
         );
       }

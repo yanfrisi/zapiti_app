@@ -3,7 +3,7 @@ import 'package:zapiti_app/domain/truco_rules.dart';
 
 void main() {
   group('TrucoRules', () {
-    test('limita la subida para no llegar al objetivo de partida', () {
+    test('usa Ahorrisi como techo oficial de la escalera', () {
       final maxValue = TrucoRules.maxAllowedValue(
         scoreTeamOne: 21,
         scoreTeamTwo: 26,
@@ -11,10 +11,10 @@ void main() {
         currentAcceptedValue: 3,
       );
 
-      expect(maxValue, 3);
+      expect(maxValue, 18);
     });
 
-    test('permite el truco base aunque un equipo este a 27', () {
+    test('el marcador no recorta el techo oficial de apuesta', () {
       final maxValue = TrucoRules.maxAllowedValue(
         scoreTeamOne: 19,
         scoreTeamTwo: 27,
@@ -22,10 +22,10 @@ void main() {
         currentAcceptedValue: 1,
       );
 
-      expect(maxValue, 3);
+      expect(maxValue, 18);
     });
 
-    test('el limite por equipo bloquea abrir truco si ya esta a 27', () {
+    test('el limite por equipo no inventa escalones por marcador', () {
       final teamWithMargin = TrucoRules.maxAllowedValueForTeam(
         teamScore: 19,
         targetScore: 30,
@@ -37,8 +37,8 @@ void main() {
         currentAcceptedValue: 1,
       );
 
-      expect(teamWithMargin, greaterThanOrEqualTo(3));
-      expect(teamNearEnd, lessThan(3));
+      expect(teamWithMargin, 18);
+      expect(teamNearEnd, 18);
     });
 
     test('no ofrece subida si el final de partida solo permite truco base', () {
@@ -57,6 +57,15 @@ void main() {
       );
 
       expect(options, [6]);
+    });
+
+    test('no ajusta una subida a valores fuera de la escalera oficial', () {
+      final options = TrucoRules.raiseOptions(
+        pendingValue: 3,
+        maxAllowedValue: 5,
+      );
+
+      expect(options, isEmpty);
     });
 
     test('rechaza contra-subidas que no caen en escalones de tres', () {

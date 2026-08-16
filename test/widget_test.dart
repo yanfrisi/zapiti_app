@@ -1104,7 +1104,7 @@ void main() {
     expect(find.text('Estás al ver'), findsOneWidget);
     expect(
       find.text(
-        'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
+        'Tu equipo tiene 29 chinos. Puedes jugar la mano por 3 chinos o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
       ),
       findsOneWidget,
     );
