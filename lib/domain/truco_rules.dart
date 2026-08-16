@@ -13,7 +13,7 @@ class TrucoRules {
     required int targetScore,
     required int currentAcceptedValue,
   }) {
-    final maxValue = targetScore - 1 - teamScore;
+    final maxValue = targetScore - teamScore;
     return maxValue < currentAcceptedValue ? currentAcceptedValue : maxValue;
   }
 
@@ -28,10 +28,10 @@ class TrucoRules {
     required int targetScore,
     required int currentAcceptedValue,
   }) {
-    final maxForTeamOne = targetScore - 1 - scoreTeamOne;
-    final maxForTeamTwo = targetScore - 1 - scoreTeamTwo;
+    final maxForTeamOne = targetScore - scoreTeamOne;
+    final maxForTeamTwo = targetScore - scoreTeamTwo;
     final maxValue =
-        maxForTeamOne < maxForTeamTwo ? maxForTeamOne : maxForTeamTwo;
+        maxForTeamOne > maxForTeamTwo ? maxForTeamOne : maxForTeamTwo;
     final minimumValue = currentAcceptedValue < firstTrucoValue
         ? firstTrucoValue
         : currentAcceptedValue;
@@ -46,9 +46,11 @@ class TrucoRules {
     required int pendingValue,
     required int maxAllowedValue,
   }) {
-    final firstRaise = pendingValue + raiseStep;
-    if (firstRaise > maxAllowedValue) return const [];
-    return [firstRaise];
+    final nextValue = pendingValue + raiseStep;
+    final adjustedRaise =
+        nextValue > maxAllowedValue ? maxAllowedValue : nextValue;
+    if (adjustedRaise <= pendingValue) return const [];
+    return [adjustedRaise];
   }
 
   static int? nextRaiseValue({

@@ -399,7 +399,7 @@
   "nextRoundUpper": "RONDA SEGUINTE",
   "callTrucoUpper": "CANTAR TRUCO",
   "alVerTitle": "Estás al ver",
-  "alVerBody": "A tua equipa tem 29 pontos. Podes jogar a mão ou ir para casa. Se fores para casa, a equipa rival soma 2 pontos.",
+  "alVerBody": "A tua equipa tem 29 pontos. Podes jogar a mão por 3 pontos ou ir para casa. Se fores para casa, a equipa rival soma 2 pontos.",
   "goHomeUpper": "IR PARA CASA",
   "holdToViewCards": "Manter para ver cartas",
   "winningTeamTitle": "Ganhou a Equipa {team}",

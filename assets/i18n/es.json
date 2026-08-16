@@ -399,7 +399,7 @@
   "nextRoundUpper": "SIGUIENTE RONDA",
   "callTrucoUpper": "CANTAR TRUCO",
   "alVerTitle": "Estás al ver",
-  "alVerBody": "Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.",
+  "alVerBody": "Tu equipo tiene 29 chinos. Puedes jugar la mano por 3 chinos o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.",
   "goHomeUpper": "IRSE A CASA",
   "holdToViewCards": "Mantener para ver cartas",
   "winningTeamTitle": "Ganó el Equipo {team}",

@@ -399,7 +399,7 @@
   "nextRoundUpper": "NEXT ROUND",
   "callTrucoUpper": "CALL TRUCO",
   "alVerTitle": "You are at al ver",
-  "alVerBody": "Your team has 29 points. You can play the hand or go home. If you go home, the rival team scores 2 points.",
+  "alVerBody": "Your team has 29 points. You can play the hand for 3 points or go home. If you go home, the rival team scores 2 points.",
   "goHomeUpper": "GO HOME",
   "holdToViewCards": "Hold to view cards",
   "winningTeamTitle": "Team {team} won",

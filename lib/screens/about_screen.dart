@@ -162,6 +162,11 @@ class AboutScreen extends StatelessWidget {
                                       'Miguel Mateos Borrego',
                                       style: bodyStyle,
                                     ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Tabares',
+                                      style: bodyStyle,
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),

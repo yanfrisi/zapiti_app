@@ -344,6 +344,19 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
     final shouldPlayHighest = _forceHighestRequestedPlayerIds.contains(bot.id);
+    final shouldPlayLowest = _forceLowestRequestedPlayerIds.contains(bot.id);
+    if (shouldPlayLowest) {
+      _forceWinRequestedPlayerIds.remove(bot.id);
+      _forceHighestRequestedPlayerIds.remove(bot.id);
+      _forceLowestRequestedPlayerIds.remove(bot.id);
+      return BotVenAMiStrategy.chooseCard(
+        bot: bot,
+        hand: hand,
+        playedCards: _playedCards,
+        players: _players,
+        hands: _hands,
+      );
+    }
     if ((shouldObeyVoyATi || shouldPlayHighest) &&
         _shouldIgnoreAggressiveCompanionCommand(bot)) {
       _forceWinRequestedPlayerIds.remove(bot.id);

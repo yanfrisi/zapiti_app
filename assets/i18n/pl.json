@@ -399,7 +399,7 @@
   "nextRoundUpper": "NASTĘPNA RUNDA",
   "callTrucoUpper": "WOŁAJ TRUCO",
   "alVerTitle": "Jesteś al ver",
-  "alVerBody": "Twoja drużyna ma 29 punktów. Możesz rozegrać rozdanie albo pójść do domu. Jeśli pójdziesz do domu, rywal dostanie 2 punkty.",
+  "alVerBody": "Twoja drużyna ma 29 punktów. Możesz rozegrać rozdanie za 3 punkty albo pójść do domu. Jeśli pójdziesz do domu, rywal dostanie 2 punkty.",
   "goHomeUpper": "IDŹ DO DOMU",
   "holdToViewCards": "Przytrzymaj, aby zobaczyć karty",
   "winningTeamTitle": "Wygrała drużyna {team}",

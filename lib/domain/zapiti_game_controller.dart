@@ -1,3 +1,4 @@
+import 'al_ver_rules.dart';
 import 'bet_state.dart';
 import 'hand_rules.dart';
 import 'legal_actions.dart';
@@ -264,6 +265,9 @@ class ZapitiGameController {
           ? 'Equipo ${alVerTeamIds.first} está al ver.'
           : 'Ambos equipos están al ver.';
       status = '$status $summary Decide antes de jugar.';
+    } else if (alVerTeamIds.length == 2) {
+      status = '$status Ambos equipos estÃ¡n al ver. La mano vale '
+          '${AlVerRules.playPoints} chinos.';
     }
     _log(status);
   }
@@ -521,7 +525,11 @@ class ZapitiGameController {
 
     if (play) {
       alVerState = AlVerState.playing;
+      status = 'Equipo $teamId decide jugar al ver. La mano vale '
+          '${AlVerRules.playPoints} chinos.';
       status = 'Equipo $teamId decide jugar al ver. La mano continúa.';
+      status = 'Equipo $teamId decide jugar al ver. La mano vale '
+          '${AlVerRules.playPoints} chinos.';
       _log(status);
       return;
     }
@@ -530,8 +538,9 @@ class ZapitiGameController {
     alVerState = AlVerState.conceded;
     _finishHandForTeam(
       rivalTeamId,
-      'Equipo $teamId se va a casa. Equipo $rivalTeamId suma 2 chinos.',
-      points: 2,
+      'Equipo $teamId se va a casa. Equipo $rivalTeamId suma '
+      '${AlVerRules.concedePoints} chinos.',
+      points: AlVerRules.concedePoints,
     );
   }
 
@@ -557,7 +566,7 @@ class ZapitiGameController {
     if (progress.isFinished && progress.winningTeamId != null) {
       _finishHandForTeam(
         progress.winningTeamId!,
-        '${winner.player.name} gana con ${winner.card}. Equipo ${progress.winningTeamId} gana el reparto y suma $handValue chinos.',
+        '${winner.player.name} gana con ${winner.card}. Equipo ${progress.winningTeamId} gana el reparto y suma ${_awardedHandPoints()} chinos.',
       );
       return;
     }
@@ -585,7 +594,7 @@ class ZapitiGameController {
     if (progress.isFinished && progress.winningTeamId != null) {
       _finishHandForTeam(
         progress.winningTeamId!,
-        'Gana el reparto el Equipo ${progress.winningTeamId} por la primera ronda. Suma $handValue chinos.',
+        'Gana el reparto el Equipo ${progress.winningTeamId} por la primera ronda. Suma ${_awardedHandPoints()} chinos.',
       );
       return;
     }
@@ -598,7 +607,7 @@ class ZapitiGameController {
 
   void _finishHandForTeam(int teamId, String message, {int? points}) {
     if (handFinished) return;
-    final awardedPoints = points ?? handValue;
+    final awardedPoints = points ?? _awardedHandPoints();
     score[teamId] = (score[teamId]! + awardedPoints).clamp(0, targetScore);
     handFinished = true;
     isRoundAwaitingContinue = false;
@@ -637,15 +646,27 @@ class ZapitiGameController {
     alVerTeamIds.clear();
     final teamOneScore = score[TeamRules.teamOne]!;
     final teamTwoScore = score[TeamRules.teamTwo]!;
-    if (teamOneScore == 29) {
+    if (teamOneScore == AlVerRules.triggerScore) {
       alVerTeamIds.add(TeamRules.teamOne);
     }
-    if (teamTwoScore == 29) {
+    if (teamTwoScore == AlVerRules.triggerScore) {
       alVerTeamIds.add(TeamRules.teamTwo);
     }
 
-    alVerState =
-        alVerTeamIds.isEmpty ? AlVerState.none : AlVerState.awaitingDecision;
+    if (alVerTeamIds.isEmpty) {
+      alVerState = AlVerState.none;
+    } else if (AlVerRules.requiresDecision(alVerTeamIds)) {
+      alVerState = AlVerState.awaitingDecision;
+    } else {
+      alVerState = AlVerState.playing;
+    }
+  }
+
+  int _awardedHandPoints() {
+    if (alVerState == AlVerState.playing && alVerTeamIds.isNotEmpty) {
+      return AlVerRules.playPoints;
+    }
+    return handValue;
   }
 
   Map<String, List<SpanishCard>> _dealRandomHands() {

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zapiti_app/domain/al_ver_rules.dart';
 import 'package:zapiti_app/domain/debug_deals.dart';
 import 'package:zapiti_app/domain/played_card.dart';
 import 'package:zapiti_app/domain/spanish_card.dart';
@@ -564,13 +565,12 @@ void main() {
       );
     });
 
-    test('solo el equipo con margen puede abrir truco a 3 con marcador 19-27',
+    test('un equipo con 27 chinos puede abrir truco a 3 para jugarse la partida',
         () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
-      controller.score[TeamRules.teamOne] = 19;
-      controller.score[TeamRules.teamTwo] = 27;
+      controller.score[TeamRules.teamOne] = 27;
 
       expect(
         controller.canCallTruco(
@@ -588,14 +588,6 @@ void main() {
         ),
         isFalse,
       );
-      expect(
-        () => controller.callTruco(
-          ZapitiPlayers.rightRival,
-          value: 3,
-          actorPlayerId: ZapitiPlayers.rightRival.id,
-        ),
-        throwsArgumentError,
-      );
 
       controller.callTruco(
         ZapitiPlayers.human,
@@ -604,7 +596,7 @@ void main() {
       );
 
       expect(controller.pendingTrucoValue, 3);
-      expect(controller.raiseOptions, isEmpty);
+      expect(controller.raiseOptions, [6]);
       expect(
         controller.canAcceptTruco(
           teamId: TeamRules.teamTwo,
@@ -612,6 +604,80 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('ajusta la siguiente subida de truco al margen exacto hasta 30', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      for (final score in [24, 25, 26, 27, 28, 29]) {
+        controller.score[TeamRules.teamOne] = score;
+        final expected = ZapitiGameController.defaultTargetScore - score;
+        expect(
+          controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne),
+          expected,
+          reason: 'score=$score',
+        );
+      }
+
+      controller.score[TeamRules.teamOne] = 25;
+      controller.callTruco(
+        ZapitiPlayers.human,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), [6]);
+
+      controller.score[TeamRules.teamTwo] = 25;
+      expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), [5]);
+    });
+
+    test('permite subidas ajustadas cerca de 30 en 24 a 29 chinos', () {
+      for (final score in [24, 25, 26, 27, 28, 29]) {
+        final controller = ZapitiGameController(
+          players: ZapitiPlayers.tableOrder,
+        );
+        controller.score[TeamRules.teamOne] = score;
+        controller.score[TeamRules.teamTwo] = score;
+
+        final canOpen = score <= 27;
+        expect(
+          controller.canCallTruco(
+            ZapitiPlayers.human,
+            value: 3,
+            actorPlayerId: ZapitiPlayers.human.id,
+          ),
+          canOpen,
+          reason: 'score=$score',
+        );
+
+        if (!canOpen) {
+          expect(
+            controller.nextTrucoValueForPlayer(ZapitiPlayers.human),
+            isNull,
+            reason: 'score=$score',
+          );
+          continue;
+        }
+
+        controller.callTruco(
+          ZapitiPlayers.human,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.human.id,
+        );
+        final remaining = ZapitiGameController.defaultTargetScore - score;
+        final expectedRaise = remaining > 3 ? remaining : null;
+        expect(
+          controller.nextTrucoValueForPlayer(ZapitiPlayers.rightRival),
+          expectedRaise,
+          reason: 'score=$score',
+        );
+        expect(
+          controller.raiseOptionsForTeam(TeamRules.teamTwo),
+          expectedRaise == null ? isEmpty : [expectedRaise],
+          reason: 'score=$score',
+        );
+      }
     });
 
     test('subidas alternan equipos y no puede haber dos propuestas pendientes',
@@ -759,7 +825,7 @@ void main() {
       );
     });
 
-    test('si el equipo al ver decide jugar, la mano continua y vale 1 chino',
+    test('si el equipo al ver decide jugar, la mano continua y vale 3 chinos',
         () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
@@ -774,6 +840,28 @@ void main() {
 
       expect(controller.alVerState, AlVerState.playing);
       expect(controller.handValue, 1);
+      expect(
+        () => controller.playCard(
+          controller.currentPlayer,
+          controller.hands[controller.currentPlayer.id]!.first,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('si ambos equipos estan al ver la mano sigue sin decision pendiente',
+        () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.score[TeamRules.teamTwo] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      expect(controller.alVerState, AlVerState.playing);
+      expect(controller.alVerTeamId, isNull);
+      expect(controller.currentPlayer.id, isNotEmpty);
       expect(
         () => controller.playCard(
           controller.currentPlayer,
@@ -846,9 +934,10 @@ void main() {
       );
     });
 
-    test('si el equipo al ver juega y gana sin truco, suma 1 chino', () {
+    test('si el equipo al ver juega y gana sin truco, suma 3 chinos', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
       );
       controller.score[TeamRules.teamOne] = 29;
       controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
@@ -859,8 +948,9 @@ void main() {
 
       _finishTwoRounds(controller);
 
-      expect(controller.score[TeamRules.teamOne], 30);
+      expect(controller.score[TeamRules.teamOne], 29 + AlVerRules.playPoints);
       expect(controller.handFinished, isTrue);
+      expect(controller.winningTeamId, isNull);
     });
 
     test('una mano nueva sin 29 limpia el estado al ver', () {

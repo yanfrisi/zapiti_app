@@ -419,6 +419,79 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _loadGuidedTutorialScenario(index);
   }
 
+  @visibleForTesting
+  void prepareComeToMeScenarioForTesting() {
+    _isGuidedTutorialMatch = false;
+    _guidedTutorialCompleted = false;
+    _updateState(() {
+      _game.nextLeadIndex = 0;
+      _game.score[TeamRules.teamOne] = 0;
+      _game.score[TeamRules.teamTwo] = 0;
+      _game.startNewHand(
+        fixedHands: {
+          'p1': const [
+            SpanishCard(value: 3, suit: Suit.oros),
+            SpanishCard(value: 5, suit: Suit.copas),
+            SpanishCard(value: 6, suit: Suit.espadas),
+          ],
+          'p2': const [
+            SpanishCard(value: 4, suit: Suit.oros),
+            SpanishCard(value: 5, suit: Suit.bastos),
+            SpanishCard(value: 6, suit: Suit.copas),
+          ],
+          'p3': const [
+            SpanishCard(value: 4, suit: Suit.bastos),
+            SpanishCard(value: 12, suit: Suit.oros),
+            SpanishCard(value: 5, suit: Suit.espadas),
+          ],
+          'p4': const [
+            SpanishCard(value: 4, suit: Suit.copas),
+            SpanishCard(value: 5, suit: Suit.oros),
+            SpanishCard(value: 6, suit: Suit.bastos),
+          ],
+        },
+      );
+      _game.roundHistory.add(
+        RoundResult(
+          playedCards: const [],
+          winner: PlayedCard(
+            player: ZapitiPlayers.human,
+            card: SpanishCard(value: 3, suit: Suit.oros),
+          ),
+        ),
+      );
+      _game.roundWins[TeamRules.teamOne] = 1;
+      _game.roundWins[TeamRules.teamTwo] = 0;
+      _game.playedCards.clear();
+      _game.turnIndex = 2;
+      _game.leadIndex = 0;
+      _game.isRoundAwaitingContinue = false;
+      _game.handFinished = false;
+      _forceLowestRequestedPlayerIds
+        ..clear()
+        ..add(ZapitiPlayers.companion.id);
+      _forceWinRequestedPlayerIds.clear();
+      _forceHighestRequestedPlayerIds.clear();
+      _isAutoPlaying = false;
+      _status = 'Escenario Ven a mí listo.';
+    });
+  }
+
+  @visibleForTesting
+  Future<void> advanceBotsForTesting() async {
+    await _advanceBots();
+  }
+
+  @visibleForTesting
+  SpanishCard chooseCurrentBotCardForTesting() {
+    final bot = _currentPlayer;
+    final hand = _hands[bot.id];
+    if (hand == null) {
+      throw StateError('El jugador actual no tiene mano cargada.');
+    }
+    return _chooseBotCard(bot, hand);
+  }
+
   bool get _canHumanCallTruco {
     if (_isRoundAwaitingContinue ||
         _isWaitingHumanTrucoResponse ||

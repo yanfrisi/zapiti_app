@@ -399,7 +399,7 @@
   "nextRoundUpper": "MANCHE SUIVANTE",
   "callTrucoUpper": "ANNONCER TRUCO",
   "alVerTitle": "Tu es al ver",
-  "alVerBody": "Ton équipe a 29 points. Tu peux jouer la main ou rentrer. Si tu rentres, l'équipe adverse marque 2 points.",
+  "alVerBody": "Ton équipe a 29 points. Tu peux jouer la main pour 3 points ou rentrer. Si tu rentres, l'équipe adverse marque 2 points.",
   "goHomeUpper": "RENTRER",
   "holdToViewCards": "Maintenir pour voir les cartes",
   "winningTeamTitle": "L'Équipe {team} a gagné",

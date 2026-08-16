@@ -264,6 +264,28 @@ void main() {
     expect(tester.takeException(), isNull);
 
     gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(6);
+    });
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Vas pobre, pero los rivales ya ven mesa dudosa. Canta truco como farol.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('PEDIR SEÑA'), findsOneWidget);
+    await tester.tap(find.text('PEDIR SEÑA'));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Vas pobre, pero los rivales ya ven mesa dudosa. Canta truco como farol.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Pasa truco malo'), findsNothing);
+
+    gameState.setState(() {
       gameState.loadGuidedTutorialScenarioForTesting(7);
     });
     await tester.pumpAndSettle();
@@ -326,6 +348,7 @@ void main() {
     expect(find.textContaining('Versión'), findsOneWidget);
     expect(find.text('Juan Francisco Gutiérrez Vázquez'), findsWidgets);
     expect(find.text('Miguel Mateos Borrego'), findsOneWidget);
+    expect(find.text('Tabares'), findsOneWidget);
     expect(find.text('Agradecimientos especiales a la Peña el Trompazo.'),
         findsOneWidget);
     expect(find.text('VOLVER'), findsOneWidget);
@@ -919,6 +942,23 @@ void main() {
     expect(find.textContaining('VEN A'), findsOneWidget);
     expect(find.text('MATA'), findsOneWidget);
     expect(find.text('VOY A TI'), findsNothing);
+  });
+
+  testWidgets('ven a mi hace que el bot conserve el Zapiti en segunda baza',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareComeToMeScenarioForTesting();
+    await tester.pump();
+
+    final chosenCard = gameState.chooseCurrentBotCardForTesting();
+    expect(chosenCard.toString(), isNot('4 de Bastos'));
   });
 
   testWidgets('pasar mano no aparece si la regla esta desactivada',

@@ -524,7 +524,7 @@ extension _GameScreenStateFlow on _GameScreenState {
       );
     });
     await Future<void>.delayed(const Duration(milliseconds: 1200));
-    if (!mounted || !_isGuidedTutorialMatch) return;
+    if (!mounted || !_isGuidedTutorialMatch || !correct) return;
 
     final nextIndex = _guidedTutorialScenarioIndex + 1;
     _updateState(() {
@@ -1913,7 +1913,11 @@ extension _GameScreenStateFlow on _GameScreenState {
       'awaitingDecision' => AlVerState.awaitingDecision,
       'playing' => AlVerState.playing,
       'conceded' => AlVerState.conceded,
-      _ => teamIds.isEmpty ? AlVerState.none : AlVerState.awaitingDecision,
+      _ => teamIds.isEmpty
+          ? AlVerState.none
+          : teamIds.length == 1
+              ? AlVerState.awaitingDecision
+              : AlVerState.playing,
     };
 
     _game.alVerTeamIds
