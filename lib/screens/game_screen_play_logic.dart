@@ -75,6 +75,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
       if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     }
 
+    if (_isGuidedTutorialMatch) {
+      await _handleGuidedTutorialCard(card);
+      return;
+    }
+
     var roundCompleted = false;
     _updateState(() {
       roundCompleted = _playCard(_humanPlayer, card);
@@ -92,10 +97,6 @@ extension _GameScreenPlayLogic on _GameScreenState {
           expectedStateVersion: _multiplayerStateVersion,
         );
       }
-      return;
-    }
-    if (_isGuidedTutorialMatch) {
-      await _handleGuidedTutorialCard(card);
       return;
     }
     if (roundCompleted) {
@@ -139,7 +140,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
     return result ?? false;
   }
 
-  Future<void> _maybeShowBotSignal(Player bot, int version) async {
+  Future<void> _maybeShowBotSignal(
+    Player bot,
+    int version, {
+    bool awaitReveal = true,
+  }) async {
     if (_playersSignaledThisHand.contains(bot.id) ||
         _handFinished ||
         _isGameFinished ||
@@ -175,7 +180,20 @@ extension _GameScreenPlayLogic on _GameScreenState {
         ? Duration(
             milliseconds: difficultyProfile.rivalSignalRevealMilliseconds,
           )
-        : const Duration(milliseconds: 300);
+        : _GameScreenState._teammateBotSignalRevealDuration;
+    if (!awaitReveal) {
+      _playerMessageTimers.remove(bot.id)?.cancel();
+      _playerMessageTimers[bot.id] = Timer(revealDuration, () {
+        if (!mounted || version != _handVersion) return;
+        _updateState(() {
+          if (_playerMessages[bot.id] == 'SENAL: $signal') {
+            _playerMessages.remove(bot.id);
+          }
+          _playerMessageTimers.remove(bot.id);
+        });
+      });
+      return;
+    }
     await Future<void>.delayed(revealDuration);
     if (!mounted || version != _handVersion) return;
     _updateState(() {
@@ -241,8 +259,16 @@ extension _GameScreenPlayLogic on _GameScreenState {
         _isLocalBotPlayer(_currentPlayer)) {
       final bot = _currentPlayer;
       final botHand = _hands[bot.id]!;
+      final hasCompanionOrderWindow = _shouldOpenCompanionBotOrderWindow(bot);
+      if (hasCompanionOrderWindow) {
+        _beginCompanionBotOrderWindow(bot);
+      }
 
-      await _maybeShowBotSignal(bot, version);
+      await _maybeShowBotSignal(
+        bot,
+        version,
+        awaitReveal: !hasCompanionOrderWindow,
+      );
       if (!mounted || version != _handVersion || _handFinished) return;
 
       if (_shouldBotCallTruco(bot)) {
@@ -291,7 +317,17 @@ extension _GameScreenPlayLogic on _GameScreenState {
         );
       });
 
-      await _botDelay(1150);
+      if (hasCompanionOrderWindow) {
+        final wasOrderReceived =
+            await _finishCompanionBotOrderWindow(bot, version);
+        if (wasOrderReceived) {
+          await Future<void>.delayed(
+            _GameScreenState._companionBotPostOrderVisualDelay,
+          );
+        }
+      } else {
+        await _botDelay(1150);
+      }
       if (!mounted || version != _handVersion || _handFinished) return;
 
       final card = _chooseBotCard(bot, botHand);
@@ -340,6 +376,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
   }
 
   SpanishCard _chooseBotCard(Player bot, List<SpanishCard> hand) {
+    _botCardSelectionCountForTesting += 1;
     final teamSignal = _teamSignalsByTeam[bot.teamId];
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
@@ -442,6 +479,64 @@ extension _GameScreenPlayLogic on _GameScreenState {
       companion: _companionPlayer,
       selectedDifficulty: _selectedDifficulty,
     );
+  }
+
+  bool _shouldOpenCompanionBotOrderWindow(Player bot) {
+    if (_isMultiplayerMatch) return false;
+    if (!_isLocalBotPlayer(bot)) return false;
+    if (bot.id != _companionPlayer.id) return false;
+    if (bot.teamId != _humanPlayer.teamId) return false;
+    if (_handFinished ||
+        _isGameFinished ||
+        _isRoundAwaitingContinue ||
+        _game.alVerState == AlVerState.awaitingDecision) {
+      return false;
+    }
+    if (_playedCards.any((card) => card.player.id == bot.id)) return false;
+    return _game.legalCardsForPlayer(bot).isNotEmpty;
+  }
+
+  void _beginCompanionBotOrderWindow(Player bot) {
+    _updateState(() {
+      final completer = Completer<void>();
+      _companionBotOrderWindowPlayerId = bot.id;
+      _companionBotOrderWindowCompleter = completer;
+      _companionBotOrderWindowFuture = Future.any<bool>(
+        [
+          Future<void>.delayed(
+            _GameScreenState._companionBotOrderWindowDuration,
+          ).then((_) => false),
+          completer.future.then((_) => true),
+        ],
+      );
+    });
+  }
+
+  Future<bool> _finishCompanionBotOrderWindow(Player bot, int version) async {
+    final completer = _companionBotOrderWindowCompleter;
+    final windowFuture = _companionBotOrderWindowFuture;
+    final wasOrderReceived = await (windowFuture ??
+        Future<void>.delayed(
+          _GameScreenState._companionBotOrderWindowDuration,
+        ).then((_) => false));
+
+    if (!mounted || version != _handVersion) return false;
+    _updateState(() {
+      if (_companionBotOrderWindowPlayerId == bot.id &&
+          _companionBotOrderWindowCompleter == completer) {
+        _companionBotOrderWindowPlayerId = null;
+        _companionBotOrderWindowCompleter = null;
+        _companionBotOrderWindowFuture = null;
+      }
+    });
+    return wasOrderReceived;
+  }
+
+  void _notifyCompanionBotOrderRegistered(String playerId) {
+    if (_companionBotOrderWindowPlayerId != playerId) return;
+    final completer = _companionBotOrderWindowCompleter;
+    if (completer == null || completer.isCompleted) return;
+    completer.complete();
   }
 
   bool _maybeCompanionBotRequestsHumanVoyATi(Player bot) {

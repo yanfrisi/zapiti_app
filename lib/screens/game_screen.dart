@@ -207,6 +207,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   ZapitiLanguage _language = ZapitiLanguage.es;
   bool _isGuidedTutorialMatch = false;
   bool _guidedTutorialCompleted = false;
+  bool _guidedTutorialAdvancePending = false;
   int _guidedTutorialScenarioIndex = 0;
   AppVersionCheckResult _versionCheck = AppVersionCheckResult.notChecked;
   int _versionCheckRequestId = 0;
@@ -219,7 +220,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   int _companionVoyATiPromptedHandVersion = -1;
   static const _debugUsePresetHands = false;
   static const _debugPresetIndex = 0;
+  static const _companionBotOrderWindowDuration = Duration(milliseconds: 1750);
+  static const _companionBotPostOrderVisualDelay = Duration(milliseconds: 550);
+  static const _teammateBotSignalRevealDuration = Duration(milliseconds: 300);
   Set<String> _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
+  String? _companionBotOrderWindowPlayerId;
+  Completer<void>? _companionBotOrderWindowCompleter;
+  Future<bool>? _companionBotOrderWindowFuture;
+  int _botCardSelectionCountForTesting = 0;
 
   List<Player> get _players =>
       _isMultiplayerMatch && _multiplayerPlayers.isNotEmpty
@@ -326,7 +334,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         for (final entry in _game.hands.entries) entry.key: entry.value.length,
       },
       'cardsRemaining': {
-        for (final player in _players) player.id: _hands[player.id]?.length ?? 0,
+        for (final player in _players)
+          player.id: _hands[player.id]?.length ?? 0,
       },
       'roomId': MultiplayerSessionStore.instance.activeRoomId,
       'localGamePlayerId': MultiplayerSessionStore.instance.localGamePlayerId,
@@ -336,6 +345,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       'pendingOrders': _forceWinRequestedPlayerIds.length +
           _forceHighestRequestedPlayerIds.length +
           _forceLowestRequestedPlayerIds.length,
+      'companionOrderWindowPlayerId': _companionBotOrderWindowPlayerId,
+      'companionOrderWindowWaiting': _companionBotOrderWindowCompleter != null,
+      'botCardSelections': _botCardSelectionCountForTesting,
     };
   }
 
@@ -416,7 +428,42 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void loadGuidedTutorialScenarioForTesting(int index) {
     _isGuidedTutorialMatch = true;
     _guidedTutorialCompleted = false;
+    _guidedTutorialAdvancePending = false;
     _loadGuidedTutorialScenario(index);
+  }
+
+  @visibleForTesting
+  int get guidedTutorialScenarioIndexForTesting => _guidedTutorialScenarioIndex;
+
+  @visibleForTesting
+  bool get guidedTutorialCompletedForTesting => _guidedTutorialCompleted;
+
+  @visibleForTesting
+  String get guidedTutorialStatusForTesting => _status;
+
+  @visibleForTesting
+  Future<void> playGuidedTutorialCardForTesting(SpanishCard card) async {
+    await _handleGuidedTutorialCard(card);
+  }
+
+  @visibleForTesting
+  Future<void> requestGuidedTutorialSignalForTesting() async {
+    await _requestCompanionSignal();
+  }
+
+  @visibleForTesting
+  void giveGuidedTutorialSignalForTesting(String label) {
+    _startSignal(label);
+  }
+
+  @visibleForTesting
+  void callGuidedTutorialTrucoForTesting() {
+    _humanCallsTruco();
+  }
+
+  @visibleForTesting
+  void passGuidedTutorialTrucoForTesting() {
+    _humanPassesTruco();
   }
 
   @visibleForTesting
@@ -484,6 +531,102 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @visibleForTesting
+  void prepareCompanionBotOrderWindowScenarioForTesting({
+    int completedTricks = 0,
+    bool companionPlaysBeforeHuman = false,
+  }) {
+    _isGuidedTutorialMatch = false;
+    _guidedTutorialCompleted = false;
+    _updateState(() {
+      if (companionPlaysBeforeHuman) {
+        _game = ZapitiGameController(
+          targetScore: _targetScore,
+          players: const [
+            ZapitiPlayers.human,
+            ZapitiPlayers.rightRival,
+            ZapitiPlayers.leftRival,
+            ZapitiPlayers.companion,
+          ],
+          humanPlayerId: ZapitiPlayers.human.id,
+        );
+      }
+      _game.nextLeadIndex = 0;
+      _game.score[TeamRules.teamOne] = 0;
+      _game.score[TeamRules.teamTwo] = 0;
+      _game.startNewHand(
+        fixedHands: {
+          'p1': const [
+            SpanishCard(value: 3, suit: Suit.oros),
+            SpanishCard(value: 6, suit: Suit.espadas),
+            SpanishCard(value: 5, suit: Suit.copas),
+          ],
+          'p2': const [
+            SpanishCard(value: 4, suit: Suit.oros),
+            SpanishCard(value: 6, suit: Suit.copas),
+            SpanishCard(value: 5, suit: Suit.bastos),
+          ],
+          'p3': const [
+            SpanishCard(value: 4, suit: Suit.bastos),
+            SpanishCard(value: 12, suit: Suit.oros),
+            SpanishCard(value: 5, suit: Suit.espadas),
+          ],
+          'p4': const [
+            SpanishCard(value: 4, suit: Suit.copas),
+            SpanishCard(value: 5, suit: Suit.oros),
+            SpanishCard(value: 6, suit: Suit.bastos),
+          ],
+        },
+      );
+      for (var index = 0; index < completedTricks; index++) {
+        _game.roundHistory.add(
+          RoundResult(
+            playedCards: const [],
+            winner: PlayedCard(
+              player: ZapitiPlayers.human,
+              card: SpanishCard(value: 3, suit: Suit.oros),
+            ),
+          ),
+        );
+      }
+      _game.roundWins[TeamRules.teamOne] = completedTricks.clamp(0, 2);
+      _game.roundWins[TeamRules.teamTwo] = 0;
+      _game.playedCards.clear();
+      final companionIndex = companionPlaysBeforeHuman ? 3 : 2;
+      _game.turnIndex = companionIndex;
+      _game.leadIndex = companionIndex;
+      _game.isRoundAwaitingContinue = false;
+      _game.handFinished = false;
+      _forceWinRequestedPlayerIds.clear();
+      _forceHighestRequestedPlayerIds.clear();
+      _forceLowestRequestedPlayerIds.clear();
+      _aiTeamsConsideredTrucoThisHand
+        ..clear()
+        ..addAll(const [TeamRules.teamOne, TeamRules.teamTwo]);
+      _companionBotOrderWindowPlayerId = null;
+      _companionBotOrderWindowCompleter = null;
+      _companionBotOrderWindowFuture = null;
+      _isAutoPlaying = false;
+      _botCardSelectionCountForTesting = 0;
+      _status = 'Ventana funcional Ven a mi lista.';
+    });
+  }
+
+  @visibleForTesting
+  void prepareRivalBotTurnScenarioForTesting() {
+    prepareCompanionBotOrderWindowScenarioForTesting();
+    _updateState(() {
+      _game.turnIndex = 3;
+      _game.leadIndex = 3;
+      _botCardSelectionCountForTesting = 0;
+    });
+  }
+
+  @visibleForTesting
+  void sendComeToMeForTesting() {
+    _humanVenAMi();
+  }
+
+  @visibleForTesting
   Future<void> advanceBotsForTesting() async {
     await _advanceBots();
   }
@@ -496,6 +639,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       throw StateError('El jugador actual no tiene mano cargada.');
     }
     return _chooseBotCard(bot, hand);
+  }
+
+  @visibleForTesting
+  bool shouldOpenCompanionOrderWindowForTesting() {
+    return _shouldOpenCompanionBotOrderWindow(_currentPlayer);
   }
 
   bool get _canHumanCallTruco {
@@ -744,6 +892,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceWinRequestedPlayerIds.add(_companionPlayer.id);
+        _notifyCompanionBotOrderRegistered(_companionPlayer.id);
       }
     });
     _sendMultiplayerSignalToCompanion(label: label, kind: 'voy_a_ti');
@@ -764,6 +913,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceLowestRequestedPlayerIds.add(_companionPlayer.id);
+        _notifyCompanionBotOrderRegistered(_companionPlayer.id);
       }
       _status = context.tr(
         'askCompanionComeToMe',
@@ -788,6 +938,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceWinRequestedPlayerIds.add(_companionPlayer.id);
+        _notifyCompanionBotOrderRegistered(_companionPlayer.id);
       }
       _status = context.tr(
         'askCompanionKill',

@@ -781,6 +781,11 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
   }
 
   void _nextStep() {
+    final step = _steps[_stepIndex];
+    final selectedAnswer = _selectedAnswers[_stepIndex];
+    if (step.prompt != null && selectedAnswer != step.correctIndex) {
+      return;
+    }
     setState(() {
       _stepIndex = (_stepIndex + 1) % _steps.length;
     });
@@ -794,6 +799,11 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
   }
 
   void _nextPractice() {
+    final challenge = _practiceChallenges[_practiceIndex];
+    final selectedAnswer = _practiceAnswers[_practiceIndex];
+    if (selectedAnswer != challenge.correctIndex) {
+      return;
+    }
     setState(() {
       _practiceIndex = (_practiceIndex + 1) % _practiceChallenges.length;
     });
@@ -2297,13 +2307,14 @@ class _MainMenuMultiplayerContentState
     _ServerConnectionState connectionState =
         _ServerConnectionState.disconnected,
   }) {
-    ZapitiLogger.warn('lobby', 'session_cleared_after_connection_loss', fields: {
-      'status': status,
-      'preserveSocket': preserveSocket,
-      'connectionState': connectionState.name,
-      'roomId': _connectedRoomId,
-      'sessionStarted': _sessionStarted,
-    });
+    ZapitiLogger.warn('lobby', 'session_cleared_after_connection_loss',
+        fields: {
+          'status': status,
+          'preserveSocket': preserveSocket,
+          'connectionState': connectionState.name,
+          'roomId': _connectedRoomId,
+          'sessionStarted': _sessionStarted,
+        });
     if (!preserveSocket) {
       final socket = _socket;
       socket?.onMessage = null;
@@ -2699,18 +2710,20 @@ class _MainMenuMultiplayerContentState
     if (!mounted) return;
 
     if (!reconnected) {
-      ZapitiLogger.warn('lobby', 'recover_after_connection_loss_failed', fields: {
-        'roomId': _connectedRoomId,
-      });
+      ZapitiLogger.warn('lobby', 'recover_after_connection_loss_failed',
+          fields: {
+            'roomId': _connectedRoomId,
+          });
       _clearSessionAfterConnectionLoss(
         _tr('multiplayerCouldNotRecoverConnection'),
       );
       return;
     }
 
-    ZapitiLogger.info('lobby', 'recover_after_connection_loss_success', fields: {
-      'roomId': _connectedRoomId,
-    });
+    ZapitiLogger.info('lobby', 'recover_after_connection_loss_success',
+        fields: {
+          'roomId': _connectedRoomId,
+        });
     _clearSessionAfterConnectionLoss(
       _tr('multiplayerConnectionRestored'),
       preserveSocket: true,

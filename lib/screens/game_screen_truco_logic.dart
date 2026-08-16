@@ -7,6 +7,13 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
     final value = _game.nextTrucoValueForPlayer(_humanPlayer);
     if (value == null) return;
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      if (scenario.expectedAction != _TutorialScenarioAction.callTruco) {
+        unawaited(_advanceGuidedTutorialAfterSuccess(correct: false));
+        return;
+      }
+    }
     var didCall = false;
 
     _updateState(() {
@@ -25,10 +32,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     });
     if (!didCall) return;
     if (_isGuidedTutorialMatch) {
-      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
-      final correct =
-          scenario.expectedAction == _TutorialScenarioAction.callTruco;
-      unawaited(_advanceGuidedTutorialAfterSuccess(correct: correct));
+      unawaited(_advanceGuidedTutorialAfterSuccess(correct: true));
       return;
     }
     if (_isMultiplayerMatch) {
@@ -107,6 +111,13 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     if (passingTeamId == null) {
       return;
     }
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      if (scenario.expectedAction != _TutorialScenarioAction.passTruco) {
+        unawaited(_advanceGuidedTutorialAfterSuccess(correct: false));
+        return;
+      }
+    }
     _updateState(() {
       _showTemporaryPlayerMessage(_humanPlayer.id, context.tr('passSpeech'));
       _isWaitingHumanTrucoResponse = false;
@@ -116,10 +127,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       );
     });
     if (_isGuidedTutorialMatch) {
-      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
-      final correct =
-          scenario.expectedAction == _TutorialScenarioAction.passTruco;
-      unawaited(_advanceGuidedTutorialAfterSuccess(correct: correct));
+      unawaited(_advanceGuidedTutorialAfterSuccess(correct: true));
       return;
     }
     if (_isMultiplayerMatch) {

@@ -60,6 +60,13 @@ extension _GameScreenSignalLogic on _GameScreenState {
     final version = _handVersion;
     final companion = _companionPlayer;
     final signal = SignalRules.signalForHand(_hands[companion.id] ?? const []);
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      if (scenario.expectedAction != _TutorialScenarioAction.requestSignal) {
+        await _advanceGuidedTutorialAfterSuccess(correct: false);
+        return;
+      }
+    }
 
     _updateState(() {
       _isRequestingCompanionSignal = true;
@@ -135,6 +142,25 @@ extension _GameScreenSignalLogic on _GameScreenState {
     }
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
 
+    if (_isGuidedTutorialMatch) {
+      final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+      final correct = scenario.expectedAction ==
+              _TutorialScenarioAction.giveSignal &&
+          (scenario.expectedSignal == null || scenario.expectedSignal == label);
+      if (!correct) {
+        unawaited(_advanceGuidedTutorialAfterSuccess(
+          correct: false,
+          fallbackMessage: scenario.expectedSignal == null
+              ? null
+              : context.tr(
+                  'expectedSignalWas',
+                  params: {'signal': scenario.expectedSignal},
+                ),
+        ));
+        return;
+      }
+    }
+
     _updateState(() {
       _playerMessages[_humanPlayer.id] = '$_signalMessagePrefix$label';
       _knownSignalsByTeam[_humanPlayer.teamId] = label;
@@ -151,11 +177,8 @@ extension _GameScreenSignalLogic on _GameScreenState {
     _sendMultiplayerSignalToCompanion(label: label);
     if (_isGuidedTutorialMatch) {
       final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
-      final correct = scenario.expectedAction ==
-              _TutorialScenarioAction.giveSignal &&
-          (scenario.expectedSignal == null || scenario.expectedSignal == label);
       unawaited(_advanceGuidedTutorialAfterSuccess(
-        correct: correct,
+        correct: true,
         fallbackMessage: scenario.expectedSignal == null
             ? null
             : context.tr(

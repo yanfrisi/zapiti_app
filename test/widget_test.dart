@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +16,12 @@ import 'package:zapiti_app/services/app_version_check_service.dart';
 
 void main() {
   const musicChannel = MethodChannel('zapiti/music');
+  const companionOrderWindow = Duration(milliseconds: 1750);
+  const beforeCompanionOrderWindow = Duration(milliseconds: 1749);
+  const oneMillisecond = Duration(milliseconds: 1);
+  const postOrderVisualDelay = Duration(milliseconds: 550);
+  const rivalBotUnaffectedProbe = Duration(milliseconds: 1300);
+  const finishAutoBotFlow = Duration(seconds: 4);
 
   setUp(() async {
     await ZapitiI18n.load();
@@ -319,6 +325,209 @@ void main() {
     expect(find.text('Permitir pasar mano'), findsNothing);
   });
 
+  testWidgets('tutorial de mesa mantiene el paso tras una respuesta incorrecta',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    final wrongAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 1, suit: Suit.espadas),
+    );
+    await tester.pump();
+
+    expect(gameState.guidedTutorialStatusForTesting, contains('Casi'));
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await wrongAction;
+
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 0);
+    expect(gameState.guidedTutorialCompletedForTesting, isFalse);
+  });
+
+  testWidgets('tutorial de mesa permite reintentar y avanzar una vez',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    final wrongAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 1, suit: Suit.espadas),
+    );
+    await tester.pump(const Duration(milliseconds: 1300));
+    await wrongAction;
+
+    final correctAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.copas),
+    );
+    await tester.pump();
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 0);
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await correctAction;
+
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 1);
+    expect(gameState.guidedTutorialCompletedForTesting, isFalse);
+  });
+
+  testWidgets('tutorial de mesa ignora varios errores consecutivos',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      final wrongAction = gameState.playGuidedTutorialCardForTesting(
+        const SpanishCard(value: 1, suit: Suit.espadas),
+      );
+      await tester.pump(const Duration(milliseconds: 1300));
+      await wrongAction;
+      expect(gameState.guidedTutorialScenarioIndexForTesting, 0);
+    }
+  });
+
+  testWidgets('tutorial de mesa no avanza dos veces por una accion correcta',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    final firstAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.copas),
+    );
+    final secondAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.copas),
+    );
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await firstAction;
+    await secondAction;
+
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 1);
+  });
+
+  testWidgets('tutorial valida tipos interactivos compartidos', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(3);
+    });
+    await tester.pumpAndSettle();
+    gameState.giveGuidedTutorialSignalForTesting('4 Bastos');
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 3);
+
+    final requestSignal = gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump(const Duration(milliseconds: 1800));
+    await requestSignal;
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 4);
+
+    gameState.giveGuidedTutorialSignalForTesting('7 Copas');
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 4);
+
+    gameState.giveGuidedTutorialSignalForTesting('4 Bastos');
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 5);
+
+    final wrongCard = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.bastos),
+    );
+    await tester.pump(const Duration(milliseconds: 1300));
+    await wrongCard;
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 5);
+
+    gameState.callGuidedTutorialTrucoForTesting();
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 6);
+
+    gameState.callGuidedTutorialTrucoForTesting();
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 7);
+
+    gameState.passGuidedTutorialTrucoForTesting();
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialCompletedForTesting, isTrue);
+  });
+
+  testWidgets('tutorial informativo no avanza con respuesta incorrecta',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gastar alta'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Casi'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Guardar fuerza'), findsOneWidget);
+    expect(find.text('Gastar alta'), findsOneWidget);
+
+    await tester.tap(find.text('Guardar fuerza'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Salvar reparto'), findsOneWidget);
+    expect(find.text('Probar suerte'), findsOneWidget);
+  });
+
+  testWidgets('practica del tutorial no avanza hasta acertar', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.touch_app_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tirar As Espadas'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Casi'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Siguiente').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tirar 4 Copas'), findsOneWidget);
+    expect(find.text('Tirar As Espadas'), findsOneWidget);
+
+    await tester.tap(find.text('Tirar 4 Copas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tirar 3 Bastos'), findsOneWidget);
+    expect(find.text('Tirar 7 Copas'), findsOneWidget);
+  });
+
   testWidgets('opciones permite cambiar idioma', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
@@ -601,8 +810,7 @@ void main() {
     );
     expect(find.text('Muy fácil'), findsOneWidget);
     expect(find.text('Experto'), findsOneWidget);
-    expect(
-      find.text('Bots distraídos, errores claros y trucos precipitados.'),
+    expect(find.text('Bots distraídos, errores claros y trucos precipitados.'),
         findsNothing);
     expect(find.text('Juegan aceptable, pero se precipitan.'), findsNothing);
   });
@@ -760,8 +968,7 @@ void main() {
     expect(find.text('Orden y señas'), findsNothing);
   });
 
-  testWidgets('ayuda de señas se traduce al cambiar idioma',
-      (tester) async {
+  testWidgets('ayuda de señas se traduce al cambiar idioma', (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -1000,6 +1207,200 @@ void main() {
         const SpanishCard(value: 5, suit: Suit.espadas),
         reason: 'difficulty=$difficulty',
       );
+    }
+  });
+
+  testWidgets('ventana funcional registra ven a mi antes de elegir carta',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      gameState
+          .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+      'p3',
+    );
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+
+    gameState.sendComeToMeForTesting();
+    await tester.pump(postOrderVisualDelay - oneMillisecond);
+
+    expect(gameState.gameController.playedCards, isEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['pendingOrders'],
+      1,
+    );
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+
+    await tester.pump(oneMillisecond);
+
+    expect(
+      gameState.gameController.playedCards.first.card,
+      const SpanishCard(value: 5, suit: Suit.espadas),
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('sin orden el bot juega automaticamente al cerrar la ventana',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(beforeCompanionOrderWindow);
+
+    expect(gameState.gameController.playedCards, isEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+
+    await tester.pump(oneMillisecond);
+
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      1,
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('no fija carta antes de finalizar la ventana de orden',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(beforeCompanionOrderWindow);
+
+    expect(gameState.gameController.playedCards, isEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+    await tester.pump(oneMillisecond);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('no abre ventana funcional para un bot rival', (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareRivalBotTurnScenarioForTesting();
+
+    expect(gameState.shouldOpenCompanionOrderWindowForTesting(), isFalse);
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      gameState
+          .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+      isNull,
+    );
+    await tester.pump(rivalBotUnaffectedProbe);
+    expect(gameState.gameController.playedCards, hasLength(1));
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      1,
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('orden y cierre de ventana no producen doble jugada',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(companionOrderWindow - oneMillisecond);
+    gameState.sendComeToMeForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    expect(gameState.gameController.playedCards, hasLength(1));
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      1,
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('ventana funcional opera en primera segunda y tercera baza',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    for (final completedTricks in [0, 1, 2]) {
+      gameState.prepareCompanionBotOrderWindowScenarioForTesting(
+        completedTricks: completedTricks,
+      );
+      final advance = gameState.advanceBotsForTesting();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        gameState
+            .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+        'p3',
+        reason: 'completedTricks=$completedTricks',
+      );
+      gameState.sendComeToMeForTesting();
+      await tester.pump(postOrderVisualDelay);
+      expect(
+        gameState.gameController.playedCards.first.card,
+        const SpanishCard(value: 5, suit: Suit.espadas),
+        reason: 'completedTricks=$completedTricks',
+      );
+      await tester.pump(finishAutoBotFlow);
+      await advance;
+    }
+  });
+
+  testWidgets('ventana funcional existe en easy normal y hard', (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    for (final difficulty in [1, 3, 4]) {
+      gameState.setDifficultyForTesting(difficulty);
+      gameState.prepareCompanionBotOrderWindowScenarioForTesting(
+        companionPlaysBeforeHuman: true,
+      );
+      final advance = gameState.advanceBotsForTesting();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        gameState
+            .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+        'p3',
+        reason: 'difficulty=$difficulty',
+      );
+      gameState.sendComeToMeForTesting();
+      await tester.pump(postOrderVisualDelay);
+      expect(
+        gameState.gameController.playedCards.first.card,
+        const SpanishCard(value: 5, suit: Suit.espadas),
+        reason: 'difficulty=$difficulty',
+      );
+      await tester.pump(finishAutoBotFlow);
+      await advance;
     }
   });
 
@@ -1303,4 +1704,3 @@ Map<String, List<SpanishCard>> _aiStrongAlVerHands() {
     ],
   };
 }
-

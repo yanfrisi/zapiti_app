@@ -411,6 +411,9 @@ extension _GameScreenStateFlow on _GameScreenState {
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
     _isAutoPlaying = false;
+    _companionBotOrderWindowPlayerId = null;
+    _companionBotOrderWindowCompleter = null;
+    _companionBotOrderWindowFuture = null;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _companionVoyATiPromptedHandVersion = -1;
@@ -447,6 +450,7 @@ extension _GameScreenStateFlow on _GameScreenState {
         _guidedTutorialScenarios[index % _guidedTutorialScenarios.length];
     _handVersion += 1;
     _guidedTutorialCompleted = false;
+    _guidedTutorialAdvancePending = false;
     _guidedTutorialScenarioIndex = index % _guidedTutorialScenarios.length;
     _alVerDecisionPromptedKey = null;
     _isAlVerDecisionDialogOpen = false;
@@ -467,6 +471,9 @@ extension _GameScreenStateFlow on _GameScreenState {
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
     _isAutoPlaying = false;
+    _companionBotOrderWindowPlayerId = null;
+    _companionBotOrderWindowCompleter = null;
+    _companionBotOrderWindowFuture = null;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _companionVoyATiPromptedHandVersion = -1;
@@ -505,7 +512,14 @@ extension _GameScreenStateFlow on _GameScreenState {
     required bool correct,
     String? fallbackMessage,
   }) async {
-    final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
+    final scenarioIndex = _guidedTutorialScenarioIndex;
+    if (correct && _guidedTutorialAdvancePending) {
+      return;
+    }
+    if (correct) {
+      _guidedTutorialAdvancePending = true;
+    }
+    final scenario = _guidedTutorialScenarios[scenarioIndex];
     _updateState(() {
       _status = correct
           ? context.tr(scenario.successKey)
@@ -524,10 +538,13 @@ extension _GameScreenStateFlow on _GameScreenState {
       );
     });
     await Future<void>.delayed(const Duration(milliseconds: 1200));
-    if (!mounted || !_isGuidedTutorialMatch || !correct) return;
+    if (!mounted || !_isGuidedTutorialMatch) return;
+    if (!correct) return;
+    if (_guidedTutorialScenarioIndex != scenarioIndex) return;
 
-    final nextIndex = _guidedTutorialScenarioIndex + 1;
+    final nextIndex = scenarioIndex + 1;
     _updateState(() {
+      _guidedTutorialAdvancePending = false;
       if (nextIndex >= _guidedTutorialScenarios.length) {
         _status = context.tr('guidedCompleteStatus');
         _showTemporaryPlayerMessage(
@@ -929,6 +946,9 @@ extension _GameScreenStateFlow on _GameScreenState {
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _isAutoPlaying = false;
+    _companionBotOrderWindowPlayerId = null;
+    _companionBotOrderWindowCompleter = null;
+    _companionBotOrderWindowFuture = null;
     _companionVoyATiPromptedHandVersion = -1;
     _alVerDecisionPromptedKey = null;
     _turnDeadlineAt = null;
@@ -942,7 +962,8 @@ extension _GameScreenStateFlow on _GameScreenState {
         });
   }
 
-  void _endCurrentGameSession({required String reason, bool notifyLeave = true}) {
+  void _endCurrentGameSession(
+      {required String reason, bool notifyLeave = true}) {
     if (notifyLeave) {
       _notifyMultiplayerLeaveIfNeeded();
     }
@@ -994,6 +1015,9 @@ extension _GameScreenStateFlow on _GameScreenState {
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _isAutoPlaying = false;
+    _companionBotOrderWindowPlayerId = null;
+    _companionBotOrderWindowCompleter = null;
+    _companionBotOrderWindowFuture = null;
     _companionVoyATiPromptedHandVersion = -1;
     _alVerDecisionPromptedKey = null;
     _turnDeadlineAt = null;
@@ -1026,7 +1050,8 @@ extension _GameScreenStateFlow on _GameScreenState {
           'reason': reason,
           'previousPlayers': _game.players.map((player) => player.id).toList(),
           'previousHands': {
-            for (final entry in _game.hands.entries) entry.key: entry.value.length,
+            for (final entry in _game.hands.entries)
+              entry.key: entry.value.length,
           },
         });
     _isMultiplayerMatch = false;
