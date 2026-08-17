@@ -22,6 +22,8 @@ void main() {
   const postOrderVisualDelay = Duration(milliseconds: 550);
   const rivalBotUnaffectedProbe = Duration(milliseconds: 1300);
   const finishAutoBotFlow = Duration(seconds: 4);
+  const incomingBetCardPreviewDuration = Duration(milliseconds: 3500);
+  const incomingBetCardPreviewFadeDuration = Duration(milliseconds: 90);
 
   setUp(() async {
     await ZapitiI18n.load();
@@ -49,6 +51,29 @@ void main() {
     await tester.ensureVisible(playButton);
     await tester.tap(playButton);
     await tester.pumpAndSettle();
+  }
+
+  Future<dynamic> showIncomingTrucoResponseOverlay(WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareIncomingTrucoResponseForTesting();
+    await tester.pump();
+
+    expect(find.text('Te cantan 3'), findsOneWidget);
+    expect(find.byKey(const ValueKey('truco-response-panel-opacity')),
+        findsOneWidget);
+    return gameState;
+  }
+
+  double trucoResponsePanelOpacity(WidgetTester tester) {
+    return tester
+        .widget<AnimatedOpacity>(
+          find.byKey(const ValueKey('truco-response-panel-opacity')),
+        )
+        .opacity;
   }
 
   testWidgets('muestra selector de personajes antes de jugar', (tester) async {
@@ -534,6 +559,108 @@ void main() {
 
     expect(find.text('Tirar 3 Bastos'), findsOneWidget);
     expect(find.text('Tirar 7 Copas'), findsOneWidget);
+  });
+
+  testWidgets('al recibir truco muestra inicialmente las cartas humanas',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+  });
+
+  testWidgets('preview de cartas de truco no desaparece inmediatamente',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump();
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await tester.pump(incomingBetCardPreviewDuration ~/ 2);
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+  });
+
+  testWidgets('preview inicial de truco termina tras la duracion configurada',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(trucoResponsePanelOpacity(tester), 1);
+    expect(find.text('Te cantan 3'), findsOneWidget);
+  });
+
+  testWidgets('el ojo del modal de truco permite volver a ver las cartas',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+    expect(trucoResponsePanelOpacity(tester), 1);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+          find.byKey(const ValueKey('truco-response-card-peek-button'))),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(trucoResponsePanelOpacity(tester), 1);
+  });
+
+  testWidgets('soltar el ojo cierra la visualizacion de cartas de truco',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+          find.byKey(const ValueKey('truco-response-card-peek-button'))),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(trucoResponsePanelOpacity(tester), 1);
+  });
+
+  testWidgets('responder truco no deja cambios tardios por timers',
+      (tester) async {
+    for (final action in ['ACEPTAR', 'RECHAZAR', 'SUBIR A 6']) {
+      await showIncomingTrucoResponseOverlay(tester);
+
+      await tester.tap(find.text(action));
+      await tester.pump();
+      expect(find.text('Te cantan 3'), findsNothing);
+
+      await tester.pump(incomingBetCardPreviewDuration);
+      await tester.pump(incomingBetCardPreviewFadeDuration);
+
+      expect(find.text('Te cantan 3'), findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('destruir el widget durante el preview de truco cancela el timer',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('opciones permite cambiar idioma', (tester) async {

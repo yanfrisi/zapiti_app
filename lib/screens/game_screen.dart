@@ -467,6 +467,57 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @visibleForTesting
+  void prepareIncomingTrucoResponseForTesting({int value = 3}) {
+    _isGuidedTutorialMatch = false;
+    _guidedTutorialCompleted = false;
+    _updateState(() {
+      _showMainMenu = false;
+      _showCharacterSelection = false;
+      _showDifficultySelection = false;
+      _showGameOptions = false;
+      _isAutoPlaying = false;
+      _isWaitingHumanTrucoResponse = false;
+      _game.nextLeadIndex = _players.indexWhere(
+        (player) => player.id == ZapitiPlayers.rightRival.id,
+      );
+      _game.startNewHand(
+        fixedHands: {
+          'p1': const [
+            SpanishCard(value: 4, suit: Suit.bastos),
+            SpanishCard(value: 7, suit: Suit.copas),
+            SpanishCard(value: 3, suit: Suit.espadas),
+          ],
+          'p2': const [
+            SpanishCard(value: 12, suit: Suit.copas),
+            SpanishCard(value: 6, suit: Suit.espadas),
+            SpanishCard(value: 4, suit: Suit.espadas),
+          ],
+          'p3': const [
+            SpanishCard(value: 2, suit: Suit.oros),
+            SpanishCard(value: 11, suit: Suit.bastos),
+            SpanishCard(value: 5, suit: Suit.espadas),
+          ],
+          'p4': const [
+            SpanishCard(value: 1, suit: Suit.copas),
+            SpanishCard(value: 10, suit: Suit.espadas),
+            SpanishCard(value: 4, suit: Suit.oros),
+          ],
+        },
+      );
+      _callTruco(
+        ZapitiPlayers.rightRival,
+        value: value,
+        actorPlayerId: ZapitiPlayers.rightRival.id,
+      );
+      _isWaitingHumanTrucoResponse = true;
+      _status = context.tr(
+        'playerCallsTruco',
+        params: {'player': ZapitiPlayers.rightRival.name},
+      );
+    });
+  }
+
+  @visibleForTesting
   void setDifficultyForTesting(int difficulty) {
     _selectedDifficulty = difficulty;
   }

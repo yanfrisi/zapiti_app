@@ -1,4 +1,4 @@
-﻿part of 'game_screen.dart';
+part of 'game_screen.dart';
 
 String _difficultyLabel(BuildContext context, int level) {
   return switch (level) {
@@ -625,14 +625,38 @@ class _TrucoResponseOverlay extends StatefulWidget {
 }
 
 class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
-  int _selectedRaiseIndex = 0;
-  bool _peekThroughOverlay = false;
+  static const _incomingBetCardPreviewDuration = Duration(milliseconds: 3500);
 
-  void _setPeekThroughOverlay(bool value) {
-    if (_peekThroughOverlay == value) return;
-    setState(() {
-      _peekThroughOverlay = value;
+  int _selectedRaiseIndex = 0;
+  bool _initialCardPreviewActive = true;
+  bool _manualPeekThroughOverlay = false;
+  Timer? _initialCardPreviewTimer;
+
+  bool get _peekThroughOverlay =>
+      _initialCardPreviewActive || _manualPeekThroughOverlay;
+
+  void _startInitialCardPreview() {
+    _initialCardPreviewTimer?.cancel();
+    _initialCardPreviewActive = true;
+    _initialCardPreviewTimer = Timer(_incomingBetCardPreviewDuration, () {
+      if (!mounted) return;
+      setState(() {
+        _initialCardPreviewActive = false;
+      });
     });
+  }
+
+  void _setManualPeekThroughOverlay(bool value) {
+    if (_manualPeekThroughOverlay == value) return;
+    setState(() {
+      _manualPeekThroughOverlay = value;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _startInitialCardPreview();
   }
 
   @override
@@ -641,6 +665,16 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
     if (_selectedRaiseIndex >= widget.raiseOptions.length) {
       _selectedRaiseIndex = 0;
     }
+    if (oldWidget.pendingTrucoValue != widget.pendingTrucoValue) {
+      setState(_startInitialCardPreview);
+    }
+  }
+
+  @override
+  void dispose() {
+    _initialCardPreviewTimer?.cancel();
+    _initialCardPreviewTimer = null;
+    super.dispose();
   }
 
   @override
@@ -681,6 +715,7 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                         clipBehavior: Clip.none,
                         children: [
                           AnimatedOpacity(
+                            key: const ValueKey('truco-response-panel-opacity'),
                             opacity: _peekThroughOverlay ? 0.16 : 1,
                             duration: const Duration(milliseconds: 90),
                             child: Container(
@@ -836,9 +871,15 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
                             top: max(4.0, gap * 0.55),
                             right: max(4.0, gap * 0.55),
                             child: GestureDetector(
-                              onTapDown: (_) => _setPeekThroughOverlay(true),
-                              onTapUp: (_) => _setPeekThroughOverlay(false),
-                              onTapCancel: () => _setPeekThroughOverlay(false),
+                              key: const ValueKey(
+                                'truco-response-card-peek-button',
+                              ),
+                              onTapDown: (_) =>
+                                  _setManualPeekThroughOverlay(true),
+                              onTapUp: (_) =>
+                                  _setManualPeekThroughOverlay(false),
+                              onTapCancel: () =>
+                                  _setManualPeekThroughOverlay(false),
                               child: Tooltip(
                                 message: context.tr('holdToViewCards'),
                                 child: DecoratedBox(
@@ -1487,9 +1528,8 @@ class _GameFinishedOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final names = winningPlayers
-        .map((player) => playerNameBuilder(player))
-        .join(' y ');
+    final names =
+        winningPlayers.map((player) => playerNameBuilder(player)).join(' y ');
     final titleStyle = Theme.of(context).textTheme.titleLarge?.copyWith(
           color: ZapitiColors.oldGold,
           fontWeight: FontWeight.w900,
