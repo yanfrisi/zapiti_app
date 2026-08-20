@@ -99,6 +99,7 @@ class GameStateSimulator {
         teamRoundWins: state.roundWins[player.teamId] ?? 0,
         opponentRoundWins:
             state.roundWins[TeamRules.opponentOf(player.teamId)] ?? 0,
+        roundHistory: state.roundHistory,
         forceWinIfPossible: state.handValue >= 4,
         teammateStillToPlay: state.teammateStillToPlay(player),
         opponentStillToPlay: state.opponentStillToPlay(player),
@@ -145,7 +146,7 @@ class _MutableSimulatedHandState {
   });
 
   factory _MutableSimulatedHandState.fromSnapshot(SimulatedHandSnapshot value) {
-    return _MutableSimulatedHandState(
+    final state = _MutableSimulatedHandState(
       players: value.players,
       hands: {
         for (final entry in value.hands.entries) entry.key: [...entry.value],
@@ -163,6 +164,14 @@ class _MutableSimulatedHandState {
       leadIndex: value.leadIndex,
       handValue: value.handValue,
     );
+    final progress = HandRules.resolve(state.roundHistory);
+    if (progress.isFinished) {
+      state.handFinished = true;
+      state.winningTeamId = progress.winningTeamId;
+      state.roundWins[TeamRules.teamOne] = progress.roundWinsFor(TeamRules.teamOne);
+      state.roundWins[TeamRules.teamTwo] = progress.roundWinsFor(TeamRules.teamTwo);
+    }
+    return state;
   }
 
   Player get currentPlayer => players[turnIndex];

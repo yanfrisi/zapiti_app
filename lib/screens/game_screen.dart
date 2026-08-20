@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../domain/bot_al_ver_strategy.dart';
 import '../domain/bot_agent_difficulty.dart';
+import '../domain/bot_bet_strategy.dart';
 import '../domain/bot_bluff_strategy.dart';
 import '../domain/bot_table_read.dart';
 import '../domain/bot_truco_raise_strategy.dart';
@@ -228,6 +229,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Completer<void>? _companionBotOrderWindowCompleter;
   Future<bool>? _companionBotOrderWindowFuture;
   int _botCardSelectionCountForTesting = 0;
+  double? _nextBotBetRollForTesting;
 
   List<Player> get _players =>
       _isMultiplayerMatch && _multiplayerPlayers.isNotEmpty
@@ -345,6 +347,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       'pendingOrders': _forceWinRequestedPlayerIds.length +
           _forceHighestRequestedPlayerIds.length +
           _forceLowestRequestedPlayerIds.length,
+      'pendingTrucoValue': _pendingTrucoValue,
+      'handValue': _handValue,
+      'trucoState': _game.trucoState.name,
+      'lastTrucoRaiserTeamId': _game.lastTrucoRaiserTeamId,
+      'status': _status,
       'companionOrderWindowPlayerId': _companionBotOrderWindowPlayerId,
       'companionOrderWindowWaiting': _companionBotOrderWindowCompleter != null,
       'botCardSelections': _botCardSelectionCountForTesting,
@@ -422,6 +429,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       teamId,
       teamIsHumanControlled: _isTeamControlledByHuman(teamId),
     );
+  }
+
+  @visibleForTesting
+  void syncAlVerFromMatchForTesting(Map<String, dynamic> match) {
+    _syncAlVerFromMatch(match);
+    _maybeHandleAlVerDecision();
   }
 
   @visibleForTesting
@@ -675,6 +688,109 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @visibleForTesting
   void sendComeToMeForTesting() {
     _humanVenAMi();
+  }
+
+  @visibleForTesting
+  void setBotBetRollForTesting(double value) {
+    _nextBotBetRollForTesting = value;
+  }
+
+  @visibleForTesting
+  void prepareBotBetScenarioForTesting({
+    bool firstRoundTie = true,
+    bool acceptedTruco = false,
+    bool botLastRaised = false,
+    bool favorable = true,
+    bool markTeamAsAlreadyConsidered = false,
+  }) {
+    _isGuidedTutorialMatch = false;
+    _guidedTutorialCompleted = false;
+    _updateState(() {
+      _game.nextLeadIndex = 0;
+      _game.score[TeamRules.teamOne] = 0;
+      _game.score[TeamRules.teamTwo] = 0;
+      _game.startNewHand(
+        fixedHands: {
+          'p1': const [
+            SpanishCard(value: 5, suit: Suit.copas),
+            SpanishCard(value: 6, suit: Suit.espadas),
+            SpanishCard(value: 4, suit: Suit.copas),
+          ],
+          'p2': favorable
+              ? const [
+                  SpanishCard(value: 4, suit: Suit.bastos),
+                  SpanishCard(value: 3, suit: Suit.oros),
+                  SpanishCard(value: 2, suit: Suit.espadas),
+                ]
+              : const [
+                  SpanishCard(value: 4, suit: Suit.bastos),
+                  SpanishCard(value: 5, suit: Suit.oros),
+                  SpanishCard(value: 4, suit: Suit.oros),
+                ],
+          'p3': const [
+            SpanishCard(value: 7, suit: Suit.bastos),
+            SpanishCard(value: 6, suit: Suit.oros),
+            SpanishCard(value: 4, suit: Suit.espadas),
+          ],
+          'p4': const [
+            SpanishCard(value: 3, suit: Suit.copas),
+            SpanishCard(value: 12, suit: Suit.copas),
+            SpanishCard(value: 5, suit: Suit.bastos),
+          ],
+        },
+      );
+      _game.roundHistory.clear();
+      _game.roundWins[TeamRules.teamOne] = 0;
+      _game.roundWins[TeamRules.teamTwo] = 0;
+      if (firstRoundTie) {
+        _game.roundHistory.add(
+          const RoundResult(
+            playedCards: [
+              PlayedCard(
+                player: ZapitiPlayers.human,
+                card: SpanishCard(value: 5, suit: Suit.copas),
+              ),
+              PlayedCard(
+                player: ZapitiPlayers.rightRival,
+                card: SpanishCard(value: 5, suit: Suit.oros),
+              ),
+              PlayedCard(
+                player: ZapitiPlayers.companion,
+                card: SpanishCard(value: 5, suit: Suit.bastos),
+              ),
+              PlayedCard(
+                player: ZapitiPlayers.leftRival,
+                card: SpanishCard(value: 5, suit: Suit.espadas),
+              ),
+            ],
+            winner: null,
+          ),
+        );
+        _game.roundWins[TeamRules.teamOne] = 1;
+        _game.roundWins[TeamRules.teamTwo] = 1;
+      }
+      _game.playedCards.clear();
+      _game.turnIndex = 1;
+      _game.leadIndex = 1;
+      _game.isRoundAwaitingContinue = false;
+      _game.handFinished = false;
+      _game.pendingTrucoValue = null;
+      _game.trucoCallerTeamId = null;
+      _game.trucoState = acceptedTruco
+          ? TrucoNegotiationState.acceptedClosed
+          : TrucoNegotiationState.notStarted;
+      _game.handValue = acceptedTruco ? TrucoRules.firstTrucoValue : 1;
+      _game.lastTrucoRaiserTeamId = acceptedTruco
+          ? (botLastRaised ? TeamRules.teamTwo : TeamRules.teamOne)
+          : null;
+      _botCardSelectionCountForTesting = 0;
+      _nextBotBetRollForTesting = null;
+      _aiTeamsConsideredTrucoThisHand.clear();
+      if (markTeamAsAlreadyConsidered) {
+        _aiTeamsConsideredTrucoThisHand.add(TeamRules.teamTwo);
+      }
+      _status = 'Escenario de apuesta IA listo.';
+    });
   }
 
   @visibleForTesting

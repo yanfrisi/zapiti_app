@@ -1,11 +1,15 @@
 import 'dart:math';
 
 import 'game_state_simulator.dart';
+import 'hand_rules.dart';
 import 'hidden_card_determinizer.dart';
 import 'played_card.dart';
 import 'player.dart';
+import 'round_result.dart';
+import 'round_rules.dart';
 import 'spanish_card.dart';
 import 'team_rules.dart';
+import 'zapiti_rules.dart';
 
 class BotRolloutEvaluator {
   const BotRolloutEvaluator._();
@@ -19,6 +23,7 @@ class BotRolloutEvaluator {
     required Map<String, List<SpanishCard>> hands,
     required int teamRoundWins,
     required int opponentRoundWins,
+    List<RoundResult> roundHistory = const <RoundResult>[],
     required int handValue,
     required int rolloutIndex,
   }) {
@@ -39,39 +44,77 @@ class BotRolloutEvaluator {
       for (final entry in determinizedHands.entries) entry.key: [...entry.value],
     };
     simulatedHands[player.id]?.remove(candidate);
+    final currentLeadPlayerId = playedCards.isEmpty ? player.id : playedCards.first.player.id;
+    final playedAfterCandidate = [
+      ...playedCards,
+      PlayedCard(player: player, card: candidate),
+    ];
+    final currentLeadIndex = players.indexWhere(
+      (entry) => entry.id == currentLeadPlayerId,
+    );
+    final candidatePlayerIndex = players.indexWhere((entry) => entry.id == player.id);
+    final initialRoundHistory = [...roundHistory];
+    final initialRoundWins = {
+      TeamRules.teamOne: teamRoundWinsForTeam(
+        player.teamId,
+        teamRoundWins,
+        opponentRoundWins,
+        true,
+      ),
+      TeamRules.teamTwo: teamRoundWinsForTeam(
+        player.teamId,
+        teamRoundWins,
+        opponentRoundWins,
+        false,
+      ),
+    };
+    final trickComplete = playedAfterCandidate.length == players.length;
+    final nextPlayedCards = trickComplete ? const <PlayedCard>[] : playedAfterCandidate;
+    final nextRoundHistory = [...initialRoundHistory];
+    final nextRoundWins = {...initialRoundWins};
+    var nextTurnIndex = (candidatePlayerIndex + 1) % players.length;
+    var nextLeadIndex = currentLeadIndex < 0 ? candidatePlayerIndex : currentLeadIndex;
+
+    if (trickComplete) {
+      final result = RoundRules.resolveRound(playedAfterCandidate);
+      nextRoundHistory.add(result);
+      final progress = HandRules.resolve(nextRoundHistory);
+      nextRoundWins[TeamRules.teamOne] = progress.roundWinsFor(TeamRules.teamOne);
+      nextRoundWins[TeamRules.teamTwo] = progress.roundWinsFor(TeamRules.teamTwo);
+      if (result.isTie) {
+        nextTurnIndex = nextLeadIndex;
+      } else {
+        nextLeadIndex = players.indexWhere(
+          (entry) => entry.id == result.winner!.player.id,
+        );
+        nextTurnIndex = nextLeadIndex;
+      }
+    }
+
     final snapshot = SimulatedHandSnapshot(
       players: players,
       hands: simulatedHands,
-      playedCards: [
-        ...playedCards,
-        PlayedCard(player: player, card: candidate),
-      ],
-      roundHistory: const [],
-      roundWins: {
-        TeamRules.teamOne: teamRoundWinsForTeam(
-          player.teamId,
-          teamRoundWins,
-          opponentRoundWins,
-          true,
-        ),
-        TeamRules.teamTwo: teamRoundWinsForTeam(
-          player.teamId,
-          teamRoundWins,
-          opponentRoundWins,
-          false,
-        ),
-      },
-      turnIndex: (players.indexWhere((entry) => entry.id == player.id) + 1) %
-          players.length,
-      leadIndex: players.indexWhere((entry) => entry.id == player.id),
+      playedCards: nextPlayedCards,
+      roundHistory: nextRoundHistory,
+      roundWins: nextRoundWins,
+      turnIndex: nextTurnIndex,
+      leadIndex: nextLeadIndex,
       handValue: handValue,
     );
     final result = simulator.simulateToEnd(snapshot, difficulty: 4);
     return _scoreResult(
-      playerTeamId: player.teamId,
-      result: result,
-      handValue: handValue,
-    );
+          playerTeamId: player.teamId,
+          result: result,
+          handValue: handValue,
+        ) +
+        _resourcePreservationAdjustment(
+          player: player,
+          hand: hand,
+          candidate: candidate,
+          teamRoundWins: teamRoundWins,
+          opponentRoundWins: opponentRoundWins,
+          result: result,
+        );
   }
 
   static double evaluateCard({
@@ -83,6 +126,7 @@ class BotRolloutEvaluator {
     required Map<String, List<SpanishCard>> hands,
     required int teamRoundWins,
     required int opponentRoundWins,
+    List<RoundResult> roundHistory = const <RoundResult>[],
     required int handValue,
     int rollouts = 12,
   }) {
@@ -98,6 +142,7 @@ class BotRolloutEvaluator {
         hands: hands,
         teamRoundWins: teamRoundWins,
         opponentRoundWins: opponentRoundWins,
+        roundHistory: roundHistory,
         handValue: handValue,
         rolloutIndex: index,
       );
@@ -133,6 +178,26 @@ class BotRolloutEvaluator {
       return roundMargin * 20;
     }
     return -1000 - handValue * 50 + roundMargin * 30;
+  }
+
+  static double _resourcePreservationAdjustment({
+    required Player player,
+    required List<SpanishCard> hand,
+    required SpanishCard candidate,
+    required int teamRoundWins,
+    required int opponentRoundWins,
+    required SimulatedHandResult result,
+  }) {
+    if (result.winningTeamId != player.teamId) return 0;
+    if (hand.length <= 1) return 0;
+    if (teamRoundWins <= opponentRoundWins) return 0;
+
+    final weakestStrength = hand
+        .map(ZapitiRules.strength)
+        .reduce((best, current) => current < best ? current : best);
+    final candidateStrength = ZapitiRules.strength(candidate);
+    if (candidateStrength <= weakestStrength) return 0;
+    return -(candidateStrength - weakestStrength) * 0.5;
   }
 
   static int _rolloutSeed({

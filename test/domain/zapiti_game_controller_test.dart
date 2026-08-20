@@ -999,6 +999,103 @@ void main() {
         ),
         returnsNormally,
       );
+      expect(controller.pendingTrucoValue, isNull);
+      expect(controller.respondingTrucoTeamId, isNull);
+    });
+
+    test(
+        'normaliza snapshot invalido de ambos equipos al ver a playing sin decision',
+        () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
+      );
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      controller.syncAlVerSnapshot(
+        teamIds: const [TeamRules.teamOne, TeamRules.teamTwo],
+        requestedState: AlVerState.awaitingDecision,
+      );
+
+      expect(controller.alVerState, AlVerState.playing);
+      expect(controller.alVerTeamId, isNull);
+      expect(controller.pendingTrucoValue, isNull);
+      expect(controller.respondingTrucoTeamId, isNull);
+      expect(
+        controller.legalActions.legalCardsFor(controller.currentPlayer),
+        isNotEmpty,
+      );
+    });
+
+    test('desde ambos equipos al ver la mano completa termina correctamente',
+        () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.score[TeamRules.teamTwo] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      _finishTwoRounds(controller);
+
+      expect(controller.handFinished, isTrue);
+      expect(controller.score[TeamRules.teamOne], 29 + AlVerRules.playPoints);
+      expect(controller.score[TeamRules.teamTwo], 29);
+    });
+
+    test('ambos equipos al ver no duplican la puntuacion final', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.score[TeamRules.teamTwo] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      _finishTwoRounds(controller);
+      expect(controller.score[TeamRules.teamOne], 29 + AlVerRules.playPoints);
+
+      controller.resolveRound();
+
+      expect(controller.score[TeamRules.teamOne], 29 + AlVerRules.playPoints);
+      expect(controller.score[TeamRules.teamTwo], 29);
+    });
+
+    test('ambos equipos al ver bloquean apuestas de apertura para ambos equipos',
+        () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.score[TeamRules.teamTwo] = 29;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.human,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.human.id,
+        ),
+        isFalse,
+      );
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.rightRival,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.rightRival.id,
+        ),
+        isFalse,
+      );
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.human),
+        isEmpty,
+      );
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
+        isEmpty,
+      );
     });
 
     test('si el equipo al ver se va a casa, el rival suma 2 chinos', () {

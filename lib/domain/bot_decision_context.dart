@@ -1,5 +1,7 @@
+import 'bet_state.dart';
 import 'played_card.dart';
 import 'player.dart';
+import 'round_result.dart';
 import 'signal_context.dart';
 import 'spanish_card.dart';
 
@@ -21,6 +23,9 @@ class BotDecisionContext {
   final SignalContext signalContext;
   final int handVersion;
   final int trickIndex;
+  final BetState betState;
+  final Map<int, int> score;
+  final List<RoundResult> roundHistory;
 
   const BotDecisionContext({
     required this.difficulty,
@@ -40,5 +45,15 @@ class BotDecisionContext {
     this.signalContext = SignalContext.empty,
     this.handVersion = 0,
     this.trickIndex = 0,
+    this.betState = const BetState(
+      acceptedLevel: BetLevel.none,
+      proposedLevel: null,
+      proposingTeam: null,
+      respondingTeam: null,
+      lastRaisingTeam: null,
+      responsePending: false,
+    ),
+    this.score = const {1: 0, 2: 0},
+    this.roundHistory = const <RoundResult>[],
   });
 }

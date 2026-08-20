@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'bot_al_ver_strategy.dart';
 import 'bot_bluff_strategy.dart';
+import 'bot_bet_strategy.dart';
 import 'bot_decision_context.dart';
 import 'bot_policy.dart';
 import 'bot_memory_context.dart';
@@ -352,8 +353,6 @@ class AiMatchSimulator {
     Random random,
     _SimulationMetrics metrics,
   ) {
-    final teamsThatConsideredTruco = <int>{};
-
     while (!controller.handFinished && !controller.isGameFinished) {
       _resolveAlVerIfNeeded(controller, config, metrics);
       if (controller.handFinished || controller.isGameFinished) return;
@@ -369,7 +368,6 @@ class AiMatchSimulator {
         config,
         random,
         player,
-        teamsThatConsideredTruco,
         metrics,
       )) {
         continue;
@@ -424,23 +422,23 @@ class AiMatchSimulator {
     AiSimulationConfig config,
     Random random,
     Player player,
-    Set<int> teamsThatConsideredTruco,
     _SimulationMetrics metrics,
   ) {
     if (controller.roundHistory.length >= 2 ||
-        controller.trucoState != TrucoNegotiationState.notStarted ||
-        teamsThatConsideredTruco.contains(player.teamId) ||
+        controller.trucoState == TrucoNegotiationState.awaitingResponse) {
+      return false;
+    }
+    final hand = controller.hands[player.id] ?? const <SpanishCard>[];
+    if (hand.isEmpty) return false;
+    final nextValue = controller.nextTrucoValueForPlayer(player);
+    if (nextValue == null ||
         !controller.canCallTruco(
           player,
-          value: TrucoRules.firstTrucoValue,
+          value: nextValue,
           actorPlayerId: player.id,
         )) {
       return false;
     }
-
-    teamsThatConsideredTruco.add(player.teamId);
-    final hand = controller.hands[player.id] ?? const <SpanishCard>[];
-    if (hand.isEmpty) return false;
 
     final teamId = player.teamId;
     final opponentTeamId = TeamRules.opponentOf(teamId);
@@ -456,9 +454,12 @@ class AiMatchSimulator {
     final needsPoints =
         controller.score[teamId]! < controller.score[opponentTeamId]! ||
             memory.teamIsUnderRoundPressure;
-    final shouldCall = BotTrucoStrategy.shouldCallWithRoll(
+    final chosenValue = BotBetStrategy.chooseBetValue(
       difficulty: _difficultyFor(config, teamId),
       roll: random.nextDouble(),
+      nextValue: nextValue,
+      maxAllowedValue: controller.maxAllowedTrucoValueForTeam(teamId),
+      strengths: teamCards.map(ZapitiRules.strength),
       teamScore: _teamHandScore(controller, teamId),
       ownMaxStrength: ownMaxStrength,
       handStrength: BotTrucoStrategy.evaluateHandStrength(teamCards),
@@ -472,8 +473,13 @@ class AiMatchSimulator {
       scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
+      isWinningReparto:
+          controller.roundWins[teamId]! > controller.roundWins[opponentTeamId]!,
+      canCloseHand: controller.roundWins[teamId]! > 0,
+      mustSaveHand: controller.roundWins[opponentTeamId]! > 0,
+      sawOpponentStrongSignal: false,
     );
-    final shouldBluff = shouldCall
+    final shouldBluff = chosenValue != null || nextValue != TrucoRules.firstTrucoValue
         ? false
         : BotBluffStrategy.shouldBluffCall(
             difficulty: _difficultyFor(config, teamId),
@@ -493,14 +499,18 @@ class AiMatchSimulator {
                 controller.score[teamId]! - controller.score[opponentTeamId]!,
           );
 
-    if (!shouldCall && !shouldBluff) return false;
+    if (chosenValue == null && !shouldBluff) return false;
 
     controller.callTruco(
       player,
-      value: TrucoRules.firstTrucoValue,
+      value: chosenValue ?? nextValue,
       actorPlayerId: player.id,
     );
-    metrics.trucoCalls += 1;
+    if ((chosenValue ?? nextValue) == TrucoRules.firstTrucoValue) {
+      metrics.trucoCalls += 1;
+    } else {
+      metrics.trucoRaises += 1;
+    }
     return true;
   }
 

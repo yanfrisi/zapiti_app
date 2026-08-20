@@ -652,14 +652,45 @@ class ZapitiGameController {
     if (teamTwoScore == AlVerRules.triggerScore) {
       alVerTeamIds.add(TeamRules.teamTwo);
     }
+    alVerState = _normalizedAlVerState(
+      requestedState: null,
+      teamIds: alVerTeamIds,
+    );
+  }
 
-    if (alVerTeamIds.isEmpty) {
-      alVerState = AlVerState.none;
-    } else if (AlVerRules.requiresDecision(alVerTeamIds)) {
-      alVerState = AlVerState.awaitingDecision;
-    } else {
-      alVerState = AlVerState.playing;
+  void syncAlVerSnapshot({
+    required Iterable<int> teamIds,
+    AlVerState? requestedState,
+  }) {
+    alVerTeamIds
+      ..clear()
+      ..addAll(teamIds);
+    alVerState = _normalizedAlVerState(
+      requestedState: requestedState,
+      teamIds: alVerTeamIds,
+    );
+  }
+
+  AlVerState _normalizedAlVerState({
+    required AlVerState? requestedState,
+    required Set<int> teamIds,
+  }) {
+    if (requestedState == AlVerState.conceded) {
+      return AlVerState.conceded;
     }
+    if (teamIds.isEmpty) {
+      return AlVerState.none;
+    }
+    if (requestedState == AlVerState.awaitingDecision &&
+        !AlVerRules.requiresDecision(teamIds)) {
+      return AlVerState.playing;
+    }
+    if (requestedState == AlVerState.playing) {
+      return AlVerState.playing;
+    }
+    return AlVerRules.requiresDecision(teamIds)
+        ? AlVerState.awaitingDecision
+        : AlVerState.playing;
   }
 
   int _awardedHandPoints() {

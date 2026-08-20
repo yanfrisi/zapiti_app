@@ -271,15 +271,16 @@ extension _GameScreenPlayLogic on _GameScreenState {
       );
       if (!mounted || version != _handVersion || _handFinished) return;
 
-      if (_shouldBotCallTruco(bot)) {
+      final betValue = _botBetValue(bot);
+      if (betValue != null) {
         _updateState(() {
           _callTruco(
             bot,
-            value: TrucoRules.firstTrucoValue,
+            value: betValue,
             actorPlayerId: bot.id,
           );
         });
-        _sendMultiplayerTrucoCallIfNeeded(bot, TrucoRules.firstTrucoValue);
+        _sendMultiplayerTrucoCallIfNeeded(bot, betValue);
 
         await _botDelay(650);
         if (!mounted || version != _handVersion || _handFinished) return;
@@ -441,6 +442,9 @@ extension _GameScreenPlayLogic on _GameScreenState {
         signalContext: _signalContextFor(bot),
         handVersion: _handVersion,
         trickIndex: _roundHistory.length,
+        betState: _betState,
+        score: _score,
+        roundHistory: _roundHistory,
       ),
     );
     _forceWinRequestedPlayerIds.remove(bot.id);

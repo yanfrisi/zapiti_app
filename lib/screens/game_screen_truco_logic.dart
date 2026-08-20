@@ -365,28 +365,28 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     _advanceBots();
   }
 
-  bool _shouldBotCallTruco(Player bot) {
+  int? _botBetValue(Player bot) {
     if (!_isLocalBotPlayer(bot)) {
-      return false;
+      return null;
     }
     if (_pendingTrucoValue != null ||
         _handFinished ||
         _roundHistory.length >= 2 ||
-        _game.trucoState != TrucoNegotiationState.notStarted ||
-        !_game.canCallTruco(
-          bot,
-          value: TrucoRules.firstTrucoValue,
-          actorPlayerId: bot.id,
-        )) {
-      return false;
+        _game.trucoState == TrucoNegotiationState.awaitingResponse) {
+      return null;
     }
 
     final hand = _hands[bot.id] ?? [];
-    if (hand.isEmpty) return false;
-    final alreadyConsidered =
-        _aiTeamsConsideredTrucoThisHand.contains(bot.teamId);
-    if (alreadyConsidered) return false;
-    _aiTeamsConsideredTrucoThisHand.add(bot.teamId);
+    if (hand.isEmpty) return null;
+    final nextValue = _game.nextTrucoValueForPlayer(bot);
+    if (nextValue == null ||
+        !_game.canCallTruco(
+          bot,
+          value: nextValue,
+          actorPlayerId: bot.id,
+        )) {
+      return null;
+    }
 
     final teamSignal = _teamSignalsByTeam[bot.teamId];
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
@@ -405,7 +405,8 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         needsPoints || memory.teamIsUnderRoundPressure;
     final teamCards = _teamCardsFor(bot.teamId);
     final handStrength = BotTrucoStrategy.evaluateHandStrength(teamCards);
-    final profile = DifficultyProfiles.byLevel(_selectedDifficulty);
+    final difficulty = _botDifficultyFor(bot);
+    final profile = DifficultyProfiles.byLevel(difficulty);
     final callChance = BotTrucoStrategy.callChance(
       profile,
       handStrength: handStrength,
@@ -420,10 +421,13 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
     );
-    final callRoll = _random.nextDouble();
-    final shouldCall = BotTrucoStrategy.shouldCallWithRoll(
-      difficulty: _selectedDifficulty,
-      roll: callRoll,
+    final betRoll = _nextBotBetRollForTesting ?? _random.nextDouble();
+    _nextBotBetRollForTesting = null;
+    final chosenValue = BotBetStrategy.chooseBetValue(
+      difficulty: difficulty,
+      nextValue: nextValue,
+      maxAllowedValue: _game.maxAllowedTrucoValueForTeam(bot.teamId),
+      strengths: teamCards.map(ZapitiRules.strength),
       teamScore: teamScore,
       ownMaxStrength: ownMaxStrength,
       handStrength: handStrength,
@@ -437,26 +441,34 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
+      isWinningReparto: _roundWins[bot.teamId]! > _roundWins[otherTeam]!,
+      canCloseHand: _roundWins[bot.teamId]! > 0,
+      mustSaveHand: _roundWins[otherTeam]! > 0,
+      sawOpponentStrongSignal: _isStrongSignal(opponentSignal),
+      roll: betRoll,
     );
     if (kDebugMode) {
       debugPrint(
-        '[AI TRUCO] team=${bot.teamId} difficulty=$_selectedDifficulty '
+        '[AI TRUCO] team=${bot.teamId} difficulty=$difficulty next=$nextValue '
         'handStrength=${handStrength.toStringAsFixed(2)} '
         'chance=${callChance.toStringAsFixed(3)} '
-        'roll=${callRoll.toStringAsFixed(3)} result=$shouldCall '
+        'roll=${betRoll.toStringAsFixed(3)} result=$chosenValue '
         'pending=${_game.trucoState == TrucoNegotiationState.awaitingResponse} '
-        'alreadyConsidered=$alreadyConsidered',
+        'accepted=${_game.isTrucoAccepted}',
       );
     }
-    if (shouldCall) {
-      return true;
+    if (chosenValue != null) {
+      return chosenValue;
     }
 
-    if (bot.teamId == _humanPlayer.teamId) return false;
+    if (nextValue != TrucoRules.firstTrucoValue ||
+        bot.teamId == _humanPlayer.teamId) {
+      return null;
+    }
 
     final bluffRoll = _random.nextDouble();
     final shouldBluff = BotBluffStrategy.shouldBluffCall(
-      difficulty: _selectedDifficulty,
+      difficulty: difficulty,
       roll: bluffRoll,
       teamScore: teamScore,
       ownMaxStrength: ownMaxStrength,
@@ -475,10 +487,10 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       debugPrint(
         '[AI TRUCO] team=${bot.teamId} '
         'bluffRoll=${bluffRoll.toStringAsFixed(3)} '
-        'bluff=$shouldBluff alreadyConsidered=true',
+        'bluff=$shouldBluff next=$nextValue',
       );
     }
-    return shouldBluff;
+    return shouldBluff ? nextValue : null;
   }
 
   int? _botRaiseValue(int teamId, {required int pendingValue}) {

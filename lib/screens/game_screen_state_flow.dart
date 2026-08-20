@@ -1945,10 +1945,15 @@ extension _GameScreenStateFlow on _GameScreenState {
               : AlVerState.playing,
     };
 
-    _game.alVerTeamIds
-      ..clear()
-      ..addAll(teamIds);
-    _game.alVerState = state;
+    _game.syncAlVerSnapshot(
+      teamIds: teamIds,
+      requestedState: state,
+    );
+    if (_game.alVerState != AlVerState.awaitingDecision ||
+        _game.alVerTeamId == null) {
+      _isAlVerDecisionDialogOpen = false;
+      _alVerDecisionPromptedKey = null;
+    }
   }
 
   Map<int, int>? _parseIntMap(dynamic rawMap) {

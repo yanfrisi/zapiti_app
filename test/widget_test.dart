@@ -590,6 +590,79 @@ void main() {
     expect(find.text('Te cantan 3'), findsOneWidget);
   });
 
+  testWidgets('la IA puede cantar truco antes de jugar carta en segunda baza',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(
+      firstRoundTie: true,
+      favorable: true,
+      markTeamAsAlreadyConsidered: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 800));
+    await advance;
+    await tester.pump();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 3);
+    expect(snapshot['botCardSelections'], 0);
+  });
+
+  testWidgets('la IA evalua Seis antes de jugar cuando Truco ya fue aceptado',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(
+      firstRoundTie: true,
+      acceptedTruco: true,
+      favorable: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 800));
+    await advance;
+    await tester.pump();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 6);
+    expect(snapshot['botCardSelections'], 0);
+  });
+
+  testWidgets('si el mismo equipo fue el ultimo en subir no vuelve a subir',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(
+      firstRoundTie: true,
+      acceptedTruco: true,
+      botLastRaised: true,
+      favorable: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 800));
+    await advance;
+    await tester.pump();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['botCardSelections'], greaterThan(0));
+  });
+
   testWidgets('el ojo del modal de truco permite volver a ver las cartas',
       (tester) async {
     await showIncomingTrucoResponseOverlay(tester);
@@ -1761,6 +1834,34 @@ void main() {
     expect(gameState.gameController.handFinished, isFalse);
   });
 
+  testWidgets(
+      'snapshot invalido con ambos equipos al ver no deja overlay ni bloqueo',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.gameController.score[TeamRules.teamOne] = 29;
+    gameState.gameController.score[TeamRules.teamTwo] = 29;
+    gameState.gameController.startNewHand(
+      fixedHands: _teamOneWinsTwoRoundsHands(),
+    );
+    gameState.syncAlVerFromMatchForTesting({
+      'alVerTeamIds': [TeamRules.teamOne, TeamRules.teamTwo],
+      'alVerState': 'awaitingDecision',
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('EstÃ¡s al ver'), findsNothing);
+    expect(gameState.gameController.alVerState, AlVerState.playing);
+    expect(gameState.gameController.alVerTeamId, isNull);
+    expect(
+      gameState.gameController.legalActions
+          .legalCardsFor(gameState.gameController.currentPlayer),
+      isNotEmpty,
+    );
+  });
+
   testWidgets('muestra modal de final de partida con resultado',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -1836,6 +1937,31 @@ Map<String, List<SpanishCard>> _aiStrongAlVerHands() {
       SpanishCard(value: 7, suit: Suit.oros),
       SpanishCard(value: 3, suit: Suit.bastos),
       SpanishCard(value: 12, suit: Suit.copas),
+    ],
+  };
+}
+
+Map<String, List<SpanishCard>> _teamOneWinsTwoRoundsHands() {
+  return {
+    'p1': const [
+      SpanishCard(value: 4, suit: Suit.bastos),
+      SpanishCard(value: 3, suit: Suit.oros),
+      SpanishCard(value: 5, suit: Suit.copas),
+    ],
+    'p2': const [
+      SpanishCard(value: 12, suit: Suit.oros),
+      SpanishCard(value: 11, suit: Suit.oros),
+      SpanishCard(value: 5, suit: Suit.oros),
+    ],
+    'p3': const [
+      SpanishCard(value: 10, suit: Suit.bastos),
+      SpanishCard(value: 10, suit: Suit.copas),
+      SpanishCard(value: 6, suit: Suit.bastos),
+    ],
+    'p4': const [
+      SpanishCard(value: 4, suit: Suit.espadas),
+      SpanishCard(value: 5, suit: Suit.espadas),
+      SpanishCard(value: 6, suit: Suit.espadas),
     ],
   };
 }

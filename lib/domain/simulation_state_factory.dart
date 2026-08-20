@@ -64,13 +64,27 @@ class DefaultSimulationStateFactory implements SimulationStateFactory {
       players: List.unmodifiable(players),
       currentTrick: currentTrick,
       playedCards: currentTrick,
-      completedTricks: const <RoundResult>[],
+      completedTricks: List.unmodifiable([
+        for (final trick in observableState.completedTricks)
+          RoundResult(
+            winner: trick.winner == null
+                ? null
+                : PlayedCard(
+                    player: trick.winner!.player,
+                    card: trick.winner!.card,
+                  ),
+            playedCards: List.unmodifiable([
+              for (final played in trick.playedCards)
+                PlayedCard(player: played.player, card: played.card),
+            ]),
+          ),
+      ]),
       currentPlayerId: observableState.currentPlayerId,
       trickLeaderId: observableState.trickLeaderId,
       betState: observableState.betState,
       score: Map.unmodifiable(observableState.score),
       roundWins: Map.unmodifiable(observableState.roundWins),
-      roundNumber: 1,
+      roundNumber: observableState.completedTricks.length + 1,
       isRoundFinished: false,
       isHandFinished: false,
       signalContext: observableState.signalContext,

@@ -4,6 +4,8 @@ import 'bot_strategy.dart';
 import 'bot_table_read.dart';
 import 'monte_carlo_difficulty_config.dart';
 import 'observable_game_state.dart';
+import 'played_card.dart';
+import 'round_rules.dart';
 import 'player.dart';
 import 'possible_deal_sampler.dart';
 import 'signal_context.dart';
@@ -66,6 +68,15 @@ class MonteCarloCardSelector {
         state.playedCards.length == state.players.length - 1) {
       final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
       return sorted.first;
+    }
+
+    final preservationChoice = _knownThirdTrickPreservationChoice(
+      state: state,
+      bot: bot,
+      legalCards: legalCards,
+    );
+    if (preservationChoice != null) {
+      return preservationChoice;
     }
 
     final rolloutProfiles = _buildRolloutProfiles(
@@ -153,6 +164,59 @@ class MonteCarloCardSelector {
     if (orderAware != null) return orderAware;
     final top = scored.take(config.topCandidateCount).toList();
     return top[random.nextInt(top.length)].card;
+  }
+
+  SpanishCard? _knownThirdTrickPreservationChoice({
+    required ObservableGameState state,
+    required Player bot,
+    required List<SpanishCard> legalCards,
+  }) {
+    final opponentTeamId = TeamRules.opponentOf(bot.teamId);
+    if ((state.roundWins[bot.teamId] ?? 0) <=
+        (state.roundWins[opponentTeamId] ?? 0)) {
+      return null;
+    }
+    if (state.playedCards.length != state.players.length - 1) {
+      return null;
+    }
+    if (legalCards.length <= 1) return null;
+    for (final player in state.players) {
+      if (player.id == bot.id) continue;
+      final known = state.publiclyKnownCardsByPlayerId[player.id];
+      final expected = state.cardsRemainingByPlayerId[player.id] ?? 0;
+      if (known == null || known.length != expected) {
+        return null;
+      }
+    }
+
+    final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
+    final weakest = sorted.first;
+    final result = RoundRules.resolveRound([
+      ...state.playedCards,
+      PlayedCard(player: bot, card: weakest),
+    ]);
+    if (result.winningTeamId == bot.teamId) {
+      return null;
+    }
+
+    SpanishCard? strongestRemaining;
+    int? strongestTeamId;
+    for (final player in state.players) {
+      final cards = player.id == bot.id
+          ? sorted.skip(1)
+          : (state.publiclyKnownCardsByPlayerId[player.id] ?? const <SpanishCard>[]);
+      for (final card in cards) {
+        if (strongestRemaining == null ||
+            ZapitiRules.strength(card) > ZapitiRules.strength(strongestRemaining)) {
+          strongestRemaining = card;
+          strongestTeamId = player.teamId;
+        }
+      }
+    }
+    if (strongestRemaining == null || strongestTeamId != bot.teamId) {
+      return null;
+    }
+    return weakest;
   }
 
   SpanishCard? _orderAwareChoice({
@@ -565,6 +629,10 @@ class MonteCarloCardSelector {
       if (isLastToPlay) bonus += 10;
       if (teammateStillToPlay) bonus += 4;
       if (signalBias.conserveResources) bonus += 34 - cardStrength * 0.35;
+      if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+          state.completedTricks.isNotEmpty) {
+        bonus += 24 - cardStrength * 0.28;
+      }
       return bonus;
     }
 
@@ -579,12 +647,22 @@ class MonteCarloCardSelector {
       } else if (signalBias.conserveResources) {
         bonus += canBeatTable ? -cardStrength * 0.34 : 22;
       }
+      if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+          state.completedTricks.isNotEmpty &&
+          isLastToPlay) {
+        bonus += canBeatTable ? -cardStrength * 0.40 : 42 - cardStrength * 0.08;
+      }
       return bonus;
     }
 
     var bonus = 0.0;
     if (signalBias.conserveResources) {
       bonus += 22 - cardStrength * 0.24;
+    }
+    if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+        state.completedTricks.isNotEmpty &&
+        state.playedCards.isEmpty) {
+      bonus += 18 - cardStrength * 0.20;
     }
     if (signalBias.mustWin && canBeatTable) {
       bonus += 80 - cardStrength * 0.48;

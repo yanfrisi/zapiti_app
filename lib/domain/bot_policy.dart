@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import 'bet_state.dart';
 import 'bot_decision_context.dart';
 import 'bot_rollout_evaluator.dart';
 import 'bot_strategy.dart';
@@ -61,6 +60,7 @@ class RolloutBotPolicy implements BotPolicy {
       forceWinIfPossible: context.forceWinIfPossible,
       teammateStillToPlay: context.teammateStillToPlay,
       opponentStillToPlay: context.opponentStillToPlay,
+      roundHistory: context.roundHistory,
       rolloutCount: rolloutCount,
     );
   }
@@ -88,19 +88,13 @@ class MonteCarloBotPolicy implements BotPolicy {
       currentPlayerId: context.bot.id,
       trickLeaderId:
           context.playedCards.isEmpty ? context.bot.id : context.playedCards.first.player.id,
-      betState: const BetState(
-        acceptedLevel: BetLevel.none,
-        proposedLevel: null,
-        proposingTeam: null,
-        respondingTeam: null,
-        lastRaisingTeam: null,
-        responsePending: false,
-      ),
-      score: const {1: 0, 2: 0},
+      betState: context.betState,
+      score: context.score,
       roundWins: {
         context.bot.teamId: context.teamRoundWins,
         3 - context.bot.teamId: context.opponentRoundWins,
       },
+      completedTricks: context.roundHistory,
       visibleSignals: const [],
       signalContext: context.signalContext.visibleToTeam(context.bot.teamId),
       handVersion: context.handVersion,
@@ -146,6 +140,7 @@ class IsmctsBotPolicy implements BotPolicy {
         hands: context.hands,
         teamRoundWins: context.teamRoundWins,
         opponentRoundWins: context.opponentRoundWins,
+        roundHistory: context.roundHistory,
         handValue: handValueEstimate,
         rolloutIndex: step,
       );

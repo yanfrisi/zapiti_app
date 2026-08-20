@@ -1,5 +1,7 @@
 import 'played_card.dart';
 import 'player.dart';
+import 'round_result.dart';
+import 'round_rules.dart';
 import 'spanish_card.dart';
 import 'bot_rollout_evaluator.dart';
 import 'card_strength_comparator.dart';
@@ -145,6 +147,7 @@ class BotStrategy {
     bool forceWinIfPossible = false,
     bool teammateStillToPlay = false,
     bool opponentStillToPlay = false,
+    List<RoundResult> roundHistory = const <RoundResult>[],
     bool allowPerfectInformation = false,
     int rolloutCount = 12,
   }) {
@@ -167,9 +170,21 @@ class BotStrategy {
       return baseline;
     }
 
-    if (difficulty < 4 || hand.length == 1) return baseline;
+    if (difficulty < 3 || hand.length == 1) return baseline;
 
-    if (difficulty >= 5 && players != null && hands != null) {
+    if (players != null && hands != null) {
+      final preservationChoice = _preserveForThirdTrickIfSafe(
+        player: player,
+        hand: hand,
+        playedCards: playedCards,
+        players: players,
+        hands: hands,
+        teamRoundWins: teamRoundWins,
+        opponentRoundWins: opponentRoundWins,
+      );
+      if (preservationChoice != null) {
+        return preservationChoice;
+      }
       if (allowPerfectInformation) {
         return _chooseCardWithPerfectRoundSearch(
           player: player,
@@ -189,6 +204,7 @@ class BotStrategy {
         playedCards: playedCards,
         players: players,
         hands: hands,
+        roundHistory: roundHistory,
         baseline: baseline,
         teamRoundWins: teamRoundWins,
         opponentRoundWins: opponentRoundWins,
@@ -236,12 +252,68 @@ class BotStrategy {
     return best;
   }
 
+  static SpanishCard? _preserveForThirdTrickIfSafe({
+    required Player player,
+    required List<SpanishCard> hand,
+    required List<PlayedCard> playedCards,
+    required List<Player> players,
+    required Map<String, List<SpanishCard>> hands,
+    required int teamRoundWins,
+    required int opponentRoundWins,
+  }) {
+    if (teamRoundWins <= opponentRoundWins) return null;
+    if (hand.length <= 1) return null;
+    if (playedCards.length != players.length - 1) return null;
+
+    final sorted = [...hand]..sort(_strengthComparator.compare);
+    final weakest = sorted.first;
+    final tableAfterWeakest = [
+      ...playedCards,
+      PlayedCard(player: player, card: weakest),
+    ];
+    final currentResult = RoundRules.resolveRound(tableAfterWeakest);
+    if (currentResult.winningTeamId == player.teamId) {
+      return null;
+    }
+
+    final remainingHands = _copyHands(hands);
+    _removeCard(remainingHands[player.id], weakest);
+    if (_teamOwnsStrongestRemainingCard(
+      teamId: player.teamId,
+      players: players,
+      hands: remainingHands,
+    )) {
+      return weakest;
+    }
+    return null;
+  }
+
+  static bool _teamOwnsStrongestRemainingCard({
+    required int teamId,
+    required List<Player> players,
+    required Map<String, List<SpanishCard>> hands,
+  }) {
+    SpanishCard? strongest;
+    int? strongestTeamId;
+    for (final player in players) {
+      for (final card in hands[player.id] ?? const <SpanishCard>[]) {
+        if (strongest == null ||
+            ZapitiRules.strength(card) > ZapitiRules.strength(strongest)) {
+          strongest = card;
+          strongestTeamId = player.teamId;
+        }
+      }
+    }
+    return strongest != null && strongestTeamId == teamId;
+  }
+
   static SpanishCard _chooseCardWithRollouts({
     required Player player,
     required List<SpanishCard> hand,
     required List<PlayedCard> playedCards,
     required List<Player> players,
     required Map<String, List<SpanishCard>> hands,
+    required List<RoundResult> roundHistory,
     required SpanishCard baseline,
     required int teamRoundWins,
     required int opponentRoundWins,
@@ -260,6 +332,7 @@ class BotStrategy {
         playedCards: playedCards,
         players: players,
         hands: hands,
+        roundHistory: roundHistory,
         teamRoundWins: teamRoundWins,
         opponentRoundWins: opponentRoundWins,
         handValue: handValueEstimate,
