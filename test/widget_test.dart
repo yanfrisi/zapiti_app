@@ -68,6 +68,28 @@ void main() {
     return gameState;
   }
 
+  Future<void> openTutorialAlVerStep(WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 7; index += 1) {
+      await tester.ensureVisible(find.byType(ChoiceChip).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ChoiceChip).first);
+      await tester.pump();
+      await tester.ensureVisible(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Al ver y final'), findsOneWidget);
+  }
+
   double trucoResponsePanelOpacity(WidgetTester tester) {
     return tester
         .widget<AnimatedOpacity>(
@@ -526,6 +548,121 @@ void main() {
 
     expect(find.text('Salvar reparto'), findsOneWidget);
     expect(find.text('Probar suerte'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver explica 2 3 y bloqueo de truco',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    expect(find.textContaining('2 chinos'), findsOneWidget);
+    expect(find.textContaining('juega por 3'), findsOneWidget);
+    expect(find.textContaining('No se puede cantar Truco'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver con respuesta incorrecta no avanza',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    await tester.tap(find.text('Perder partida'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Casi'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Al ver y final'), findsOneWidget);
+    expect(find.text('Conceder 2'), findsOneWidget);
+    expect(find.text('Perder partida'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver con respuesta correcta avanza un paso',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    await tester.tap(find.text('Conceder 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Objetivo'), findsOneWidget);
+    expect(find.text('Guardar fuerza'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver renderiza bien en movil pequeno',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    expect(find.text('Al ver y final'), findsOneWidget);
+    expect(
+      find.textContaining('irte a casa regala 2 chinos'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('No se puede cantar Truco ni subir'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tutorial al ver sigue cargando textos en ingles',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 7; index += 1) {
+      await tester.ensureVisible(find.byType(ChoiceChip).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ChoiceChip).first);
+      await tester.pump();
+      await tester.ensureVisible(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Al ver and endgame'), findsOneWidget);
+    expect(
+      find.textContaining('going home gives away 2 points'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('You cannot call truco or raise'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('practica del tutorial no avanza hasta acertar', (tester) async {
