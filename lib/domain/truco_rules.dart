@@ -7,13 +7,24 @@ class TrucoRules {
 
   /// Devuelve el valor máximo que puede proponer un equipo concreto.
   ///
-  /// La escalera oficial no se recorta por marcador: Truco, Seis, Nueve,
-  /// Doce, Quince y Ahorrisi.
+  /// Cerca de 30, la escalera sigue existiendo pero el equipo que ya está en
+  /// 27 o 28 solo puede abrir o participar en Truco base. A 29 ya no puede
+  /// iniciar ni continuar apuestas de Truco.
   static int maxAllowedValueForTeam({
     required int teamScore,
     required int targetScore,
     required int currentAcceptedValue,
   }) {
+    final pointsToAlVer = maxPointsBeforeTarget(
+      teamScore: teamScore,
+      targetScore: targetScore,
+    );
+    if (pointsToAlVer <= 0) {
+      return 0;
+    }
+    if (pointsToAlVer < firstTrucoValue) {
+      return firstTrucoValue;
+    }
     return maxTrucoValue;
   }
 
@@ -26,7 +37,17 @@ class TrucoRules {
     required int targetScore,
     required int currentAcceptedValue,
   }) {
-    return maxTrucoValue;
+    final teamOneMax = maxAllowedValueForTeam(
+      teamScore: scoreTeamOne,
+      targetScore: targetScore,
+      currentAcceptedValue: currentAcceptedValue,
+    );
+    final teamTwoMax = maxAllowedValueForTeam(
+      teamScore: scoreTeamTwo,
+      targetScore: targetScore,
+      currentAcceptedValue: currentAcceptedValue,
+    );
+    return teamOneMax > teamTwoMax ? teamOneMax : teamTwoMax;
   }
 
   /// Lista de subidas disponibles para quien debe responder al truco.
@@ -73,5 +94,35 @@ class TrucoRules {
   /// Al pasar no se paga la subida pendiente, sino el último valor aceptado.
   static int passPoints({required int currentAcceptedValue}) {
     return currentAcceptedValue;
+  }
+
+  /// Máximo que un equipo puede sumar sin llegar todavía al cierre.
+  ///
+  /// En Zapiti, al acercarse a 30 el Truco solo puede resolverse hasta dejar
+  /// al equipo en 29; la definición final pasa por la mano siguiente.
+  static int maxPointsBeforeTarget({
+    required int teamScore,
+    required int targetScore,
+  }) {
+    return (targetScore - 1 - teamScore).clamp(0, maxTrucoValue);
+  }
+
+  /// Puntos efectivos que puede cobrar un equipo por una resolución de Truco.
+  ///
+  /// El valor nominal de la apuesta puede ser 3 o más, pero a 27/28 solo se
+  /// cobran los puntos que dejan al equipo como máximo en 29.
+  static int awardedPointsForTeam({
+    required int teamScore,
+    required int targetScore,
+    required int nominalValue,
+  }) {
+    final maxAllowedPoints = maxPointsBeforeTarget(
+      teamScore: teamScore,
+      targetScore: targetScore,
+    );
+    if (maxAllowedPoints <= 0) {
+      return 0;
+    }
+    return nominalValue < maxAllowedPoints ? nominalValue : maxAllowedPoints;
   }
 }

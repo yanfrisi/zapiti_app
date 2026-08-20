@@ -3,7 +3,8 @@ import 'package:zapiti_app/domain/truco_rules.dart';
 
 void main() {
   group('TrucoRules', () {
-    test('usa Ahorrisi como techo oficial de la escalera', () {
+    test('usa Ahorrisi como techo oficial de la escalera con marcador normal',
+        () {
       final maxValue = TrucoRules.maxAllowedValue(
         scoreTeamOne: 21,
         scoreTeamTwo: 26,
@@ -14,7 +15,9 @@ void main() {
       expect(maxValue, 18);
     });
 
-    test('el marcador no recorta el techo oficial de apuesta', () {
+    test(
+        'el tope global sigue siendo Ahorrisi si el otro equipo todavia tiene margen',
+        () {
       final maxValue = TrucoRules.maxAllowedValue(
         scoreTeamOne: 19,
         scoreTeamTwo: 27,
@@ -25,7 +28,7 @@ void main() {
       expect(maxValue, 18);
     });
 
-    test('el limite por equipo no inventa escalones por marcador', () {
+    test('a 27 y 28 se permite truco pero se bloquean subidas mayores', () {
       final teamWithMargin = TrucoRules.maxAllowedValueForTeam(
         teamScore: 19,
         targetScore: 30,
@@ -37,8 +40,25 @@ void main() {
         currentAcceptedValue: 1,
       );
 
+      final teamAt28 = TrucoRules.maxAllowedValueForTeam(
+        teamScore: 28,
+        targetScore: 30,
+        currentAcceptedValue: 1,
+      );
+
       expect(teamWithMargin, 18);
-      expect(teamNearEnd, 18);
+      expect(teamNearEnd, 3);
+      expect(teamAt28, 3);
+    });
+
+    test('a 29 ya no hay truco legal para ese equipo', () {
+      final teamAt29 = TrucoRules.maxAllowedValueForTeam(
+        teamScore: 29,
+        targetScore: 30,
+        currentAcceptedValue: 1,
+      );
+
+      expect(teamAt29, 0);
     });
 
     test('no ofrece subida si el final de partida solo permite truco base', () {
@@ -66,6 +86,33 @@ void main() {
       );
 
       expect(options, isEmpty);
+    });
+
+    test('al resolver truco cerca de 30 solo se cobra hasta 29', () {
+      expect(
+        TrucoRules.awardedPointsForTeam(
+          teamScore: 27,
+          targetScore: 30,
+          nominalValue: 3,
+        ),
+        2,
+      );
+      expect(
+        TrucoRules.awardedPointsForTeam(
+          teamScore: 28,
+          targetScore: 30,
+          nominalValue: 3,
+        ),
+        1,
+      );
+      expect(
+        TrucoRules.awardedPointsForTeam(
+          teamScore: 10,
+          targetScore: 30,
+          nominalValue: 6,
+        ),
+        6,
+      );
     });
 
     test('rechaza contra-subidas que no caen en escalones de tres', () {

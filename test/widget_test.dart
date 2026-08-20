@@ -550,8 +550,7 @@ void main() {
     expect(find.text('Probar suerte'), findsOneWidget);
   });
 
-  testWidgets('tutorial al ver explica 2 3 y bloqueo de truco',
-      (tester) async {
+  testWidgets('tutorial al ver explica 2 3 y bloqueo de truco', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1200));
     addTearDown(() async {
       await tester.binding.setSurfaceSize(null);
@@ -1496,6 +1495,31 @@ void main() {
     expect(find.text('VOY A TI'), findsNothing);
   });
 
+  testWidgets('la UI refleja la legalidad de truco del dominio en 27 28 y 29',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 27;
+    });
+    await tester.pump();
+    expect(gameState.canHumanCallTrucoForTesting, isTrue);
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 28;
+    });
+    await tester.pump();
+    expect(gameState.canHumanCallTrucoForTesting, isTrue);
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 29;
+    });
+    await tester.pump();
+    expect(gameState.canHumanCallTrucoForTesting, isFalse);
+  });
+
   testWidgets('ven a mi hace que el bot conserve el Zapiti en segunda baza',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
@@ -2048,10 +2072,12 @@ void main() {
     expect(gameState.companionPrivateSignalStatusForTesting, 'Compa mira...');
 
     await tester.pump(const Duration(milliseconds: 450));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
 
     await tester.pump(const Duration(seconds: 2, milliseconds: 999));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
 
     await tester.pump(const Duration(milliseconds: 1));
     expect(gameState.companionPrivateSignalStatusForTesting, isNull);
@@ -2075,7 +2101,8 @@ void main() {
     gameState.requestGuidedTutorialSignalForTesting();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 450));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
 
     await tester.pump(const Duration(seconds: 3));
     expect(gameState.companionPrivateSignalStatusForTesting, isNull);
@@ -2084,7 +2111,8 @@ void main() {
     await tester.pump();
     expect(gameState.companionPrivateSignalStatusForTesting, 'Compa mira...');
     await tester.pump(const Duration(milliseconds: 450));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
   });
 
   testWidgets(
@@ -2118,10 +2146,12 @@ void main() {
 
     expect(secondRequestId, isNotNull);
     expect(secondRequestId, isNot(firstRequestId));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
 
     await tester.pump(const Duration(milliseconds: 1549));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
 
     await tester.pump(const Duration(milliseconds: 1451));
     expect(gameState.companionPrivateSignalStatusForTesting, isNull);
@@ -2145,7 +2175,8 @@ void main() {
     gameState.requestGuidedTutorialSignalForTesting();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 450));
-    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 4));
@@ -2201,8 +2232,8 @@ void main() {
 
     await startGame(tester);
     final restartedState = tester.state(find.byType(GameScreen)) as dynamic;
-    final snapshot =
-        restartedState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    final snapshot = restartedState.offlineRuntimeSnapshotForTesting()
+        as Map<String, Object?>;
 
     expect(restartedState.gameController.score[TeamRules.teamOne], 0);
     expect(restartedState.gameController.score[TeamRules.teamTwo], 0);

@@ -456,6 +456,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   String get guidedTutorialStatusForTesting => _status;
 
   @visibleForTesting
+  bool get canHumanCallTrucoForTesting => _canHumanCallTruco;
+
+  @visibleForTesting
   Future<void> playGuidedTutorialCardForTesting(SpanishCard card) async {
     await _handleGuidedTutorialCard(card);
   }

@@ -447,7 +447,12 @@ class ZapitiGameController {
         pendingTrucoValue == null) {
       throw StateError('No hay truco pendiente que pasar.');
     }
-    final points = TrucoRules.passPoints(currentAcceptedValue: handValue);
+    final nominalPoints = TrucoRules.passPoints(currentAcceptedValue: handValue);
+    final points = TrucoRules.awardedPointsForTeam(
+      teamScore: score[callerTeamId]!,
+      targetScore: targetScore,
+      nominalValue: nominalPoints,
+    );
     trucoState = TrucoNegotiationState.rejectedHandFinished;
     _finishHandForTeam(
       callerTeamId,
@@ -697,7 +702,15 @@ class ZapitiGameController {
     if (alVerState == AlVerState.playing && alVerTeamIds.isNotEmpty) {
       return AlVerRules.playPoints;
     }
-    return handValue;
+    final progress = HandRules.resolve(roundHistory);
+    if (progress.winningTeamId == null) {
+      return handValue;
+    }
+    return TrucoRules.awardedPointsForTeam(
+      teamScore: score[progress.winningTeamId]!,
+      targetScore: targetScore,
+      nominalValue: handValue,
+    );
   }
 
   Map<String, List<SpanishCard>> _dealRandomHands() {

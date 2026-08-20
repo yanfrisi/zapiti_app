@@ -374,7 +374,8 @@ void main() {
       expect(controller.isRoundAwaitingContinue, isTrue);
     });
 
-    test('si las dos primeras empatan, la tercera ganada decide el reparto', () {
+    test('si las dos primeras empatan, la tercera ganada decide el reparto',
+        () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       )..startNewHand(fixedHands: _twoTiesThenTeamOneWinsHands());
@@ -454,6 +455,54 @@ void main() {
       expect(controller.handValue, 3);
     });
 
+    test('a 27 un truco aceptado suma solo hasta 29', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        autoStart: false,
+      )..startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+      controller.score[TeamRules.teamOne] = 27;
+
+      controller.callTruco(
+        ZapitiPlayers.human,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      controller.acceptTruco(
+        teamId: TeamRules.teamTwo,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      _finishTwoRounds(controller);
+
+      expect(controller.score[TeamRules.teamOne], 29);
+      expect(controller.score[TeamRules.teamTwo], 0);
+      expect(controller.isGameFinished, isFalse);
+      expect(controller.handValue, 3);
+    });
+
+    test('a 28 un truco aceptado suma solo hasta 29', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        autoStart: false,
+      )..startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+      controller.score[TeamRules.teamOne] = 28;
+
+      controller.callTruco(
+        ZapitiPlayers.human,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      controller.acceptTruco(
+        teamId: TeamRules.teamTwo,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      _finishTwoRounds(controller);
+
+      expect(controller.score[TeamRules.teamOne], 29);
+      expect(controller.score[TeamRules.teamTwo], 0);
+      expect(controller.isGameFinished, isFalse);
+      expect(controller.handValue, 3);
+    });
+
     test('subida aceptada actualiza el valor de la mano', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
@@ -494,6 +543,27 @@ void main() {
       expect(controller.score[TeamRules.teamOne], 1);
       expect(controller.handFinished, isTrue);
       expect(controller.trucoState, TrucoNegotiationState.rejectedHandFinished);
+    });
+
+    test('a 29 el equipo ya no puede abrir truco y la UI debe verlo igual', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+
+      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne), 0);
+      expect(
+        controller.canCallTruco(
+          ZapitiPlayers.human,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.human.id,
+        ),
+        isFalse,
+      );
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.human),
+        isNot(contains(const BetAction.call(3))),
+      );
     });
 
     test('rechazar truco mantiene la salida del siguiente jugador en mesa', () {
@@ -708,7 +778,7 @@ void main() {
       );
     });
 
-    test('un equipo con 27 chinos puede abrir truco a 3 para jugarse la partida',
+    test('un equipo con 27 chinos puede abrir truco y el rival puede aceptarlo',
         () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
@@ -749,11 +819,13 @@ void main() {
       );
     });
 
-    test('la siguiente subida de truco sigue la escalera oficial', () {
+    test(
+        'el tope legal por equipo pasa a truco base en 27 y 28, y a nada en 29',
+        () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
-      for (final score in [24, 25, 26, 27, 28, 29]) {
+      for (final score in [24, 25, 26]) {
         controller.score[TeamRules.teamOne] = score;
         expect(
           controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne),
@@ -761,6 +833,12 @@ void main() {
           reason: 'score=$score',
         );
       }
+      controller.score[TeamRules.teamOne] = 27;
+      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne), 3);
+      controller.score[TeamRules.teamOne] = 28;
+      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne), 3);
+      controller.score[TeamRules.teamOne] = 29;
+      expect(controller.maxAllowedTrucoValueForTeam(TeamRules.teamOne), 0);
 
       controller.score[TeamRules.teamOne] = 25;
       controller.callTruco(
@@ -774,8 +852,10 @@ void main() {
       expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), [6]);
     });
 
-    test('permite subidas oficiales cerca de 30 en 24 a 29 chinos', () {
-      for (final score in [24, 25, 26, 27, 28, 29]) {
+    test(
+        'a 27 y 28 truco sigue siendo legal pero no nuevas subidas para ese equipo',
+        () {
+      for (final score in [27, 28]) {
         final controller = ZapitiGameController(
           players: ZapitiPlayers.tableOrder,
         );
@@ -807,7 +887,30 @@ void main() {
           [6],
           reason: 'score=$score',
         );
+        expect(
+          controller.canCallTruco(
+            ZapitiPlayers.human,
+            value: 6,
+            actorPlayerId: ZapitiPlayers.human.id,
+          ),
+          isFalse,
+          reason: 'score=$score team one cannot self-raise',
+        );
       }
+
+      final controllerAt29 = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controllerAt29.score[TeamRules.teamOne] = 29;
+      controllerAt29.score[TeamRules.teamTwo] = 29;
+      expect(
+        controllerAt29.canCallTruco(
+          ZapitiPlayers.human,
+          value: 3,
+          actorPlayerId: ZapitiPlayers.human.id,
+        ),
+        isFalse,
+      );
     });
 
     test('subidas alternan equipos y no puede haber dos propuestas pendientes',
@@ -1062,7 +1165,8 @@ void main() {
       expect(controller.score[TeamRules.teamTwo], 29);
     });
 
-    test('ambos equipos al ver bloquean apuestas de apertura para ambos equipos',
+    test(
+        'ambos equipos al ver bloquean apuestas de apertura para ambos equipos',
         () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
