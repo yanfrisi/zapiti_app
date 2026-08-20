@@ -1174,7 +1174,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
               'companionSignal',
               params: {'signal': _localizedSignalName(label)},
             ),
-            clearAfter: const Duration(seconds: 2),
+            clearAfter: _GameScreenState._companionSignalFeedbackDuration,
           );
           _status = context.tr(
             'signalReceivedFrom',

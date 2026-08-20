@@ -223,6 +223,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static const _debugPresetIndex = 0;
   static const _companionBotOrderWindowDuration = Duration(milliseconds: 1750);
   static const _companionBotPostOrderVisualDelay = Duration(milliseconds: 550);
+  static const _companionSignalFeedbackDuration = Duration(seconds: 3);
   static const _teammateBotSignalRevealDuration = Duration(milliseconds: 300);
   Set<String> _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
   String? _companionBotOrderWindowPlayerId;
@@ -894,6 +895,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     String? value, {
     Duration? clearAfter,
     String? requestId,
+    VoidCallback? onClear,
   }) {
     _companionPrivateSignalTimer?.cancel();
     _companionPrivateSignalTimer = null;
@@ -909,6 +911,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             _companionPrivateSignalRequestId == requestId) {
           _companionPrivateSignalStatus = null;
           _companionPrivateSignalRequestId = null;
+          onClear?.call();
         }
         _companionPrivateSignalTimer = null;
       });

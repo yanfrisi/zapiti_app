@@ -1889,6 +1889,130 @@ void main() {
     expect(gameState.gameController.score[TeamRules.teamOne], 0);
     expect(gameState.gameController.score[TeamRules.teamTwo], 0);
   });
+
+  testWidgets('pedir sena mantiene visible la respuesta durante 3 segundos',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa mira...');
+
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(seconds: 2, milliseconds: 999));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+  });
+
+  testWidgets('pedir sena puede volver a mostrar una nueva respuesta',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(seconds: 3));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa mira...');
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+  });
+
+  testWidgets(
+      'dos pedidos consecutivos no reutilizan el timer anterior ni borran la segunda respuesta',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    final firstRequestId = gameState.companionPrivateSignalRequestIdForTesting;
+    expect(firstRequestId, isNotNull);
+
+    await tester.pump(const Duration(seconds: 1));
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    final secondRequestId = gameState.companionPrivateSignalRequestIdForTesting;
+
+    expect(secondRequestId, isNotNull);
+    expect(secondRequestId, isNot(firstRequestId));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(milliseconds: 1549));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(milliseconds: 1451));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+  });
+
+  testWidgets('pedir sena no deja timers activos al cerrar la pantalla',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 4));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Map<String, List<SpanishCard>> _aiBadAlVerHands() {

@@ -2,7 +2,6 @@ part of 'game_screen.dart';
 
 extension _GameScreenSignalLogic on _GameScreenState {
   static const _signalMessagePrefix = 'SENAL: ';
-  static const _companionSignalGestureDuration = Duration(milliseconds: 300);
   static const _companionNoSignalStatusDuration = Duration(milliseconds: 450);
 
   int get _currentTrickIndex => _roundHistory.length;
@@ -97,6 +96,7 @@ extension _GameScreenSignalLogic on _GameScreenState {
       'companionSignal',
       params: {'signal': _localizedSignalName(signal)},
     );
+    final requestId = 'local-signal-${++_localSignalRequestSequence}';
     _updateState(() {
       _playersSignaledThisHand.add(companion.id);
       _playerMessages[companion.id] = '$_signalMessagePrefix$signal';
@@ -107,7 +107,13 @@ extension _GameScreenSignalLogic on _GameScreenState {
       );
       _setCompanionPrivateSignalStatus(
         companionSignalStatus,
-        clearAfter: const Duration(seconds: 2),
+        clearAfter: _GameScreenState._companionSignalFeedbackDuration,
+        requestId: requestId,
+        onClear: () {
+          if (_playerMessages[companion.id] == '$_signalMessagePrefix$signal') {
+            _playerMessages.remove(companion.id);
+          }
+        },
       );
       _teamSignalsByTeam[companion.teamId] = signal;
       _knownSignalsByTeam[companion.teamId] = signal;
@@ -123,17 +129,6 @@ extension _GameScreenSignalLogic on _GameScreenState {
       await _advanceGuidedTutorialAfterSuccess(correct: correct);
       return;
     }
-
-    await Future<void>.delayed(_companionSignalGestureDuration);
-    if (!mounted || version != _handVersion) return;
-    _updateState(() {
-      if (_playerMessages[companion.id] == '$_signalMessagePrefix$signal') {
-        _playerMessages.remove(companion.id);
-      }
-      if (_companionPrivateSignalStatus == companionSignalStatus) {
-        _setCompanionPrivateSignalStatus(null);
-      }
-    });
   }
 
   void _startSignal(String label) {
