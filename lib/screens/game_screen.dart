@@ -1589,6 +1589,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         scoreTeamOne: _score[TeamRules.teamOne]!,
                         scoreTeamTwo: _score[TeamRules.teamTwo]!,
                         onRestart: _restartGame,
+                        onExit: _returnToMainMenu,
                         playerNameBuilder: _localizedPlayerName,
                       ),
                     if (_showGameOptions)

@@ -1880,6 +1880,7 @@ void main() {
     expect(find.textContaining('Yo y'), findsOneWidget);
     expect(find.text('Puntuación final: 30 - 24'), findsOneWidget);
     expect(find.text('OTRA PARTIDA'), findsWidgets);
+    expect(find.text('SALIR'), findsWidgets);
 
     await tester.tap(find.text('OTRA PARTIDA').last);
     await tester.pumpAndSettle();
@@ -2011,6 +2012,156 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 4));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('salir desde partida finalizada vuelve al menu principal',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('JUGAR'), findsOneWidget);
+    expect(find.text('TUTORIAL'), findsOneWidget);
+    expect(find.text('GanÃ³ el Equipo 1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('salir deja estado limpio al iniciar una nueva partida',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareComeToMeScenarioForTesting();
+    gameState.prepareIncomingTrucoResponseForTesting();
+    await tester.pump();
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+
+    await startGame(tester);
+    final restartedState = tester.state(find.byType(GameScreen)) as dynamic;
+    final snapshot =
+        restartedState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+
+    expect(restartedState.gameController.score[TeamRules.teamOne], 0);
+    expect(restartedState.gameController.score[TeamRules.teamTwo], 0);
+    expect(restartedState.gameController.playedCards, isEmpty);
+    expect(restartedState.gameController.roundHistory, isEmpty);
+    expect(restartedState.gameController.handFinished, isFalse);
+    expect(restartedState.gameController.winningTeamId, isNull);
+    expect(restartedState.gameController.alVerState, AlVerState.none);
+    expect(snapshot['activeSignals'], 0);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['companionOrderWindowPlayerId'], isNull);
+    expect(snapshot['companionOrderWindowWaiting'], isFalse);
+    expect(restartedState.companionPrivateSignalStatusForTesting, isNull);
+    expect(restartedState.companionPrivateSignalRequestIdForTesting, isNull);
+    expect(
+      restartedState.gameController.legalActions
+          .legalCardsFor(restartedState.gameController.currentPlayer),
+      isNotEmpty,
+    );
+    expect(find.textContaining('Ronda 1/3'), findsOneWidget);
+    expect(find.text('GanÃ³ el Equipo 1'), findsNothing);
+  });
+
+  testWidgets('salir cancela timers pendientes de la partida finalizada',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNotNull);
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(find.text('JUGAR'), findsOneWidget);
+    expect(find.text('Compa mira...'), findsNothing);
+    expect(find.textContaining('Compa:'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'partida terminar salir nueva partida terminar y otra partida no acumula estado',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    var gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+
+    await startGame(tester);
+    gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OTRA PARTIDA').last);
+    await tester.pumpAndSettle();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(gameState.gameController.score[TeamRules.teamOne], 0);
+    expect(gameState.gameController.score[TeamRules.teamTwo], 0);
+    expect(gameState.gameController.winningTeamId, isNull);
+    expect(gameState.gameController.handFinished, isFalse);
+    expect(gameState.gameController.alVerState, AlVerState.none);
+    expect(snapshot['activeSignals'], 0);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['companionOrderWindowWaiting'], isFalse);
+    expect(find.textContaining('Ronda 1/3'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

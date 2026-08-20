@@ -1515,6 +1515,7 @@ class _GameFinishedOverlay extends StatelessWidget {
   final int scoreTeamOne;
   final int scoreTeamTwo;
   final VoidCallback onRestart;
+  final VoidCallback onExit;
   final String Function(Player) playerNameBuilder;
 
   const _GameFinishedOverlay({
@@ -1523,6 +1524,7 @@ class _GameFinishedOverlay extends StatelessWidget {
     required this.scoreTeamOne,
     required this.scoreTeamTwo,
     required this.onRestart,
+    required this.onExit,
     required this.playerNameBuilder,
   });
 
@@ -1612,11 +1614,40 @@ class _GameFinishedOverlay extends StatelessWidget {
                               style: bodyStyle,
                             ),
                             SizedBox(height: gap),
-                            ZapitiActionButton(
-                              label: context.tr('newMatchUpper'),
-                              icon: Icons.restart_alt,
-                              onPressed: onRestart,
-                              primary: true,
+                            LayoutBuilder(
+                              builder: (context, buttonConstraints) {
+                                final stackButtons =
+                                    buttonConstraints.maxWidth < 320;
+                                final exitButton = ZapitiActionButton(
+                                  label: context.tr('exit'),
+                                  icon: Icons.exit_to_app,
+                                  onPressed: onExit,
+                                );
+                                final restartButton = ZapitiActionButton(
+                                  label: context.tr('newMatchUpper'),
+                                  icon: Icons.restart_alt,
+                                  onPressed: onRestart,
+                                  primary: true,
+                                );
+                                if (stackButtons) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      exitButton,
+                                      SizedBox(height: gap * 0.65),
+                                      restartButton,
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  children: [
+                                    Expanded(child: exitButton),
+                                    SizedBox(width: gap * 0.65),
+                                    Expanded(child: restartButton),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),
