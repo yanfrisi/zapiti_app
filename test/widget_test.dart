@@ -1030,6 +1030,7 @@ void main() {
     expect(find.text('Juan Francisco Gutiérrez Vázquez'), findsWidgets);
     expect(find.text('Miguel Mateos Borrego'), findsOneWidget);
     expect(find.text('Tabares'), findsOneWidget);
+    expect(find.text('Saúl Lázaro'), findsOneWidget);
     expect(find.text('Agradecimientos especiales a la Peña el Trompazo.'),
         findsOneWidget);
     expect(find.text('VOLVER'), findsOneWidget);

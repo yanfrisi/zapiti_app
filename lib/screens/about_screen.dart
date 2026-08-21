@@ -167,6 +167,11 @@ class AboutScreen extends StatelessWidget {
                                       'Tabares',
                                       style: bodyStyle,
                                     ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Saúl Lázaro',
+                                      style: bodyStyle,
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
