@@ -14,6 +14,7 @@ import 'simulation_game_engine.dart';
 import 'simulation_game_state.dart';
 import 'simulation_state_factory.dart';
 import 'spanish_card.dart';
+import 'suit.dart';
 import 'team_rules.dart';
 import 'zapiti_rules.dart';
 
@@ -77,6 +78,24 @@ class MonteCarloCardSelector {
     );
     if (preservationChoice != null) {
       return preservationChoice;
+    }
+
+    final secondTrickLeadChoice = _secondTrickLeadPreservationChoice(
+      state: state,
+      bot: bot,
+      legalCards: legalCards,
+    );
+    if (secondTrickLeadChoice != null) {
+      return secondTrickLeadChoice;
+    }
+
+    final openingLeadChoice = _openingLeadPreservationChoice(
+      state: state,
+      bot: bot,
+      legalCards: legalCards,
+    );
+    if (openingLeadChoice != null) {
+      return openingLeadChoice;
     }
 
     final rolloutProfiles = _buildRolloutProfiles(
@@ -217,6 +236,54 @@ class MonteCarloCardSelector {
       return null;
     }
     return weakest;
+  }
+
+  SpanishCard? _secondTrickLeadPreservationChoice({
+    required ObservableGameState state,
+    required Player bot,
+    required List<SpanishCard> legalCards,
+  }) {
+    if (state.playedCards.isNotEmpty || legalCards.length <= 1) return null;
+
+    final opponentTeamId = TeamRules.opponentOf(bot.teamId);
+    if ((state.roundWins[bot.teamId] ?? 0) <=
+        (state.roundWins[opponentTeamId] ?? 0)) {
+      return null;
+    }
+
+    const premiumTrump = SpanishCard(value: 4, suit: Suit.bastos);
+    if (!legalCards.contains(premiumTrump)) return null;
+
+    final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
+    return sorted.firstWhere(
+      (card) => card != premiumTrump,
+      orElse: () => premiumTrump,
+    );
+  }
+
+  SpanishCard? _openingLeadPreservationChoice({
+    required ObservableGameState state,
+    required Player bot,
+    required List<SpanishCard> legalCards,
+  }) {
+    if (state.playedCards.isNotEmpty || legalCards.length <= 1) return null;
+
+    final opponentTeamId = TeamRules.opponentOf(bot.teamId);
+    final teamRoundWins = state.roundWins[bot.teamId] ?? 0;
+    final opponentRoundWins = state.roundWins[opponentTeamId] ?? 0;
+    final signalBias = _observableSignalBiasForPlayer(state, bot);
+    final firstRoundWasTie = state.completedTricks.length == 1 &&
+        state.completedTricks.first.isTie;
+
+    // After a tie the next trick decides the hand, so playing the best card
+    // can be correct. Otherwise the leader should usually show a low card.
+    final mustPress = signalBias.mustWin ||
+        opponentRoundWins > teamRoundWins ||
+        firstRoundWasTie;
+    if (mustPress) return null;
+
+    final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
+    return sorted.first;
   }
 
   SpanishCard? _orderAwareChoice({
@@ -841,6 +908,7 @@ class MonteCarloCardSelector {
       switch (signal.type) {
         case StrategicSignalType.venAMi:
         case StrategicSignalType.voyATi:
+        case StrategicSignalType.trucaTu:
           conserve = true;
           break;
         case StrategicSignalType.mata:

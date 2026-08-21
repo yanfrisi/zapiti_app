@@ -63,6 +63,7 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
         StrategicSignalType.venAMi => 0.65,
         StrategicSignalType.mata => 0.8,
         StrategicSignalType.voyATi => 0.55,
+        StrategicSignalType.trucaTu => 0.4,
       };
     }
     return value;
@@ -84,6 +85,7 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
       switch (signal.type) {
         case StrategicSignalType.venAMi:
         case StrategicSignalType.voyATi:
+        case StrategicSignalType.trucaTu:
           bonus += _currentTrickPressure(state, bot.teamId) >= 0 ? 4 : 10;
           break;
         case StrategicSignalType.mata:

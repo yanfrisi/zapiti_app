@@ -2,6 +2,7 @@ enum StrategicSignalType {
   venAMi,
   mata,
   voyATi,
+  trucaTu,
   cardSignal,
 }
 

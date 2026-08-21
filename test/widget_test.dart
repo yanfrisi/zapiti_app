@@ -16,13 +16,13 @@ import 'package:zapiti_app/services/app_version_check_service.dart';
 
 void main() {
   const musicChannel = MethodChannel('zapiti/music');
-  const companionOrderWindow = Duration(milliseconds: 1750);
-  const beforeCompanionOrderWindow = Duration(milliseconds: 1749);
+  const companionOrderWindow = Duration(seconds: 2);
+  const beforeCompanionOrderWindow = Duration(milliseconds: 1999);
   const oneMillisecond = Duration(milliseconds: 1);
-  const postOrderVisualDelay = Duration(milliseconds: 550);
+  const postOrderVisualDelay = Duration(milliseconds: 220);
   const rivalBotUnaffectedProbe = Duration(milliseconds: 1300);
   const finishAutoBotFlow = Duration(seconds: 4);
-  const incomingBetCardPreviewDuration = Duration(milliseconds: 3500);
+  const incomingBetCardPreviewDuration = Duration(milliseconds: 700);
   const incomingBetCardPreviewFadeDuration = Duration(milliseconds: 90);
 
   setUp(() async {
@@ -799,6 +799,134 @@ void main() {
     expect(snapshot['botCardSelections'], greaterThan(0));
   });
 
+  testWidgets('truca tu hace que el companero evalue truco antes de jugar',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting();
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 3);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['botCardSelections'], 0);
+    expect(gameState.gameController.playedCards, isEmpty);
+    await advance;
+  });
+
+  testWidgets('truca tu no obliga a apostar con posicion floja', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(favorable: false);
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['pendingOrders'], 0);
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('truca tu evalua seis y nunca vuelve a truco', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(acceptedTruco: true);
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 6);
+    expect(snapshot['botCardSelections'], 0);
+    await advance;
+  });
+
+  testWidgets('truca tu respeta alternancia y no re-sube tras propia subida',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(
+      acceptedTruco: true,
+      botLastRaised: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('truca tu no produce apuesta ilegal en al ver', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(alVer: true);
+    gameState.sendTrucaTuForTesting();
+    await tester.pump();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(companionOrderWindow);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(gameState.gameController.playedCards, isEmpty);
+    await advance;
+  });
+
+  testWidgets('sin truca tu la IA mantiene su politica previa', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(favorable: false);
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(companionOrderWindow);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
   testWidgets('el ojo del modal de truco permite volver a ver las cartas',
       (tester) async {
     await showIncomingTrucoResponseOverlay(tester);
@@ -1492,6 +1620,7 @@ void main() {
 
     expect(find.textContaining('VEN A'), findsOneWidget);
     expect(find.text('MATA'), findsOneWidget);
+    expect(find.textContaining('TRUCA'), findsOneWidget);
     expect(find.text('VOY A TI'), findsNothing);
   });
 

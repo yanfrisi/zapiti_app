@@ -2,6 +2,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zapiti_app/domain/bot_truco_strategy.dart';
 
 void main() {
+  test('experto prioriza el truco tras una primera baza empatada con triunfo premium', () {
+    expect(
+      BotTrucoStrategy.shouldCall(
+        difficulty: 5,
+        teamScore: 100,
+        ownMaxStrength: 100,
+        handStrength: 0.55,
+        cardsOnTable: 1,
+        teamRoundWins: 1,
+        opponentRoundWins: 1,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: true,
+        needsPoints: false,
+        firstRoundWasTie: true,
+      ),
+      isTrue,
+    );
+  });
+
   group('BotTrucoStrategy', () {
     test('no truca demasiado rapido al salir con fuerza media de equipo', () {
       final shouldCall = BotTrucoStrategy.shouldCall(

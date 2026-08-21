@@ -81,6 +81,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _isAutoPlaying = true;
       }
     });
+    _closeIncomingTrucoOverlay(
+      response: 'accept',
+      actorPlayerId: _humanPlayer.id,
+      value: _handValue,
+    );
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.activeRoomId;
@@ -126,6 +131,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         actorPlayerId: _humanPlayer.id,
       );
     });
+    _closeIncomingTrucoOverlay(
+      response: 'pass',
+      actorPlayerId: _humanPlayer.id,
+      value: _pendingTrucoValue,
+    );
     if (_isGuidedTutorialMatch) {
       unawaited(_advanceGuidedTutorialAfterSuccess(correct: true));
       return;
@@ -176,6 +186,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       }
     });
     if (!didRaise) return;
+    _closeIncomingTrucoOverlay(
+      response: 'raise',
+      actorPlayerId: _humanPlayer.id,
+      value: value,
+    );
     if (_isMultiplayerMatch) {
       final socket = MultiplayerSessionStore.instance.socket;
       final roomId = MultiplayerSessionStore.instance.activeRoomId;
@@ -280,8 +295,14 @@ extension _GameScreenTrucoLogic on _GameScreenState {
 
   Future<void> _resolveBotResponseToTruco() async {
     final version = _handVersion;
+    _logGameplay('bot', 'truco_response_start', fields: {
+      'pendingValue': _pendingTrucoValue,
+      'callerTeamId': _trucoCallerTeamId,
+    });
 
-    await _botDelay(900);
+    // Bot-to-human truco responses should surface quickly; the decision is
+    // already made, so a long pause only feels like UI lag.
+    await _botDelay(180);
     if (!mounted ||
         version != _handVersion ||
         _handFinished ||
@@ -303,6 +324,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _isWaitingHumanTrucoResponse = true;
         _status = context.tr('answerYourTeam');
       });
+      _openIncomingTrucoOverlay(
+        caller: _players.firstWhere((player) => player.teamId == callerTeamId),
+        value: pendingValue,
+        source: 'bot_response',
+      );
       return;
     }
 
@@ -355,6 +381,12 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         _sendMultiplayerTrucoPassIfNeeded(respondingPlayer);
       }
     });
+    _logGameplay('bot', 'truco_response_end', fields: {
+      'respondingTeamId': respondingTeamId,
+      'accepted': accepts,
+      'raiseValue': raiseValue,
+      'handFinished': _handFinished,
+    });
 
     if (!mounted ||
         version != _handVersion ||
@@ -366,6 +398,11 @@ extension _GameScreenTrucoLogic on _GameScreenState {
   }
 
   int? _botBetValue(Player bot) {
+    final forcedByOrder = _forceBetEvaluationRequestedPlayerIds.remove(bot.id);
+    final instructedToEvaluateBet =
+        forcedByOrder && bot.teamId == _humanPlayer.teamId;
+    final treatAsCompanion =
+        bot.teamId == _humanPlayer.teamId && !instructedToEvaluateBet;
     if (!_isLocalBotPlayer(bot)) {
       return null;
     }
@@ -407,6 +444,19 @@ extension _GameScreenTrucoLogic on _GameScreenState {
     final handStrength = BotTrucoStrategy.evaluateHandStrength(teamCards);
     final difficulty = _botDifficultyFor(bot);
     final profile = DifficultyProfiles.byLevel(difficulty);
+    final firstRoundWasTie = _roundHistory.length == 1 &&
+        _roundHistory.first.isTie;
+    final hasPremiumTrump = hand.any(
+      (card) =>
+          card.value == 4 && card.suit == Suit.bastos,
+    );
+    if (firstRoundWasTie &&
+        difficulty >= 4 &&
+        hasPremiumTrump &&
+        nextValue == TrucoRules.firstTrucoValue &&
+        bot.teamId == _humanPlayer.teamId) {
+      return nextValue;
+    }
     final callChance = BotTrucoStrategy.callChance(
       profile,
       handStrength: handStrength,
@@ -416,7 +466,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       teamRoundWins: _roundWins[bot.teamId]!,
       needsPoints: pressuredByScoreOrRounds,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
-      isCompanion: bot.teamId == _humanPlayer.teamId,
+      isCompanion: treatAsCompanion,
       scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
       opponentsSpentPower: memory.opponentsSpentPower,
       teamSpentPower: memory.teamSpentPower,
@@ -436,7 +486,7 @@ extension _GameScreenTrucoLogic on _GameScreenState {
       opponentRoundWins: _roundWins[otherTeam]!,
       teamHasStrongSignal: _isStrongSignal(teamSignal),
       opponentHasStrongSignal: _isStrongSignal(opponentSignal),
-      isCompanion: bot.teamId == _humanPlayer.teamId,
+      isCompanion: treatAsCompanion,
       needsPoints: pressuredByScoreOrRounds,
       scoreGap: _score[bot.teamId]! - _score[otherTeam]!,
       opponentsSpentPower: memory.opponentsSpentPower,
@@ -453,12 +503,22 @@ extension _GameScreenTrucoLogic on _GameScreenState {
         'handStrength=${handStrength.toStringAsFixed(2)} '
         'chance=${callChance.toStringAsFixed(3)} '
         'roll=${betRoll.toStringAsFixed(3)} result=$chosenValue '
+        'forcedByOrder=$forcedByOrder '
         'pending=${_game.trucoState == TrucoNegotiationState.awaitingResponse} '
         'accepted=${_game.isTrucoAccepted}',
       );
     }
     if (chosenValue != null) {
       return chosenValue;
+    }
+
+    // "Truca tu" should feel like a real instruction. If the companion was
+    // explicitly asked to evaluate and the hand clears a modest floor, prefer
+    // opening truco instead of silently doing nothing.
+    if (instructedToEvaluateBet &&
+        nextValue == TrucoRules.firstTrucoValue &&
+        handStrength >= 0.60) {
+      return nextValue;
     }
 
     if (nextValue != TrucoRules.firstTrucoValue ||

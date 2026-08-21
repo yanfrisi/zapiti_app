@@ -42,8 +42,8 @@ class MonteCarloDifficultyConfigs {
   );
 
   static const hard = MonteCarloDifficultyConfig(
-    simulationsPerMove: 400,
-    rolloutDepth: 999,
+    simulationsPerMove: 80,
+    rolloutDepth: 3,
     mistakeProbability: 0.01,
     topCandidateCount: 1,
     useActionInference: true,
@@ -52,8 +52,8 @@ class MonteCarloDifficultyConfigs {
   );
 
   static const expert = MonteCarloDifficultyConfig(
-    simulationsPerMove: 2000,
-    rolloutDepth: 999,
+    simulationsPerMove: 120,
+    rolloutDepth: 3,
     mistakeProbability: 0,
     topCandidateCount: 1,
     useActionInference: true,
@@ -70,4 +70,3 @@ class MonteCarloDifficultyConfigs {
     };
   }
 }
-

@@ -204,9 +204,34 @@ extension _GameScreenPlayLogic on _GameScreenState {
   }
 
   bool _playCard(Player player, SpanishCard card) {
+    final beforePlayerId = _currentPlayer.id;
+    _logGameplay('game', 'play_card_start', fields: {
+      'actorPlayerId': player.id,
+      'card': card.toString(),
+      'currentPlayerBefore': beforePlayerId,
+    });
     try {
-      return _game.playCard(player, card);
-    } on Object {
+      final roundCompleted = _game.playCard(player, card);
+      _logGameplay('game', 'play_card_end', fields: {
+        'actorPlayerId': player.id,
+        'card': card.toString(),
+        'roundCompleted': roundCompleted,
+        'currentPlayerAfter': _currentPlayer.id,
+        'playedCardsAfter': _playedCards.length,
+      });
+      return roundCompleted;
+    } on Object catch (error, stackTrace) {
+      ZapitiLogger.error(
+        'game',
+        'play_card_failed',
+        error: error,
+        stackTrace: stackTrace,
+        fields: {
+          'actorPlayerId': player.id,
+          'card': card.toString(),
+          'currentPlayerBefore': beforePlayerId,
+        },
+      );
       return false;
     }
   }
@@ -249,131 +274,218 @@ extension _GameScreenPlayLogic on _GameScreenState {
       return;
     }
     final version = _handVersion;
-    _isAutoPlaying = true;
-
-    while (mounted &&
-        version == _handVersion &&
-        !_handFinished &&
-        !_isRoundAwaitingContinue &&
-        !_isGameFinished &&
-        _isLocalBotPlayer(_currentPlayer)) {
-      final bot = _currentPlayer;
-      final botHand = _hands[bot.id]!;
-      final hasCompanionOrderWindow = _shouldOpenCompanionBotOrderWindow(bot);
-      if (hasCompanionOrderWindow) {
-        _beginCompanionBotOrderWindow(bot);
-      }
-
-      await _maybeShowBotSignal(
-        bot,
-        version,
-        awaitReveal: !hasCompanionOrderWindow,
-      );
-      if (!mounted || version != _handVersion || _handFinished) return;
-
-      final betValue = _botBetValue(bot);
-      if (betValue != null) {
-        _updateState(() {
-          _callTruco(
-            bot,
-            value: betValue,
-            actorPlayerId: bot.id,
-          );
-        });
-        _sendMultiplayerTrucoCallIfNeeded(bot, betValue);
-
-        await _botDelay(650);
-        if (!mounted || version != _handVersion || _handFinished) return;
-
-        _updateState(() {
-          _isAutoPlaying = false;
-          _isWaitingHumanTrucoResponse =
-              _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
-          _status = _isWaitingHumanTrucoResponse
-              ? context.tr(
-                  'playerCallsTruco',
-                  params: {'name': _localizedPlayerName(bot)},
-                )
-              : context.tr(
-                  'playerCallsTrucoShort',
-                  params: {'name': _localizedPlayerName(bot)},
-                );
-        });
-        if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
-          _resolveBotResponseToTruco();
-        }
-        return;
-      }
-
-      final didAskHumanToWin = _maybeCompanionBotRequestsHumanVoyATi(bot);
-      if (didAskHumanToWin) {
-        await _botDelay(450);
-        if (!mounted || version != _handVersion || _handFinished) return;
-      }
-
-      _updateState(() {
-        _status = context.tr(
-          'botThinking',
-          params: {'name': _localizedPlayerName(bot)},
-        );
+    if (_advanceBotsInFlight && _advanceBotsInFlightHandVersion == version) {
+      _logGameplay('turn', 'bot_advance_reentry_blocked', fields: {
+        'requestedPlayerId': _currentPlayer.id,
+        'activePlayerId': _advanceBotsInFlightPlayerId,
+        'activeRunId': _advanceBotsActiveRunId,
       });
-
-      if (hasCompanionOrderWindow) {
-        final wasOrderReceived =
-            await _finishCompanionBotOrderWindow(bot, version);
-        if (wasOrderReceived) {
-          await Future<void>.delayed(
-            _GameScreenState._companionBotPostOrderVisualDelay,
-          );
-        }
-      } else {
-        await _botDelay(1150);
-      }
-      if (!mounted || version != _handVersion || _handFinished) return;
-
-      final card = _chooseBotCard(bot, botHand);
-      var roundCompleted = false;
-      _updateState(() {
-        roundCompleted = _playCard(bot, card);
-      });
-      _sendMultiplayerCardIfNeeded(bot, card);
-
-      if (roundCompleted) {
-        if (_isMultiplayerMatch) {
-          _updateState(() {
-            _status = context.tr('waitingMatchResolution');
-            _isAutoPlaying = false;
-          });
-        } else {
-          _resolveRoundWithPause();
-        }
-        return;
-      }
-
-      await _botDelay(350);
+      return;
     }
-
-    if (!mounted || version != _handVersion) return;
-
-    _updateState(() {
-      _isAutoPlaying = false;
-      if (!_handFinished) {
-        if (_currentPlayer.id == _humanPlayer.id) {
-          _status = context.tr('yourTurn');
-        } else if (_isMultiplayerMatch &&
-            !_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
-          _status = context.tr(
-            'waitingForPlayer',
-            params: {'name': _localizedPlayerName(_currentPlayer)},
-          );
-        } else if (_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
-          _status = context.tr(
-            'turnOfPlayer',
-            params: {'name': _localizedPlayerName(_currentPlayer)},
-          );
-        }
-      }
+    final runId = _advanceBotsActiveRunId + 1;
+    _advanceBotsActiveRunId = runId;
+    _advanceBotsInFlight = true;
+    _advanceBotsInFlightHandVersion = version;
+    _advanceBotsInFlightPlayerId = _currentPlayer.id;
+    _isAutoPlaying = true;
+    _logGameplay('turn', 'bot_advance_start', fields: {
+      'runId': runId,
+      'startingPlayerId': _currentPlayer.id,
+      'startingPlayerType':
+          _currentPlayer.teamId == _humanPlayer.teamId ? 'partner' : 'bot',
     });
+
+    try {
+      while (mounted &&
+          version == _handVersion &&
+          !_handFinished &&
+          !_isRoundAwaitingContinue &&
+          !_isGameFinished &&
+          _isLocalBotPlayer(_currentPlayer)) {
+        final bot = _currentPlayer;
+        final botHand = _hands[bot.id]!;
+        final hasCompanionOrderWindow = _shouldOpenCompanionBotOrderWindow(bot);
+        _logGameplay('turn', 'bot_turn_start', fields: {
+          'runId': runId,
+          'playerId': bot.id,
+          'playerType': bot.teamId == _humanPlayer.teamId ? 'partner' : 'bot',
+          'cardsRemaining': botHand.length,
+          'hasCompanionOrderWindow': hasCompanionOrderWindow,
+        });
+        if (hasCompanionOrderWindow) {
+          _beginCompanionBotOrderWindow(bot);
+          _logGameplay('turn', 'companion_order_window_open', fields: {
+            'runId': runId,
+            'playerId': bot.id,
+          });
+        }
+
+        await _maybeShowBotSignal(
+          bot,
+          version,
+          awaitReveal: !hasCompanionOrderWindow,
+        );
+        if (!mounted || version != _handVersion || _handFinished) return;
+
+        _updateState(() {
+          _status = context.tr(
+            'botThinking',
+            params: {'name': _localizedPlayerName(bot)},
+          );
+        });
+        _logGameplay('bot', 'thinking_start', fields: {
+          'runId': runId,
+          'playerId': bot.id,
+        });
+
+        if (hasCompanionOrderWindow) {
+          final orderWindowWatch = Stopwatch()..start();
+          final wasOrderReceived =
+              await _finishCompanionBotOrderWindow(bot, version);
+          orderWindowWatch.stop();
+          _logGameplay('turn', 'companion_order_window_closed', fields: {
+            'runId': runId,
+            'playerId': bot.id,
+            'receivedOrder': wasOrderReceived,
+            'durationMs': orderWindowWatch.elapsedMilliseconds,
+          });
+          if (wasOrderReceived) {
+            await Future<void>.delayed(
+              _GameScreenState._companionBotPostOrderVisualDelay,
+            );
+          }
+        } else {
+          await _botDelay(1150);
+        }
+        if (!mounted || version != _handVersion || _handFinished) return;
+
+        final betWatch = Stopwatch()..start();
+        final betValue = _botBetValue(bot);
+        betWatch.stop();
+        _logGameplay('bot', 'bet_selector_end', fields: {
+          'runId': runId,
+          'playerId': bot.id,
+          'durationMs': betWatch.elapsedMilliseconds,
+          'value': betValue,
+        });
+        if (betValue != null) {
+          _updateState(() {
+            _callTruco(
+              bot,
+              value: betValue,
+              actorPlayerId: bot.id,
+            );
+          });
+          _sendMultiplayerTrucoCallIfNeeded(bot, betValue);
+
+          // Once the bot has already decided to sing truco, keep only a short
+          // beat before showing the human-response overlay.
+          await _botDelay(180);
+          if (!mounted || version != _handVersion || _handFinished) return;
+
+          _updateState(() {
+            _isAutoPlaying = false;
+            _isWaitingHumanTrucoResponse =
+                _teamNeedsLocalHumanTrucoResponse(_game.respondingTrucoTeamId);
+            _status = _isWaitingHumanTrucoResponse
+                ? context.tr(
+                    'playerCallsTruco',
+                    params: {'name': _localizedPlayerName(bot)},
+                  )
+                : context.tr(
+                    'playerCallsTrucoShort',
+                    params: {'name': _localizedPlayerName(bot)},
+                  );
+          });
+          if (_isWaitingHumanTrucoResponse) {
+            _openIncomingTrucoOverlay(
+              caller: bot,
+              value: betValue,
+              source: 'bot_turn',
+            );
+          }
+          if (_teamNeedsLocalBotTrucoResponse(_game.respondingTrucoTeamId)) {
+            unawaited(_resolveBotResponseToTruco());
+          }
+          return;
+        }
+
+        final didAskHumanToWin = _maybeCompanionBotRequestsHumanVoyATi(bot);
+        if (didAskHumanToWin) {
+          await _botDelay(450);
+          if (!mounted || version != _handVersion || _handFinished) return;
+        }
+
+        final selectorWatch = Stopwatch()..start();
+        final card = _chooseBotCard(bot, botHand);
+        selectorWatch.stop();
+        _logGameplay('bot', 'selector_end', fields: {
+          'runId': runId,
+          'playerId': bot.id,
+          'durationMs': selectorWatch.elapsedMilliseconds,
+          'selectedCard': card.toString(),
+        });
+        var roundCompleted = false;
+        _updateState(() {
+          roundCompleted = _playCard(bot, card);
+        });
+        _sendMultiplayerCardIfNeeded(bot, card);
+        _logGameplay('bot', 'turn_played', fields: {
+          'runId': runId,
+          'playerId': bot.id,
+          'selectedCard': card.toString(),
+          'roundCompleted': roundCompleted,
+        });
+
+        if (roundCompleted) {
+          if (_isMultiplayerMatch) {
+            _updateState(() {
+              _status = context.tr('waitingMatchResolution');
+              _isAutoPlaying = false;
+            });
+          } else {
+            _resolveRoundWithPause();
+          }
+          return;
+        }
+
+        await _botDelay(350);
+      }
+
+      if (!mounted || version != _handVersion) return;
+
+      _updateState(() {
+        _isAutoPlaying = false;
+        if (!_handFinished) {
+          if (_currentPlayer.id == _humanPlayer.id) {
+            _status = context.tr('yourTurn');
+          } else if (_isMultiplayerMatch &&
+              !_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
+            _status = context.tr(
+              'waitingForPlayer',
+              params: {'name': _localizedPlayerName(_currentPlayer)},
+            );
+          } else if (_controlledHumanPlayerIds.contains(_currentPlayer.id)) {
+            _status = context.tr(
+              'turnOfPlayer',
+              params: {'name': _localizedPlayerName(_currentPlayer)},
+            );
+          }
+        }
+      });
+    } finally {
+      _logGameplay('turn', 'bot_advance_end', fields: {
+        'runId': runId,
+        'finalPlayerId': mounted ? _currentPlayer.id : null,
+        'handFinished': _handFinished,
+        'isRoundAwaitingContinue': _isRoundAwaitingContinue,
+      });
+      if (_advanceBotsActiveRunId == runId) {
+        _advanceBotsInFlight = false;
+        _advanceBotsInFlightHandVersion = null;
+        _advanceBotsInFlightPlayerId = null;
+      }
+    }
   }
 
   SpanishCard _chooseBotCard(Player bot, List<SpanishCard> hand) {
@@ -698,6 +810,9 @@ extension _GameScreenPlayLogic on _GameScreenState {
         (signal) => signal.handVersion == _handVersion,
       );
       _forceWinRequestedPlayerIds.clear();
+      _forceHighestRequestedPlayerIds.clear();
+      _forceLowestRequestedPlayerIds.clear();
+      _forceBetEvaluationRequestedPlayerIds.clear();
       _isAutoPlaying = false;
       if (_currentPlayer.id == _humanPlayer.id) {
         _status = context.tr('yourTurn');
@@ -982,6 +1097,9 @@ extension _GameScreenPlayLogic on _GameScreenState {
             (signal) => signal.handVersion == _handVersion,
           );
           _forceWinRequestedPlayerIds.clear();
+          _forceHighestRequestedPlayerIds.clear();
+          _forceLowestRequestedPlayerIds.clear();
+          _forceBetEvaluationRequestedPlayerIds.clear();
           _isAutoPlaying = false;
           if (_currentPlayer.id == _humanPlayer.id) {
             _status = context.tr('yourTurn');
@@ -1165,6 +1283,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
             params: {'name': _localizedPlayerName(player)},
           );
           break;
+        case 'truca_tu':
+          if (!_playedCards.any((card) => card.player.id == _humanPlayer.id)) {
+            _forceBetEvaluationRequestedPlayerIds.add(_humanPlayer.id);
+          }
+          _status = context.tr(
+            'partnerTrucaTuInstruction',
+            params: {'name': _localizedPlayerName(player)},
+          );
+          break;
         default:
           _playersSignaledThisHand.add(player.id);
           _teamSignalsByTeam[player.teamId] = label;
@@ -1273,6 +1400,8 @@ extension _GameScreenPlayLogic on _GameScreenState {
         return context.tr('comeToMe');
       case 'mata':
         return context.tr('kill');
+      case 'truca_tu':
+        return context.tr('trucaTu');
       default:
         return fallbackLabel;
     }

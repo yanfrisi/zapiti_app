@@ -406,6 +406,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
     _forceLowestRequestedPlayerIds.clear();
+    _forceBetEvaluationRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
@@ -414,6 +415,13 @@ extension _GameScreenStateFlow on _GameScreenState {
     _companionBotOrderWindowPlayerId = null;
     _companionBotOrderWindowCompleter = null;
     _companionBotOrderWindowFuture = null;
+    _advanceBotsInFlight = false;
+    _advanceBotsActiveRunId = 0;
+    _advanceBotsInFlightHandVersion = null;
+    _advanceBotsInFlightPlayerId = null;
+    _incomingTrucoOverlayOpenedAtMicros = null;
+    _incomingTrucoOverlayValue = null;
+    _incomingTrucoOverlayCallerPlayerId = null;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _companionVoyATiPromptedHandVersion = -1;
@@ -466,6 +474,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
     _forceLowestRequestedPlayerIds.clear();
+    _forceBetEvaluationRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
@@ -474,6 +483,13 @@ extension _GameScreenStateFlow on _GameScreenState {
     _companionBotOrderWindowPlayerId = null;
     _companionBotOrderWindowCompleter = null;
     _companionBotOrderWindowFuture = null;
+    _advanceBotsInFlight = false;
+    _advanceBotsActiveRunId = 0;
+    _advanceBotsInFlightHandVersion = null;
+    _advanceBotsInFlightPlayerId = null;
+    _incomingTrucoOverlayOpenedAtMicros = null;
+    _incomingTrucoOverlayValue = null;
+    _incomingTrucoOverlayCallerPlayerId = null;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _companionVoyATiPromptedHandVersion = -1;
@@ -922,6 +938,7 @@ extension _GameScreenStateFlow on _GameScreenState {
           'forceWin': _forceWinRequestedPlayerIds.length,
           'forceHighest': _forceHighestRequestedPlayerIds.length,
           'forceLowest': _forceLowestRequestedPlayerIds.length,
+          'forceBetEvaluation': _forceBetEvaluationRequestedPlayerIds.length,
         });
     for (final timer in _playerMessageTimers.values) {
       timer.cancel();
@@ -940,6 +957,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
     _forceLowestRequestedPlayerIds.clear();
+    _forceBetEvaluationRequestedPlayerIds.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
@@ -949,6 +967,13 @@ extension _GameScreenStateFlow on _GameScreenState {
     _companionBotOrderWindowPlayerId = null;
     _companionBotOrderWindowCompleter = null;
     _companionBotOrderWindowFuture = null;
+    _advanceBotsInFlight = false;
+    _advanceBotsActiveRunId = 0;
+    _advanceBotsInFlightHandVersion = null;
+    _advanceBotsInFlightPlayerId = null;
+    _incomingTrucoOverlayOpenedAtMicros = null;
+    _incomingTrucoOverlayValue = null;
+    _incomingTrucoOverlayCallerPlayerId = null;
     _companionVoyATiPromptedHandVersion = -1;
     _alVerDecisionPromptedKey = null;
     _turnDeadlineAt = null;
@@ -1009,6 +1034,8 @@ extension _GameScreenStateFlow on _GameScreenState {
     _activeStrategicSignals.clear();
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
+    _forceLowestRequestedPlayerIds.clear();
+    _forceBetEvaluationRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
@@ -1018,6 +1045,13 @@ extension _GameScreenStateFlow on _GameScreenState {
     _companionBotOrderWindowPlayerId = null;
     _companionBotOrderWindowCompleter = null;
     _companionBotOrderWindowFuture = null;
+    _advanceBotsInFlight = false;
+    _advanceBotsActiveRunId = 0;
+    _advanceBotsInFlightHandVersion = null;
+    _advanceBotsInFlightPlayerId = null;
+    _incomingTrucoOverlayOpenedAtMicros = null;
+    _incomingTrucoOverlayValue = null;
+    _incomingTrucoOverlayCallerPlayerId = null;
     _companionVoyATiPromptedHandVersion = -1;
     _alVerDecisionPromptedKey = null;
     _turnDeadlineAt = null;
@@ -1100,16 +1134,8 @@ extension _GameScreenStateFlow on _GameScreenState {
     List<Player> players,
     String humanPlayerId,
   ) {
-    final humanTeamId = players
-        .firstWhere(
-          (player) => player.id == humanPlayerId,
-          orElse: () => players.first,
-        )
-        .teamId;
     return {
-      for (final player in players)
-        if (player.id == humanPlayerId || player.teamId != humanTeamId)
-          player.id,
+      for (final player in players) player.id,
     };
   }
 
@@ -1707,7 +1733,7 @@ extension _GameScreenStateFlow on _GameScreenState {
 
     final parsedScore = _parseIntMap(match['score']);
     final parsedRoundWins = _parseIntMap(match['roundWins']);
-    final serverHandSequence = match['handSequence'] as int?;
+    final serverHandSequence = _parseNullableInt(match['handSequence']);
     final serverStateVersion = _parseNullableInt(match['stateVersion']);
     final currentPlayerId = match['currentPlayerId']?.toString();
     final leadPlayerId = match['leadPlayerId']?.toString();
@@ -1746,10 +1772,10 @@ extension _GameScreenStateFlow on _GameScreenState {
         ? -1
         : _players.indexWhere((player) => player.id == currentPlayerId);
     final leadIndex = leadPlayerId == null
-        ? match['leadIndex'] as int?
+        ? _parseNullableInt(match['leadIndex'])
         : _players.indexWhere((player) => player.id == leadPlayerId);
     final nextLeadIndex = nextLeadPlayerId == null
-        ? match['nextLeadIndex'] as int?
+        ? _parseNullableInt(match['nextLeadIndex'])
         : _players.indexWhere((player) => player.id == nextLeadPlayerId);
 
     _hands
@@ -1779,9 +1805,10 @@ extension _GameScreenStateFlow on _GameScreenState {
       _handValue = match['handValue'] as int;
     }
     final rawBetState = match['betState'];
-    if (rawBetState is Map<String, dynamic>) {
-      final proposedLevel = rawBetState['proposedLevel']?.toString();
-      final acceptedLevel = rawBetState['acceptedLevel']?.toString();
+    if (rawBetState is Map) {
+      final betState = Map<String, dynamic>.from(rawBetState);
+      final proposedLevel = betState['proposedLevel']?.toString();
+      final acceptedLevel = betState['acceptedLevel']?.toString();
       _pendingTrucoValue = switch (proposedLevel) {
         'truco' => 3,
         'six' => 6,
@@ -1791,8 +1818,9 @@ extension _GameScreenStateFlow on _GameScreenState {
         'ahorrisi' => 18,
         _ => null,
       };
-      _trucoCallerTeamId = rawBetState['proposingTeam'] as int?;
-      _game.lastTrucoRaiserTeamId = rawBetState['lastRaisingTeam'] as int?;
+      _trucoCallerTeamId = _parseNullableInt(betState['proposingTeam']);
+      _game.lastTrucoRaiserTeamId =
+          _parseNullableInt(betState['lastRaisingTeam']);
       _handValue = switch (acceptedLevel) {
         'truco' => 3,
         'six' => 6,
@@ -1803,8 +1831,8 @@ extension _GameScreenStateFlow on _GameScreenState {
         _ => 1,
       };
     } else {
-      _pendingTrucoValue = match['pendingTrucoValue'] as int?;
-      _trucoCallerTeamId = match['trucoCallerTeamId'] as int?;
+      _pendingTrucoValue = _parseNullableInt(match['pendingTrucoValue']);
+      _trucoCallerTeamId = _parseNullableInt(match['trucoCallerTeamId']);
     }
     _allowPassHand = match['allowPassHand'] as bool? ?? _allowPassHand;
     _game.allowPassHand = _allowPassHand;
@@ -1821,7 +1849,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     }
     _isRoundAwaitingContinue =
         match['isRoundAwaitingContinue'] as bool? ?? _isRoundAwaitingContinue;
-    _winningTeamId = match['winningTeamId'] as int?;
+    _winningTeamId = _parseNullableInt(match['winningTeamId']);
     _status = match['status']?.toString() ?? _status;
     _turnDeadlineAt = _parseNullableInt(match['turnDeadlineAt']);
     _turnSecondsRemaining = _calculateTurnSecondsRemaining(_turnDeadlineAt);

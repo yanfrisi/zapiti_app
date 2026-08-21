@@ -100,6 +100,7 @@ class GameStateSimulator {
         opponentRoundWins:
             state.roundWins[TeamRules.opponentOf(player.teamId)] ?? 0,
         roundHistory: state.roundHistory,
+        allowPerfectInformation: true,
         forceWinIfPossible: state.handValue >= 4,
         teammateStillToPlay: state.teammateStillToPlay(player),
         opponentStillToPlay: state.opponentStillToPlay(player),

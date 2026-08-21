@@ -57,7 +57,24 @@ class GameSocket {
                 'payload': message.payload,
                 'payloadKeys': message.payload.keys.toList(),
               });
-              onMessage?.call(message);
+              try {
+                onMessage?.call(message);
+              } catch (error, stackTrace) {
+                ZapitiLogger.error(
+                  'socket',
+                  'message_handler_failed',
+                  error: error,
+                  stackTrace: stackTrace,
+                  fields: {
+                    'url': url,
+                    'type': message.type.wireName,
+                    'roomId': message.roomId,
+                    'playerId': message.playerId,
+                    'messageId': message.messageId,
+                    'correlationId': message.correlationId,
+                  },
+                );
+              }
             }
           } catch (error, stackTrace) {
             ZapitiLogger.error(
@@ -67,7 +84,6 @@ class GameSocket {
               stackTrace: stackTrace,
               fields: {'url': url},
             );
-            onError?.call(error);
           }
         },
         onError: (error) {

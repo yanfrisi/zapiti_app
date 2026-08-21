@@ -319,7 +319,8 @@ class AiMatchSimulator {
     while (!controller.isGameFinished &&
         metrics.hands <= config.maxHandsPerMatch) {
       _playCurrentHand(controller, config, random, metrics);
-      if (!controller.isGameFinished) {
+      if (!controller.isGameFinished &&
+          metrics.hands < config.maxHandsPerMatch) {
         _startNewSimulatedHand(controller, random, config, metrics);
         metrics.hands += 1;
       }
@@ -353,7 +354,34 @@ class AiMatchSimulator {
     Random random,
     _SimulationMetrics metrics,
   ) {
+    var stagnantIterations = 0;
+    String? previousSignature;
     while (!controller.handFinished && !controller.isGameFinished) {
+      final signature = [
+        controller.turnIndex,
+        controller.leadIndex,
+        controller.handValue,
+        controller.pendingTrucoValue,
+        controller.trucoState.name,
+        controller.playedCards.length,
+        controller.roundHistory.length,
+        controller.roundWins[TeamRules.teamOne],
+        controller.roundWins[TeamRules.teamTwo],
+        controller.score[TeamRules.teamOne],
+        controller.score[TeamRules.teamTwo],
+        for (final player in controller.players)
+          '${player.id}:${controller.hands[player.id]?.length ?? 0}',
+      ].join('|');
+      if (signature == previousSignature) {
+        stagnantIterations += 1;
+        if (stagnantIterations >= 64) {
+          throw StateError('AI simulation stalled at $signature');
+        }
+      } else {
+        previousSignature = signature;
+        stagnantIterations = 0;
+      }
+
       _resolveAlVerIfNeeded(controller, config, metrics);
       if (controller.handFinished || controller.isGameFinished) return;
 

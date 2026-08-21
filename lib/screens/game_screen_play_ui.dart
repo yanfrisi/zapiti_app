@@ -625,12 +625,13 @@ class _TrucoResponseOverlay extends StatefulWidget {
 }
 
 class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
-  static const _incomingBetCardPreviewDuration = Duration(milliseconds: 3500);
+  static const _incomingBetCardPreviewDuration = Duration(milliseconds: 700);
 
   int _selectedRaiseIndex = 0;
   bool _initialCardPreviewActive = true;
   bool _manualPeekThroughOverlay = false;
   Timer? _initialCardPreviewTimer;
+  late final Stopwatch _lifecycleWatch;
 
   bool get _peekThroughOverlay =>
       _initialCardPreviewActive || _manualPeekThroughOverlay;
@@ -640,6 +641,10 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
     _initialCardPreviewActive = true;
     _initialCardPreviewTimer = Timer(_incomingBetCardPreviewDuration, () {
       if (!mounted) return;
+      ZapitiLogger.info('overlay', 'truco_waiting_response', fields: {
+        'value': widget.pendingTrucoValue,
+        'previewDurationMs': _lifecycleWatch.elapsedMilliseconds,
+      });
       setState(() {
         _initialCardPreviewActive = false;
       });
@@ -656,6 +661,11 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
   @override
   void initState() {
     super.initState();
+    _lifecycleWatch = Stopwatch()..start();
+    ZapitiLogger.info('overlay', 'truco_overlay_widget_show', fields: {
+      'value': widget.pendingTrucoValue,
+      'raiseOptions': widget.raiseOptions,
+    });
     _startInitialCardPreview();
   }
 
@@ -666,12 +676,22 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
       _selectedRaiseIndex = 0;
     }
     if (oldWidget.pendingTrucoValue != widget.pendingTrucoValue) {
+      ZapitiLogger.info('overlay', 'truco_overlay_widget_update', fields: {
+        'oldValue': oldWidget.pendingTrucoValue,
+        'newValue': widget.pendingTrucoValue,
+      });
       setState(_startInitialCardPreview);
     }
   }
 
   @override
   void dispose() {
+    ZapitiLogger.info('overlay', 'truco_overlay_widget_close', fields: {
+      'value': widget.pendingTrucoValue,
+      'visibleMs': _lifecycleWatch.elapsedMilliseconds,
+      'previewStillActive': _initialCardPreviewActive,
+    });
+    _lifecycleWatch.stop();
     _initialCardPreviewTimer?.cancel();
     _initialCardPreviewTimer = null;
     super.dispose();
@@ -938,6 +958,7 @@ class _VisibleGameControls extends StatelessWidget {
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
   final VoidCallback onComeToMe;
+  final VoidCallback onTrucaTu;
   final VoidCallback onKill;
   final VoidCallback onCallTruco;
   final VoidCallback onAcceptTruco;
@@ -969,6 +990,7 @@ class _VisibleGameControls extends StatelessWidget {
     required this.onPassHand,
     required this.onVoyATi,
     required this.onComeToMe,
+    required this.onTrucaTu,
     required this.onKill,
     required this.onCallTruco,
     required this.onAcceptTruco,
@@ -1015,6 +1037,11 @@ class _VisibleGameControls extends StatelessWidget {
           icon: Icons.keyboard_double_arrow_down_outlined,
           onPressed: signalsEnabled ? onComeToMe : null,
         );
+        final trucaTuCommand = ZapitiActionButton(
+          label: context.tr('trucaTuUpper'),
+          icon: Icons.campaign_outlined,
+          onPressed: signalsEnabled ? onTrucaTu : null,
+        );
         final killCommand = ZapitiActionButton(
           label: context.tr('killUpper'),
           icon: Icons.local_fire_department_outlined,
@@ -1051,6 +1078,8 @@ class _VisibleGameControls extends StatelessWidget {
                       SizedBox(height: gap),
                     ] else ...[
                       Expanded(child: comeToMeCommand),
+                      SizedBox(height: gap),
+                      Expanded(child: trucaTuCommand),
                       SizedBox(height: gap),
                       Expanded(child: killCommand),
                       SizedBox(height: gap),
@@ -1101,6 +1130,8 @@ class _VisibleGameControls extends StatelessWidget {
                         SizedBox(width: gap),
                       ] else ...[
                         Expanded(child: comeToMeCommand),
+                        SizedBox(width: gap),
+                        Expanded(child: trucaTuCommand),
                         SizedBox(width: gap),
                         Expanded(child: killCommand),
                         SizedBox(width: gap),
@@ -1690,6 +1721,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
   final VoidCallback onComeToMe;
+  final VoidCallback onTrucaTu;
   final VoidCallback onKill;
   final VoidCallback onCallTruco;
   final VoidCallback onContinueRound;
@@ -1724,6 +1756,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
     required this.onPassHand,
     required this.onVoyATi,
     required this.onComeToMe,
+    required this.onTrucaTu,
     required this.onKill,
     required this.onCallTruco,
     required this.onContinueRound,
@@ -1767,6 +1800,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
                 onPassHand: onPassHand,
                 onVoyATi: onVoyATi,
                 onComeToMe: onComeToMe,
+                onTrucaTu: onTrucaTu,
                 onKill: onKill,
                 onCallTruco: onCallTruco,
                 onContinueRound: onContinueRound,
@@ -1840,6 +1874,7 @@ class _LandscapeActionPanel extends StatelessWidget {
   final VoidCallback onPassHand;
   final VoidCallback onVoyATi;
   final VoidCallback onComeToMe;
+  final VoidCallback onTrucaTu;
   final VoidCallback onKill;
   final VoidCallback onCallTruco;
   final VoidCallback onContinueRound;
@@ -1863,6 +1898,7 @@ class _LandscapeActionPanel extends StatelessWidget {
     required this.onPassHand,
     required this.onVoyATi,
     required this.onComeToMe,
+    required this.onTrucaTu,
     required this.onKill,
     required this.onCallTruco,
     required this.onContinueRound,
@@ -1874,8 +1910,28 @@ class _LandscapeActionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryHeight = (44 * scale).clamp(36.0, 56.0);
-    final secondaryHeight = (34 * scale).clamp(30.0, 44.0);
+    final primaryHeight = (36 * scale).clamp(30.0, 48.0);
+    final secondaryHeight = (26 * scale).clamp(22.0, 36.0);
+    final askSignal = ZapitiActionButton(
+      label: context.tr('askSignalUpper'),
+      icon: Icons.visibility_outlined,
+      onPressed: signalsEnabled ? onAskCompanionSignal : null,
+    );
+    final comeToMeCommand = ZapitiActionButton(
+      label: context.tr('comeToMeUpper'),
+      icon: Icons.keyboard_double_arrow_down_outlined,
+      onPressed: signalsEnabled ? onComeToMe : null,
+    );
+    final trucaTuCommand = ZapitiActionButton(
+      label: context.tr('trucaTuUpper'),
+      icon: Icons.campaign_outlined,
+      onPressed: signalsEnabled ? onTrucaTu : null,
+    );
+    final killCommand = ZapitiActionButton(
+      label: context.tr('killUpper'),
+      icon: Icons.local_fire_department_outlined,
+      onPressed: signalsEnabled ? onKill : null,
+    );
 
     return Container(
       padding: EdgeInsets.all(max(3.0, 4 * scale)),
@@ -1892,57 +1948,67 @@ class _LandscapeActionPanel extends StatelessWidget {
         children: [
           SizedBox(height: primaryHeight, child: _primaryAction(context)),
           SizedBox(height: gap),
-          SizedBox(
-            height: secondaryHeight,
-            child: Row(
-              children: [
-                if (canPassHand) ...[
+          if (isHumanTurn)
+            SizedBox(
+              height: secondaryHeight,
+              child: Row(
+                children: [
+                  if (canPassHand) ...[
+                    Expanded(
+                      child: ZapitiActionButton(
+                        label: context.tr('passHandUpper'),
+                        icon: Icons.swap_horiz_outlined,
+                        onPressed: onPassHand,
+                        primary: true,
+                      ),
+                    ),
+                    SizedBox(width: gap),
+                  ],
                   Expanded(
                     child: ZapitiActionButton(
-                      label: context.tr('passHandUpper'),
-                      icon: Icons.swap_horiz_outlined,
-                      onPressed: onPassHand,
-                      primary: true,
+                      label: context.tr('askSignalUpper'),
+                      icon: Icons.visibility_outlined,
+                      onPressed: signalsEnabled ? onAskCompanionSignal : null,
                     ),
                   ),
                   SizedBox(width: gap),
-                ],
-                Expanded(
-                  child: ZapitiActionButton(
-                    label: context.tr('askSignalUpper'),
-                    icon: Icons.visibility_outlined,
-                    onPressed: signalsEnabled ? onAskCompanionSignal : null,
-                  ),
-                ),
-                SizedBox(width: gap),
-                if (isHumanTurn)
                   Expanded(
                     child: ZapitiActionButton(
                       label: context.tr('voyATiUpper'),
                       icon: Icons.record_voice_over_outlined,
                       onPressed: signalsEnabled ? onVoyATi : null,
                     ),
-                  )
-                else ...[
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              height: secondaryHeight * 2 + gap,
+              child: Column(
+                children: [
                   Expanded(
-                    child: ZapitiActionButton(
-                      label: context.tr('comeToMeUpper'),
-                      icon: Icons.keyboard_double_arrow_down_outlined,
-                      onPressed: signalsEnabled ? onComeToMe : null,
+                    child: Row(
+                      children: [
+                        Expanded(child: askSignal),
+                        SizedBox(width: gap),
+                        Expanded(child: comeToMeCommand),
+                      ],
                     ),
                   ),
-                  SizedBox(width: gap),
+                  SizedBox(height: gap),
                   Expanded(
-                    child: ZapitiActionButton(
-                      label: context.tr('killUpper'),
-                      icon: Icons.local_fire_department_outlined,
-                      onPressed: signalsEnabled ? onKill : null,
+                    child: Row(
+                      children: [
+                        Expanded(child: trucaTuCommand),
+                        SizedBox(width: gap),
+                        Expanded(child: killCommand),
+                      ],
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
           SizedBox(height: gap),
           SizedBox(
             height: secondaryHeight,

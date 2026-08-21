@@ -21,6 +21,17 @@ void main() {
       expect(BotPolicySelector.forDifficulty(4), isA<MonteCarloBotPolicy>());
       expect(BotPolicySelector.forDifficulty(5), isA<MonteCarloBotPolicy>());
     });
+
+    test('mantiene presupuestos Monte Carlo razonables para la UI', () {
+      expect(MonteCarloDifficultyConfigs.hard.simulationsPerMove,
+          lessThanOrEqualTo(80));
+      expect(MonteCarloDifficultyConfigs.hard.rolloutDepth,
+          lessThanOrEqualTo(3));
+      expect(MonteCarloDifficultyConfigs.expert.simulationsPerMove,
+          lessThanOrEqualTo(120));
+      expect(MonteCarloDifficultyConfigs.expert.rolloutDepth,
+          lessThanOrEqualTo(3));
+    });
   });
 
   group('Bot policies', () {
@@ -241,6 +252,75 @@ void main() {
       );
 
       expect(teamOneHand, contains(card));
+    });
+
+    test('nivel 5 guarda el 4 de bastos al salir en la segunda baza', () {
+      const botHand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.copas),
+      ];
+      final card = MonteCarloBotPolicy().chooseCard(
+        const BotDecisionContext(
+          difficulty: 5,
+          bot: bot,
+          players: [bot, rival, teammate, rearRival],
+          hand: botHand,
+          hands: {
+            'bot': botHand,
+            'rival': [
+              SpanishCard(value: 3, suit: Suit.espadas),
+              SpanishCard(value: 5, suit: Suit.oros),
+            ],
+            'mate': [SpanishCard(value: 7, suit: Suit.copas)],
+            'rear': [SpanishCard(value: 2, suit: Suit.espadas)],
+          },
+          playedCards: [],
+          teamRoundWins: 1,
+          opponentRoundWins: 0,
+          preserveStrongCards: true,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: true,
+          opponentStillToPlay: true,
+        ),
+      );
+
+      expect(card, const SpanishCard(value: 6, suit: Suit.oros));
+    });
+
+    test('nivel 5 sale bajo para dar vision a la pareja', () {
+      const botHand = [
+        SpanishCard(value: 3, suit: Suit.oros),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 12, suit: Suit.espadas),
+      ];
+      final card = MonteCarloBotPolicy().chooseCard(
+        const BotDecisionContext(
+          difficulty: 5,
+          bot: bot,
+          players: [bot, rival, teammate, rearRival],
+          hand: botHand,
+          hands: {
+            'bot': botHand,
+            'rival': [SpanishCard(value: 5, suit: Suit.oros)],
+            'mate': [SpanishCard(value: 7, suit: Suit.copas)],
+            'rear': [SpanishCard(value: 2, suit: Suit.espadas)],
+          },
+          playedCards: [],
+          teamRoundWins: 0,
+          opponentRoundWins: 0,
+          preserveStrongCards: false,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: true,
+          opponentStillToPlay: true,
+        ),
+      );
+
+      expect(card, const SpanishCard(value: 6, suit: Suit.copas));
     });
   });
 
