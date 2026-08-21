@@ -16,6 +16,14 @@ import 'package:zapiti_app/services/app_version_check_service.dart';
 
 void main() {
   const musicChannel = MethodChannel('zapiti/music');
+  const companionOrderWindow = Duration(seconds: 2);
+  const beforeCompanionOrderWindow = Duration(milliseconds: 1999);
+  const oneMillisecond = Duration(milliseconds: 1);
+  const postOrderVisualDelay = Duration(milliseconds: 220);
+  const rivalBotUnaffectedProbe = Duration(milliseconds: 1300);
+  const finishAutoBotFlow = Duration(seconds: 4);
+  const incomingBetCardPreviewDuration = Duration(milliseconds: 700);
+  const incomingBetCardPreviewFadeDuration = Duration(milliseconds: 90);
 
   setUp(() async {
     await ZapitiI18n.load();
@@ -45,6 +53,51 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<dynamic> showIncomingTrucoResponseOverlay(WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareIncomingTrucoResponseForTesting();
+    await tester.pump();
+
+    expect(find.text('Te cantan 3'), findsOneWidget);
+    expect(find.byKey(const ValueKey('truco-response-panel-opacity')),
+        findsOneWidget);
+    return gameState;
+  }
+
+  Future<void> openTutorialAlVerStep(WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 7; index += 1) {
+      await tester.ensureVisible(find.byType(ChoiceChip).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ChoiceChip).first);
+      await tester.pump();
+      await tester.ensureVisible(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Al ver y final'), findsOneWidget);
+  }
+
+  double trucoResponsePanelOpacity(WidgetTester tester) {
+    return tester
+        .widget<AnimatedOpacity>(
+          find.byKey(const ValueKey('truco-response-panel-opacity')),
+        )
+        .opacity;
+  }
+
   testWidgets('muestra selector de personajes antes de jugar', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
@@ -59,6 +112,142 @@ void main() {
     expect(find.text('Jugador 2'), findsOneWidget);
     expect(find.text('Jugador 3'), findsOneWidget);
     expect(find.text('Jugador 4'), findsOneWidget);
+  });
+
+  testWidgets(
+      'puede iniciar partida local tras un estado multijugador cancelado',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.simulateStaleMultiplayerCancellationForTesting();
+    await tester.pumpAndSettle();
+
+    expect(gameState.isMultiplayerMatchForTesting, isTrue);
+    expect(gameState.multiplayerMatchCanceledForTesting, isTrue);
+    expect(find.text('JUGAR'), findsOneWidget);
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+
+    expect(gameState.isMultiplayerMatchForTesting, isFalse);
+    expect(gameState.multiplayerMatchCanceledForTesting, isFalse);
+    expect(find.text('Elige tu personaje'), findsOneWidget);
+    expect(find.text('La partida se ha cancelado.'), findsNothing);
+
+    final startButton = find.text('EMPEZAR PARTIDA');
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige dificultad'), findsOneWidget);
+
+    final playButton = find.text('JUGAR');
+    await tester.ensureVisible(playButton);
+    await tester.tap(playButton);
+    await tester.pumpAndSettle();
+
+    expect(gameState.isMultiplayerMatchForTesting, isFalse);
+    expect(gameState.gameController.players.length, 4);
+    expect(gameState.gameController.humanPlayerId, 'p1');
+  });
+
+  testWidgets(
+      'multijugador remoto al salir no contamina manos de la partida offline',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.simulateActiveRemoteMultiplayerMatchForTesting();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EMPEZAR PARTIDA'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['isMultiplayerMatch'], isFalse);
+    expect(snapshot['players'], ['p1', 'p2', 'p3', 'p4']);
+    expect(snapshot['controllerPlayers'], ['p1', 'p2', 'p3', 'p4']);
+    expect(snapshot['humanPlayerId'], 'p1');
+    expect(snapshot['roomId'], isNull);
+    expect(snapshot['localGamePlayerId'], isNull);
+    expect(snapshot['hasSocket'], isFalse);
+    expect(snapshot['controlledPlayerIds'], ['p1']);
+    expect(snapshot['activeSignals'], 0);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['cardsRemaining'], {
+      'p1': 3,
+      'p2': 3,
+      'p3': 3,
+      'p4': 3,
+    });
+    expect(
+      (snapshot['hands'] as Map).keys.any(
+            (key) => key.toString().startsWith('player_remote_'),
+          ),
+      isFalse,
+    );
+  });
+
+  testWidgets('pedir senas multijugador es privado y repetible',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareMultiplayerSignalRequestScenarioForTesting(
+      localPlayerId: 'player_b',
+    );
+    await tester.pump();
+
+    for (var i = 1; i <= 5; i += 1) {
+      final requestId = 'req_$i';
+      gameState.simulateIncomingSignalRequestForTesting(
+        senderPlayerId: 'player_a',
+        receiverPlayerId: 'player_b',
+        requestId: requestId,
+      );
+      await tester.pump();
+
+      expect(gameState.companionPrivateSignalStatusForTesting,
+          'Jugador A te pide seña');
+      expect(gameState.companionPrivateSignalRequestIdForTesting, requestId);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+    }
+
+    gameState.prepareMultiplayerSignalRequestScenarioForTesting(
+      localPlayerId: 'player_a',
+    );
+    gameState.simulateIncomingSignalRequestForTesting(
+      senderPlayerId: 'player_a',
+      receiverPlayerId: 'player_b',
+      requestId: 'sender_should_ignore',
+    );
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+
+    gameState.prepareMultiplayerSignalRequestScenarioForTesting(
+      localPlayerId: 'player_c',
+    );
+    gameState.simulateIncomingSignalRequestForTesting(
+      senderPlayerId: 'player_a',
+      receiverPlayerId: 'player_b',
+      requestId: 'rival_should_ignore',
+    );
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
   });
 
   testWidgets('menu principal abre tutorial y opciones', (tester) async {
@@ -99,31 +288,55 @@ void main() {
     expect(gameState.gameController.currentPlayer.id, 'p1');
 
     gameState.setState(() {
-      gameState.loadGuidedTutorialScenarioForTesting(3);
+      gameState.loadGuidedTutorialScenarioForTesting(4);
     });
     await tester.pumpAndSettle();
-    expect(find.text('Pide seña'), findsOneWidget);
     expect(find.text('PEDIR SEÑA'), findsOneWidget);
     await tester.tap(find.text('PEDIR SEÑA'));
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle();
-    expect(find.text('Da seña'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('4 Bastos'));
-    await tester.pump(const Duration(milliseconds: 1300));
-    await tester.pumpAndSettle();
-    expect(find.text('Canta truco'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
     gameState.setState(() {
       gameState.loadGuidedTutorialScenarioForTesting(5);
     });
     await tester.pumpAndSettle();
-    expect(find.text('Canta truco'), findsOneWidget);
+    await tester.tap(find.byTooltip('4 de Bastos'));
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(6);
+    });
+    await tester.pumpAndSettle();
     expect(find.text('CANTAR TRUCO'), findsOneWidget);
     await tester.tap(find.text('CANTAR TRUCO'));
     await tester.pump(const Duration(milliseconds: 1300));
     await tester.pumpAndSettle();
-    expect(find.text('Farol controlado'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(6);
+    });
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Vas pobre, pero los rivales ya ven mesa dudosa. Canta truco como farol.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('PEDIR SEÑA'), findsOneWidget);
+    await tester.tap(find.text('PEDIR SEÑA'));
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Vas pobre, pero los rivales ya ven mesa dudosa. Canta truco como farol.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Pasa truco malo'), findsNothing);
 
     gameState.setState(() {
       gameState.loadGuidedTutorialScenarioForTesting(7);
@@ -159,6 +372,634 @@ void main() {
     expect(find.text('Permitir pasar mano'), findsNothing);
   });
 
+  testWidgets('tutorial de mesa mantiene el paso tras una respuesta incorrecta',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    final wrongAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 1, suit: Suit.espadas),
+    );
+    await tester.pump();
+
+    expect(gameState.guidedTutorialStatusForTesting, contains('Casi'));
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await wrongAction;
+
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 0);
+    expect(gameState.guidedTutorialCompletedForTesting, isFalse);
+  });
+
+  testWidgets('tutorial de mesa permite reintentar y avanzar una vez',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    final wrongAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 1, suit: Suit.espadas),
+    );
+    await tester.pump(const Duration(milliseconds: 1300));
+    await wrongAction;
+
+    final correctAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.copas),
+    );
+    await tester.pump();
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 0);
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await correctAction;
+
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 1);
+    expect(gameState.guidedTutorialCompletedForTesting, isFalse);
+  });
+
+  testWidgets('tutorial de mesa ignora varios errores consecutivos',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      final wrongAction = gameState.playGuidedTutorialCardForTesting(
+        const SpanishCard(value: 1, suit: Suit.espadas),
+      );
+      await tester.pump(const Duration(milliseconds: 1300));
+      await wrongAction;
+      expect(gameState.guidedTutorialScenarioIndexForTesting, 0);
+    }
+  });
+
+  testWidgets('tutorial de mesa no avanza dos veces por una accion correcta',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(0);
+    });
+    await tester.pumpAndSettle();
+
+    final firstAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.copas),
+    );
+    final secondAction = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.copas),
+    );
+
+    await tester.pump(const Duration(milliseconds: 1300));
+    await firstAction;
+    await secondAction;
+
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 1);
+  });
+
+  testWidgets('tutorial valida tipos interactivos compartidos', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setState(() {
+      gameState.loadGuidedTutorialScenarioForTesting(3);
+    });
+    await tester.pumpAndSettle();
+    gameState.giveGuidedTutorialSignalForTesting('4 Bastos');
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 3);
+
+    final requestSignal = gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump(const Duration(milliseconds: 1800));
+    await requestSignal;
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 4);
+
+    gameState.giveGuidedTutorialSignalForTesting('7 Copas');
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 4);
+
+    gameState.giveGuidedTutorialSignalForTesting('4 Bastos');
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 5);
+
+    final wrongCard = gameState.playGuidedTutorialCardForTesting(
+      const SpanishCard(value: 4, suit: Suit.bastos),
+    );
+    await tester.pump(const Duration(milliseconds: 1300));
+    await wrongCard;
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 5);
+
+    gameState.callGuidedTutorialTrucoForTesting();
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 6);
+
+    gameState.callGuidedTutorialTrucoForTesting();
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialScenarioIndexForTesting, 7);
+
+    gameState.passGuidedTutorialTrucoForTesting();
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(gameState.guidedTutorialCompletedForTesting, isTrue);
+  });
+
+  testWidgets('tutorial informativo no avanza con respuesta incorrecta',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Gastar alta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gastar alta'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Casi'), findsOneWidget);
+
+    await tester.ensureVisible(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Guardar fuerza'), findsOneWidget);
+    expect(find.text('Gastar alta'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Guardar fuerza'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Guardar fuerza'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Salvar reparto'), findsOneWidget);
+    expect(find.text('Probar suerte'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver explica 2 3 y bloqueo de truco', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    expect(find.textContaining('2 chinos'), findsOneWidget);
+    expect(find.textContaining('juega por 3'), findsOneWidget);
+    expect(find.textContaining('No se puede cantar Truco'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver con respuesta incorrecta no avanza',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    await tester.tap(find.text('Perder partida'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Casi'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Al ver y final'), findsOneWidget);
+    expect(find.text('Conceder 2'), findsOneWidget);
+    expect(find.text('Perder partida'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver con respuesta correcta avanza un paso',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    await tester.tap(find.text('Conceder 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Objetivo'), findsOneWidget);
+    expect(find.text('Guardar fuerza'), findsOneWidget);
+  });
+
+  testWidgets('tutorial al ver renderiza bien en movil pequeno',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await openTutorialAlVerStep(tester);
+
+    expect(find.text('Al ver y final'), findsOneWidget);
+    expect(
+      find.textContaining('irte a casa regala 2 chinos'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('No se puede cantar Truco ni subir'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tutorial al ver sigue cargando textos en ingles',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 7; index += 1) {
+      await tester.ensureVisible(find.byType(ChoiceChip).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ChoiceChip).first);
+      await tester.pump();
+      await tester.ensureVisible(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Siguiente').last);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Al ver and endgame'), findsOneWidget);
+    expect(
+      find.textContaining('going home gives away 2 points'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('You cannot call truco or raise'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('practica del tutorial no avanza hasta acertar', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TUTORIAL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.touch_app_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tirar As Espadas'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Casi'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Siguiente').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tirar 4 Copas'), findsOneWidget);
+    expect(find.text('Tirar As Espadas'), findsOneWidget);
+
+    await tester.tap(find.text('Tirar 4 Copas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Siguiente').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tirar 3 Bastos'), findsOneWidget);
+    expect(find.text('Tirar 7 Copas'), findsOneWidget);
+  });
+
+  testWidgets('al recibir truco muestra inicialmente las cartas humanas',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+  });
+
+  testWidgets('preview de cartas de truco no desaparece inmediatamente',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump();
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await tester.pump(incomingBetCardPreviewDuration ~/ 2);
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+  });
+
+  testWidgets('preview inicial de truco termina tras la duracion configurada',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(trucoResponsePanelOpacity(tester), 1);
+    expect(find.text('Te cantan 3'), findsOneWidget);
+  });
+
+  testWidgets('la IA puede cantar truco antes de jugar carta en segunda baza',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(
+      firstRoundTie: true,
+      favorable: true,
+      markTeamAsAlreadyConsidered: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 800));
+    await advance;
+    await tester.pump();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 3);
+    expect(snapshot['botCardSelections'], 0);
+  });
+
+  testWidgets('la IA evalua Seis antes de jugar cuando Truco ya fue aceptado',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(
+      firstRoundTie: true,
+      acceptedTruco: true,
+      favorable: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 800));
+    await advance;
+    await tester.pump();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 6);
+    expect(snapshot['botCardSelections'], 0);
+  });
+
+  testWidgets('si el mismo equipo fue el ultimo en subir no vuelve a subir',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(
+      firstRoundTie: true,
+      acceptedTruco: true,
+      botLastRaised: true,
+      favorable: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 800));
+    await advance;
+    await tester.pump();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['botCardSelections'], greaterThan(0));
+  });
+
+  testWidgets('truca tu hace que el companero evalue truco antes de jugar',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting();
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 3);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['botCardSelections'], 0);
+    expect(gameState.gameController.playedCards, isEmpty);
+    await advance;
+  });
+
+  testWidgets('truca tu no obliga a apostar con posicion floja', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(favorable: false);
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['pendingOrders'], 0);
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('truca tu evalua seis y nunca vuelve a truco', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(acceptedTruco: true);
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 6);
+    expect(snapshot['botCardSelections'], 0);
+    await advance;
+  });
+
+  testWidgets('truca tu respeta alternancia y no re-sube tras propia subida',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(
+      acceptedTruco: true,
+      botLastRaised: true,
+    );
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+    gameState.sendTrucaTuForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('truca tu no produce apuesta ilegal en al ver', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(alVer: true);
+    gameState.sendTrucaTuForTesting();
+    await tester.pump();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(companionOrderWindow);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(gameState.gameController.playedCards, isEmpty);
+    await advance;
+  });
+
+  testWidgets('sin truca tu la IA mantiene su politica previa', (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareCompanionBotTrucaTuScenarioForTesting(favorable: false);
+    gameState.setBotBetRollForTesting(0.0);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(companionOrderWindow);
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('el ojo del modal de truco permite volver a ver las cartas',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+    expect(trucoResponsePanelOpacity(tester), 1);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+          find.byKey(const ValueKey('truco-response-card-peek-button'))),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(trucoResponsePanelOpacity(tester), 1);
+  });
+
+  testWidgets('soltar el ojo cierra la visualizacion de cartas de truco',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+          find.byKey(const ValueKey('truco-response-card-peek-button'))),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(trucoResponsePanelOpacity(tester), 1);
+  });
+
+  testWidgets('responder truco no deja cambios tardios por timers',
+      (tester) async {
+    for (final action in ['ACEPTAR', 'RECHAZAR', 'SUBIR A 6']) {
+      await showIncomingTrucoResponseOverlay(tester);
+
+      await tester.tap(find.text(action));
+      await tester.pump();
+      expect(find.text('Te cantan 3'), findsNothing);
+
+      await tester.pump(incomingBetCardPreviewDuration);
+      await tester.pump(incomingBetCardPreviewFadeDuration);
+
+      expect(find.text('Te cantan 3'), findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('destruir el widget durante el preview de truco cancela el timer',
+      (tester) async {
+    await showIncomingTrucoResponseOverlay(tester);
+    expect(trucoResponsePanelOpacity(tester), 0.16);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(incomingBetCardPreviewDuration);
+    await tester.pump(incomingBetCardPreviewFadeDuration);
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('opciones permite cambiar idioma', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ZapitiApp());
@@ -188,6 +1029,7 @@ void main() {
     expect(find.textContaining('Versión'), findsOneWidget);
     expect(find.text('Juan Francisco Gutiérrez Vázquez'), findsWidgets);
     expect(find.text('Miguel Mateos Borrego'), findsOneWidget);
+    expect(find.text('Tabares'), findsOneWidget);
     expect(find.text('Agradecimientos especiales a la Peña el Trompazo.'),
         findsOneWidget);
     expect(find.text('VOLVER'), findsOneWidget);
@@ -208,11 +1050,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
     expect(find.text('Usuario'), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(find.text('ENTRAR'), findsOneWidget);
     expect(find.text('CREAR USUARIO'), findsOneWidget);
+  });
+
+  testWidgets('crear usuario exige nombre de jugador sin valor por defecto',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pump();
+
+    await tester.tap(find.text('MULTIJUGADOR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CREAR USUARIO'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('multiplayer-create-account')),
+        findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Nombre de jugador'), findsOneWidget);
+    expect(find.text('Jugador'), findsNothing);
+    expect(find.text('Escribe tu nombre para continuar.'), findsOneWidget);
   });
 
   testWidgets('multijugador usa textos traducidos al cambiar idioma',
@@ -259,7 +1119,7 @@ void main() {
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
     expect(find.text('Multijugador no disponible'), findsOneWidget);
     expect(find.text('Actualiza Zapiti para jugar online.'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsNothing);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsNothing);
   });
 
   testWidgets('multijugador muestra espera mientras comprueba version',
@@ -280,9 +1140,7 @@ void main() {
     expect(find.text('MULTIJUGADOR'), findsOneWidget);
     expect(find.text('Comprobando multijugador'), findsOneWidget);
     expect(
-      find.text(
-        'Comprobando versión. El servicio puede tardar unos segundos...',
-      ),
+      find.textContaining('El servicio puede tardar unos segundos'),
       findsOneWidget,
     );
 
@@ -294,10 +1152,10 @@ void main() {
 ''');
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
   });
 
-  testWidgets('multijugador recuerda el usuario', (tester) async {
+  testWidgets('multijugador no recupera el usuario al reabrir', (tester) async {
     SharedPreferences.setMockInitialValues({
       'multiplayer_username': 'juan',
     });
@@ -307,7 +1165,8 @@ void main() {
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('juan'), findsOneWidget);
+    expect(find.text('juan'), findsNothing);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
   });
 
   testWidgets('multijugador no desborda en movil horizontal', (tester) async {
@@ -323,7 +1182,7 @@ void main() {
     await tester.tap(find.text('MULTIJUGADOR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.byKey(const ValueKey('multiplayer-login')), findsOneWidget);
     expect(find.text('Contrasena'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -426,6 +1285,37 @@ void main() {
     expect(find.text('Bots distraídos, errores claros y trucos precipitados.'),
         findsNothing);
     expect(find.text('Juegan aceptable, pero se precipitan.'), findsNothing);
+  });
+
+  testWidgets('permite volver atras en el flujo de un jugador', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige tu personaje'), findsOneWidget);
+
+    final backButton = find.text('VOLVER');
+    await tester.ensureVisible(backButton);
+    await tester.tap(backButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('JUGAR'), findsOneWidget);
+
+    await tester.tap(find.text('JUGAR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EMPEZAR PARTIDA'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige dificultad'), findsOneWidget);
+
+    final difficultyBackButton = find.text('VOLVER');
+    await tester.ensureVisible(difficultyBackButton);
+    await tester.tap(difficultyBackButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elige tu personaje'), findsOneWidget);
   });
 
   testWidgets('setup no desborda en movil pequeno vertical', (tester) async {
@@ -542,12 +1432,62 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     expect(find.text('Mala'), findsOneWidget);
-    expect(find.text('Orden Númerico de Valor'), findsNothing);
+    expect(find.text('Orden Numérico de Valor'), findsNothing);
 
     await tester.tap(find.text('CERRAR'));
     await tester.pumpAndSettle();
 
     expect(find.text('Orden y señas'), findsNothing);
+  });
+
+  testWidgets('ayuda de señas se traduce al cambiar idioma', (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PLAY'), findsOneWidget);
+    await tester.tap(find.text('PLAY'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your character'), findsOneWidget);
+    final startButton = find.text('START MATCH');
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose difficulty'), findsOneWidget);
+    final playButton = find.text('PLAY');
+    await tester.ensureVisible(playButton);
+    await tester.tap(playButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SIGNALS HELP'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Order and signals'), findsOneWidget);
+    expect(find.text('4 of Clubs'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Ace of Swords'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Ace of Swords'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Bad hand'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Bad hand'), findsOneWidget);
   });
 
   testWidgets('la mesa no desborda en movil vertical', (tester) async {
@@ -646,7 +1586,7 @@ void main() {
     });
   }
 
-  testWidgets('pedir seña muestra respuesta en landscape', (tester) async {
+  testWidgets('pedir señal muestra respuesta en landscape', (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -663,7 +1603,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('voy a ti cambia a mata si no es el turno humano',
+  testWidgets('si no es el turno humano aparecen ven a mi y mata',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
@@ -678,7 +1618,288 @@ void main() {
     });
     await tester.pump();
 
+    expect(find.textContaining('VEN A'), findsOneWidget);
     expect(find.text('MATA'), findsOneWidget);
+    expect(find.textContaining('TRUCA'), findsOneWidget);
+    expect(find.text('VOY A TI'), findsNothing);
+  });
+
+  testWidgets('la UI refleja la legalidad de truco del dominio en 27 28 y 29',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 27;
+    });
+    await tester.pump();
+    expect(gameState.canHumanCallTrucoForTesting, isTrue);
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 28;
+    });
+    await tester.pump();
+    expect(gameState.canHumanCallTrucoForTesting, isTrue);
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 29;
+    });
+    await tester.pump();
+    expect(gameState.canHumanCallTrucoForTesting, isFalse);
+  });
+
+  testWidgets('ven a mi hace que el bot conserve el Zapiti en segunda baza',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareComeToMeScenarioForTesting();
+    await tester.pump();
+
+    final chosenCard = gameState.chooseCurrentBotCardForTesting();
+    expect(chosenCard, const SpanishCard(value: 5, suit: Suit.espadas));
+    expect(gameState.offlineRuntimeSnapshotForTesting()['pendingOrders'], 0);
+  });
+
+  testWidgets('sin ven a mi el bot mantiene su politica normal',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareComeToMeScenarioForTesting(issueOrder: false);
+    await tester.pump();
+
+    final chosenCard = gameState.chooseCurrentBotCardForTesting();
+    expect(chosenCard, const SpanishCard(value: 4, suit: Suit.bastos));
+  });
+
+  testWidgets('ven a mi manda tirar bajo en easy normal y hard',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    for (final difficulty in [1, 3, 4]) {
+      gameState.setDifficultyForTesting(difficulty);
+      gameState.prepareComeToMeScenarioForTesting();
+      await tester.pump();
+
+      final chosenCard = gameState.chooseCurrentBotCardForTesting();
+      expect(
+        chosenCard,
+        const SpanishCard(value: 5, suit: Suit.espadas),
+        reason: 'difficulty=$difficulty',
+      );
+    }
+  });
+
+  testWidgets('ventana funcional registra ven a mi antes de elegir carta',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      gameState
+          .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+      'p3',
+    );
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+
+    gameState.sendComeToMeForTesting();
+    await tester.pump(postOrderVisualDelay - oneMillisecond);
+
+    expect(gameState.gameController.playedCards, isEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['pendingOrders'],
+      1,
+    );
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+
+    await tester.pump(oneMillisecond);
+
+    expect(
+      gameState.gameController.playedCards.first.card,
+      const SpanishCard(value: 5, suit: Suit.espadas),
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('sin orden el bot juega automaticamente al cerrar la ventana',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(beforeCompanionOrderWindow);
+
+    expect(gameState.gameController.playedCards, isEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+
+    await tester.pump(oneMillisecond);
+
+    expect(gameState.gameController.playedCards, isNotEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      1,
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('no fija carta antes de finalizar la ventana de orden',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(beforeCompanionOrderWindow);
+
+    expect(gameState.gameController.playedCards, isEmpty);
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      0,
+    );
+    await tester.pump(oneMillisecond);
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('no abre ventana funcional para un bot rival', (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareRivalBotTurnScenarioForTesting();
+
+    expect(gameState.shouldOpenCompanionOrderWindowForTesting(), isFalse);
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      gameState
+          .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+      isNull,
+    );
+    await tester.pump(rivalBotUnaffectedProbe);
+    expect(gameState.gameController.playedCards, hasLength(1));
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      1,
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('orden y cierre de ventana no producen doble jugada',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareCompanionBotOrderWindowScenarioForTesting();
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(companionOrderWindow - oneMillisecond);
+    gameState.sendComeToMeForTesting();
+    await tester.pump(postOrderVisualDelay);
+
+    expect(gameState.gameController.playedCards, hasLength(1));
+    expect(
+      gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
+      1,
+    );
+    await tester.pump(finishAutoBotFlow);
+    await advance;
+  });
+
+  testWidgets('ventana funcional opera en primera segunda y tercera baza',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    for (final completedTricks in [0, 1, 2]) {
+      gameState.prepareCompanionBotOrderWindowScenarioForTesting(
+        completedTricks: completedTricks,
+      );
+      final advance = gameState.advanceBotsForTesting();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        gameState
+            .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+        'p3',
+        reason: 'completedTricks=$completedTricks',
+      );
+      gameState.sendComeToMeForTesting();
+      await tester.pump(postOrderVisualDelay);
+      expect(
+        gameState.gameController.playedCards.first.card,
+        const SpanishCard(value: 5, suit: Suit.espadas),
+        reason: 'completedTricks=$completedTricks',
+      );
+      await tester.pump(finishAutoBotFlow);
+      await advance;
+    }
+  });
+
+  testWidgets('ventana funcional existe en easy normal y hard', (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    for (final difficulty in [1, 3, 4]) {
+      gameState.setDifficultyForTesting(difficulty);
+      gameState.prepareCompanionBotOrderWindowScenarioForTesting(
+        companionPlaysBeforeHuman: true,
+      );
+      final advance = gameState.advanceBotsForTesting();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        gameState
+            .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+        'p3',
+        reason: 'difficulty=$difficulty',
+      );
+      gameState.sendComeToMeForTesting();
+      await tester.pump(postOrderVisualDelay);
+      expect(
+        gameState.gameController.playedCards.first.card,
+        const SpanishCard(value: 5, suit: Suit.espadas),
+        reason: 'difficulty=$difficulty',
+      );
+      await tester.pump(finishAutoBotFlow);
+      await advance;
+    }
   });
 
   testWidgets('pasar mano no aparece si la regla esta desactivada',
@@ -777,6 +1998,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('dialogo de salir de partida usa el idioma seleccionado',
+      (tester) async {
+    tester.view.physicalSize = const Size(844, 390);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ZapitiApp());
+
+    await tester.tap(find.text('OPCIONES'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('PLAY'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('START MATCH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PLAY'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('BACK'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Leave match'), findsOneWidget);
+    expect(find.text('Salir de la partida'), findsNothing);
+    expect(find.text('CANCEL'), findsOneWidget);
+    expect(find.text('EXIT'), findsWidgets);
+  });
+
   testWidgets('muestra la decision al ver para el equipo humano',
       (tester) async {
     await startGame(tester);
@@ -793,7 +2045,7 @@ void main() {
     expect(find.text('Estás al ver'), findsOneWidget);
     expect(
       find.text(
-        'Tu equipo tiene 29 chinos. Puedes jugar la mano o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
+        'Tu equipo tiene 29 chinos. Puedes jugar la mano por 3 chinos o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
       ),
       findsOneWidget,
     );
@@ -872,6 +2124,34 @@ void main() {
     expect(gameState.gameController.handFinished, isFalse);
   });
 
+  testWidgets(
+      'snapshot invalido con ambos equipos al ver no deja overlay ni bloqueo',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.gameController.score[TeamRules.teamOne] = 29;
+    gameState.gameController.score[TeamRules.teamTwo] = 29;
+    gameState.gameController.startNewHand(
+      fixedHands: _teamOneWinsTwoRoundsHands(),
+    );
+    gameState.syncAlVerFromMatchForTesting({
+      'alVerTeamIds': [TeamRules.teamOne, TeamRules.teamTwo],
+      'alVerState': 'awaitingDecision',
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('EstÃ¡s al ver'), findsNothing);
+    expect(gameState.gameController.alVerState, AlVerState.playing);
+    expect(gameState.gameController.alVerTeamId, isNull);
+    expect(
+      gameState.gameController.legalActions
+          .legalCardsFor(gameState.gameController.currentPlayer),
+      isNotEmpty,
+    );
+  });
+
   testWidgets('muestra modal de final de partida con resultado',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -890,6 +2170,7 @@ void main() {
     expect(find.textContaining('Yo y'), findsOneWidget);
     expect(find.text('Puntuación final: 30 - 24'), findsOneWidget);
     expect(find.text('OTRA PARTIDA'), findsWidgets);
+    expect(find.text('SALIR'), findsWidgets);
 
     await tester.tap(find.text('OTRA PARTIDA').last);
     await tester.pumpAndSettle();
@@ -898,6 +2179,287 @@ void main() {
     expect(gameState.gameController.winningTeamId, isNull);
     expect(gameState.gameController.score[TeamRules.teamOne], 0);
     expect(gameState.gameController.score[TeamRules.teamTwo], 0);
+  });
+
+  testWidgets('pedir sena mantiene visible la respuesta durante 3 segundos',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa mira...');
+
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(seconds: 2, milliseconds: 999));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+  });
+
+  testWidgets('pedir sena puede volver a mostrar una nueva respuesta',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(seconds: 3));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    expect(gameState.companionPrivateSignalStatusForTesting, 'Compa mira...');
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+  });
+
+  testWidgets(
+      'dos pedidos consecutivos no reutilizan el timer anterior ni borran la segunda respuesta',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    final firstRequestId = gameState.companionPrivateSignalRequestIdForTesting;
+    expect(firstRequestId, isNotNull);
+
+    await tester.pump(const Duration(seconds: 1));
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    final secondRequestId = gameState.companionPrivateSignalRequestIdForTesting;
+
+    expect(secondRequestId, isNotNull);
+    expect(secondRequestId, isNot(firstRequestId));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(milliseconds: 1549));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pump(const Duration(milliseconds: 1451));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNull);
+  });
+
+  testWidgets('pedir sena no deja timers activos al cerrar la pantalla',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.hands['p3'] = const [
+        SpanishCard(value: 7, suit: Suit.copas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+        SpanishCard(value: 4, suit: Suit.oros),
+      ];
+    });
+    await tester.pump();
+
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(
+        gameState.companionPrivateSignalStatusForTesting, 'Compa: 7 de Copas');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 4));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('salir desde partida finalizada vuelve al menu principal',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('JUGAR'), findsOneWidget);
+    expect(find.text('TUTORIAL'), findsOneWidget);
+    expect(find.text('GanÃ³ el Equipo 1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('salir deja estado limpio al iniciar una nueva partida',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareComeToMeScenarioForTesting();
+    gameState.prepareIncomingTrucoResponseForTesting();
+    await tester.pump();
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+
+    await startGame(tester);
+    final restartedState = tester.state(find.byType(GameScreen)) as dynamic;
+    final snapshot = restartedState.offlineRuntimeSnapshotForTesting()
+        as Map<String, Object?>;
+
+    expect(restartedState.gameController.score[TeamRules.teamOne], 0);
+    expect(restartedState.gameController.score[TeamRules.teamTwo], 0);
+    expect(restartedState.gameController.playedCards, isEmpty);
+    expect(restartedState.gameController.roundHistory, isEmpty);
+    expect(restartedState.gameController.handFinished, isFalse);
+    expect(restartedState.gameController.winningTeamId, isNull);
+    expect(restartedState.gameController.alVerState, AlVerState.none);
+    expect(snapshot['activeSignals'], 0);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['companionOrderWindowPlayerId'], isNull);
+    expect(snapshot['companionOrderWindowWaiting'], isFalse);
+    expect(restartedState.companionPrivateSignalStatusForTesting, isNull);
+    expect(restartedState.companionPrivateSignalRequestIdForTesting, isNull);
+    expect(
+      restartedState.gameController.legalActions
+          .legalCardsFor(restartedState.gameController.currentPlayer),
+      isNotEmpty,
+    );
+    expect(find.textContaining('Ronda 1/3'), findsOneWidget);
+    expect(find.text('GanÃ³ el Equipo 1'), findsNothing);
+  });
+
+  testWidgets('salir cancela timers pendientes de la partida finalizada',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.requestGuidedTutorialSignalForTesting();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(gameState.companionPrivateSignalStatusForTesting, isNotNull);
+
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(find.text('JUGAR'), findsOneWidget);
+    expect(find.text('Compa mira...'), findsNothing);
+    expect(find.textContaining('Compa:'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'partida terminar salir nueva partida terminar y otra partida no acumula estado',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await startGame(tester);
+
+    var gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SALIR').last);
+    await tester.pumpAndSettle();
+
+    await startGame(tester);
+    gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 30;
+      gameState.gameController.score[TeamRules.teamTwo] = 24;
+      gameState.gameController.winningTeamId = TeamRules.teamOne;
+      gameState.gameController.handFinished = true;
+    });
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OTRA PARTIDA').last);
+    await tester.pumpAndSettle();
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(gameState.gameController.score[TeamRules.teamOne], 0);
+    expect(gameState.gameController.score[TeamRules.teamTwo], 0);
+    expect(gameState.gameController.winningTeamId, isNull);
+    expect(gameState.gameController.handFinished, isFalse);
+    expect(gameState.gameController.alVerState, AlVerState.none);
+    expect(snapshot['activeSignals'], 0);
+    expect(snapshot['pendingOrders'], 0);
+    expect(snapshot['pendingTrucoValue'], isNull);
+    expect(snapshot['companionOrderWindowWaiting'], isFalse);
+    expect(find.textContaining('Ronda 1/3'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 
@@ -947,6 +2509,31 @@ Map<String, List<SpanishCard>> _aiStrongAlVerHands() {
       SpanishCard(value: 7, suit: Suit.oros),
       SpanishCard(value: 3, suit: Suit.bastos),
       SpanishCard(value: 12, suit: Suit.copas),
+    ],
+  };
+}
+
+Map<String, List<SpanishCard>> _teamOneWinsTwoRoundsHands() {
+  return {
+    'p1': const [
+      SpanishCard(value: 4, suit: Suit.bastos),
+      SpanishCard(value: 3, suit: Suit.oros),
+      SpanishCard(value: 5, suit: Suit.copas),
+    ],
+    'p2': const [
+      SpanishCard(value: 12, suit: Suit.oros),
+      SpanishCard(value: 11, suit: Suit.oros),
+      SpanishCard(value: 5, suit: Suit.oros),
+    ],
+    'p3': const [
+      SpanishCard(value: 10, suit: Suit.bastos),
+      SpanishCard(value: 10, suit: Suit.copas),
+      SpanishCard(value: 6, suit: Suit.bastos),
+    ],
+    'p4': const [
+      SpanishCard(value: 4, suit: Suit.espadas),
+      SpanishCard(value: 5, suit: Suit.espadas),
+      SpanishCard(value: 6, suit: Suit.espadas),
     ],
   };
 }

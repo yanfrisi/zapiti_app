@@ -1,4 +1,4 @@
-﻿part of 'game_screen.dart';
+part of 'game_screen.dart';
 
 class _WoodBackground extends StatelessWidget {
   final Widget child;
@@ -198,8 +198,8 @@ class _MainMenuScreen extends StatelessWidget {
                 ),
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color:
-                        Colors.black.withValues(alpha: showingPanel ? 0.34 : 0.06),
+                    color: Colors.black
+                        .withValues(alpha: showingPanel ? 0.34 : 0.06),
                   ),
                 ),
                 Padding(
@@ -268,15 +268,15 @@ class _MainMenuActions extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ZapitiColors.cardCream,
-                      fontWeight: FontWeight.w900,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black,
-                          blurRadius: 4,
-                        ),
-                      ],
+                  color: ZapitiColors.cardCream,
+                  fontWeight: FontWeight.w900,
+                  shadows: const [
+                    Shadow(
+                      color: Colors.black,
+                      blurRadius: 4,
                     ),
+                  ],
+                ),
               ),
             ),
           ZapitiActionButton(
@@ -340,6 +340,7 @@ class _MainMenuActions extends StatelessWidget {
     );
   }
 }
+
 class _MainMenuInfoPanel extends StatelessWidget {
   final _MainMenuPanel panel;
   final bool audioEnabled;
@@ -527,6 +528,98 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
   final Map<int, int> _selectedAnswers = {};
   final Map<int, int> _practiceAnswers = {};
 
+  static const _lessonSections = [
+    _TutorialLessonSection(
+      title: 'tutorialGuideIntroTitle',
+      body: [
+        'tutorialGuideIntroBody1',
+        'tutorialGuideIntroBody2',
+      ],
+      icon: Icons.school_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideOriginTitle',
+      body: [
+        'tutorialGuideOriginBody1',
+        'tutorialGuideOriginBody2',
+      ],
+      icon: Icons.auto_stories_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideObjectiveTitle',
+      body: [
+        'tutorialGuideObjectiveBody1',
+        'tutorialGuideObjectiveBody2',
+      ],
+      icon: Icons.emoji_events_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideTurnsTitle',
+      body: [
+        'tutorialGuideTurnsBody1',
+        'tutorialGuideTurnsBody2',
+        'tutorialGuideTurnsBody3',
+      ],
+      icon: Icons.sync_alt_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideCardsTitle',
+      body: [
+        'tutorialGuideCardsBody1',
+        'tutorialGuideCardsBody2',
+      ],
+      icon: Icons.style_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideTeamplayTitle',
+      body: [
+        'tutorialGuideTeamplayBody1',
+        'tutorialGuideTeamplayBody2',
+      ],
+      icon: Icons.groups_2_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideSignalsTitle',
+      body: [
+        'tutorialGuideSignalsBody1',
+        'tutorialGuideSignalsBody2',
+      ],
+      icon: Icons.visibility_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideTrucoTitle',
+      body: [
+        'tutorialGuideTrucoBody1',
+        'tutorialGuideTrucoBody2',
+      ],
+      icon: Icons.campaign_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideBluffTitle',
+      body: [
+        'tutorialGuideBluffBody1',
+        'tutorialGuideBluffBody2',
+      ],
+      icon: Icons.psychology_alt_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideAlVerTitle',
+      body: [
+        'tutorialGuideAlVerBody1',
+        'tutorialGuideAlVerBody2',
+      ],
+      icon: Icons.flag_outlined,
+    ),
+    _TutorialLessonSection(
+      title: 'tutorialGuideFirstStepsTitle',
+      body: [
+        'tutorialGuideFirstStepsBody1',
+        'tutorialGuideFirstStepsBody2',
+      ],
+      icon: Icons.checklist_outlined,
+    ),
+  ];
+
   static const _steps = [
     _TutorialStep(
       title: 'tutorialObjectiveTitle',
@@ -688,6 +781,11 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
   }
 
   void _nextStep() {
+    final step = _steps[_stepIndex];
+    final selectedAnswer = _selectedAnswers[_stepIndex];
+    if (step.prompt != null && selectedAnswer != step.correctIndex) {
+      return;
+    }
     setState(() {
       _stepIndex = (_stepIndex + 1) % _steps.length;
     });
@@ -695,13 +793,17 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
 
   void _previousPractice() {
     setState(() {
-      _practiceIndex =
-          (_practiceIndex - 1 + _practiceChallenges.length) %
-              _practiceChallenges.length;
+      _practiceIndex = (_practiceIndex - 1 + _practiceChallenges.length) %
+          _practiceChallenges.length;
     });
   }
 
   void _nextPractice() {
+    final challenge = _practiceChallenges[_practiceIndex];
+    final selectedAnswer = _practiceAnswers[_practiceIndex];
+    if (selectedAnswer != challenge.correctIndex) {
+      return;
+    }
     setState(() {
       _practiceIndex = (_practiceIndex + 1) % _practiceChallenges.length;
     });
@@ -774,7 +876,6 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
           shortest * 0.22,
           min(visualHeight * 0.74, 110.0),
         );
-        final bodyMaxLines = compact ? 1 : (contentHeight < 430 ? 2 : 3);
         final selectedAnswer = _selectedAnswers[_stepIndex];
 
         if (_mode == _TutorialMode.practice) {
@@ -789,259 +890,301 @@ class _MainMenuTutorialContentState extends State<_MainMenuTutorialContent> {
           );
 
           return Column(
-            mainAxisSize: MainAxisSize.max,
             children: [
               _modeSelector(compact),
               SizedBox(height: compact ? 4 : 8),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: ZapitiColors.oldGold.withValues(alpha: 0.72),
-                  ),
-                ),
-                child: SizedBox(
-                  height: practiceVisualHeight,
-                  width: double.infinity,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _PracticeVisual(
-                      key: ValueKey(_practiceIndex),
-                      challenge: challenge,
-                      cardWidth: cardWidth,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: compact ? 3 : 10),
-              Row(
-                children: [
-                  Icon(
-                    challenge.icon,
-                    color: ZapitiColors.wineRed,
-                    size: compact ? 18 : 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      context.tr(challenge.title),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: titleStyle,
-                    ),
-                  ),
-                  SizedBox(
-                    width: compact ? 76 : 94,
-                    height: compact ? 28 : 32,
-                    child: ZapitiActionButton(
-                      label: context.tr('tutorialTableUpper'),
-                      icon: Icons.table_bar_outlined,
-                      onPressed: widget.onStartTableTutorial,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: compact ? 1 : 5),
               Expanded(
-                child: Text(
-                  context.tr(challenge.situation),
-                  maxLines: bodyMaxLines,
-                  overflow: TextOverflow.ellipsis,
-                  style: bodyStyle,
-                ),
-              ),
-              if (showPracticePrompt) ...[
-                SizedBox(height: compact ? 2 : 6),
-                _PracticeDecisionPrompt(
-                  challenge: challenge,
-                  selectedIndex: selectedPracticeAnswer,
-                  onSelected: (index) {
-                    setState(() {
-                      _practiceAnswers[_practiceIndex] = index;
-                    });
-                  },
-                ),
-              ],
-              SizedBox(height: compact ? 6 : 10),
-              Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Anterior',
-                    onPressed: _previousPractice,
-                    icon: const Icon(Icons.chevron_left),
-                    color: ZapitiColors.darkBrown,
-                    constraints: BoxConstraints.tightFor(
-                      width: compact ? 30 : 44,
-                      height: compact ? 26 : 40,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (var index = 0;
-                            index < _practiceChallenges.length;
-                            index++)
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            width: index == _practiceIndex
-                                ? (compact ? 15 : 18)
-                                : (compact ? 6 : 8),
-                            height: compact ? 6 : 8,
-                            margin: EdgeInsets.symmetric(
-                              horizontal: compact ? 2 : 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: index == _practiceIndex
-                                  ? (selectedPracticeAnswer == null
-                                      ? ZapitiColors.wineRed
-                                      : answerIsCorrect
-                                          ? ZapitiColors.tableGreenDark
-                                          : ZapitiColors.wineRed)
-                                  : ZapitiColors.darkBrown
-                                      .withValues(alpha: 0.24),
-                              borderRadius: BorderRadius.circular(99),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(bottom: compact ? 8 : 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color:
+                              ZapitiColors.tableGreen.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: ZapitiColors.oldGold.withValues(alpha: 0.72),
+                          ),
+                        ),
+                        child: SizedBox(
+                          height: practiceVisualHeight,
+                          width: double.infinity,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: _PracticeVisual(
+                              key: ValueKey(_practiceIndex),
+                              challenge: challenge,
+                              cardWidth: cardWidth,
                             ),
                           ),
+                        ),
+                      ),
+                      SizedBox(height: compact ? 6 : 10),
+                      Row(
+                        children: [
+                          Icon(
+                            challenge.icon,
+                            color: ZapitiColors.wineRed,
+                            size: compact ? 18 : 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              context.tr(challenge.title),
+                              maxLines: compact ? 2 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: titleStyle,
+                            ),
+                          ),
+                          SizedBox(
+                            width: compact ? 76 : 94,
+                            height: compact ? 28 : 32,
+                            child: ZapitiActionButton(
+                              label: context.tr('tutorialTableUpper'),
+                              icon: Icons.table_bar_outlined,
+                              onPressed: widget.onStartTableTutorial,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: compact ? 4 : 6),
+                      Text(
+                        context.tr(challenge.situation),
+                        style: bodyStyle,
+                      ),
+                      if (showPracticePrompt) ...[
+                        SizedBox(height: compact ? 6 : 10),
+                        _PracticeDecisionPrompt(
+                          challenge: challenge,
+                          selectedIndex: selectedPracticeAnswer,
+                          onSelected: (index) {
+                            setState(() {
+                              _practiceAnswers[_practiceIndex] = index;
+                            });
+                          },
+                        ),
                       ],
-                    ),
+                      SizedBox(height: compact ? 8 : 12),
+                      Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Anterior',
+                            onPressed: _previousPractice,
+                            icon: const Icon(Icons.chevron_left),
+                            color: ZapitiColors.darkBrown,
+                            constraints: BoxConstraints.tightFor(
+                              width: compact ? 30 : 44,
+                              height: compact ? 26 : 40,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var index = 0;
+                                    index < _practiceChallenges.length;
+                                    index++)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 160),
+                                    width: index == _practiceIndex
+                                        ? (compact ? 15 : 18)
+                                        : (compact ? 6 : 8),
+                                    height: compact ? 6 : 8,
+                                    margin: EdgeInsets.symmetric(
+                                      horizontal: compact ? 2 : 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: index == _practiceIndex
+                                          ? (selectedPracticeAnswer == null
+                                              ? ZapitiColors.wineRed
+                                              : answerIsCorrect
+                                                  ? ZapitiColors.tableGreenDark
+                                                  : ZapitiColors.wineRed)
+                                          : ZapitiColors.darkBrown
+                                              .withValues(alpha: 0.24),
+                                      borderRadius: BorderRadius.circular(99),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Siguiente',
+                            onPressed: _nextPractice,
+                            icon: const Icon(Icons.chevron_right),
+                            color: ZapitiColors.darkBrown,
+                            constraints: BoxConstraints.tightFor(
+                              width: compact ? 30 : 44,
+                              height: compact ? 26 : 40,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: 'Siguiente',
-                    onPressed: _nextPractice,
-                    icon: const Icon(Icons.chevron_right),
-                    color: ZapitiColors.darkBrown,
-                    constraints: BoxConstraints.tightFor(
-                      width: compact ? 30 : 44,
-                      height: compact ? 26 : 40,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
+                ),
               ),
             ],
           );
         }
-
         return Column(
-          mainAxisSize: MainAxisSize.max,
           children: [
             _modeSelector(compact),
             SizedBox(height: compact ? 4 : 8),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: ZapitiColors.oldGold.withValues(alpha: 0.72),
-                ),
-              ),
-              child: SizedBox(
-                height: visualHeight,
-                width: double.infinity,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: _TutorialVisual(
-                    key: ValueKey(_stepIndex),
-                    index: _stepIndex,
-                    cardWidth: cardWidth,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: compact ? 3 : 10),
-            Row(
-              children: [
-                Icon(
-                  step.icon,
-                  color: ZapitiColors.wineRed,
-                  size: compact ? 18 : 24,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    context.tr(step.title),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: titleStyle,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: compact ? 1 : 5),
             Expanded(
-              child: Text(
-                context.tr(step.body),
-                maxLines: bodyMaxLines,
-                overflow: TextOverflow.ellipsis,
-                style: bodyStyle,
-              ),
-            ),
-            if (showPrompt) ...[
-              SizedBox(height: compact ? 2 : 6),
-              _TutorialDecisionPrompt(
-                step: step,
-                selectedIndex: selectedAnswer,
-                onSelected: (index) {
-                  setState(() {
-                    _selectedAnswers[_stepIndex] = index;
-                  });
-                },
-              ),
-            ],
-            SizedBox(height: compact ? 6 : 10),
-            Row(
-              children: [
-                IconButton(
-                  tooltip: 'Anterior',
-                  onPressed: _previousStep,
-                  icon: const Icon(Icons.chevron_left),
-                  color: ZapitiColors.darkBrown,
-                  constraints: BoxConstraints.tightFor(
-                    width: compact ? 30 : 44,
-                    height: compact ? 26 : 40,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (var index = 0; index < _steps.length; index++)
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          width: index == _stepIndex
-                              ? (compact ? 15 : 18)
-                              : (compact ? 6 : 8),
-                          height: compact ? 6 : 8,
-                          margin: EdgeInsets.symmetric(
-                            horizontal: compact ? 2 : 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: index == _stepIndex
-                                ? ZapitiColors.wineRed
-                                : ZapitiColors.darkBrown
-                                    .withValues(alpha: 0.24),
-                            borderRadius: BorderRadius.circular(99),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: compact ? 8 : 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZapitiColors.tableGreen.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: ZapitiColors.oldGold.withValues(alpha: 0.72),
+                        ),
+                      ),
+                      child: SizedBox(
+                        height: visualHeight,
+                        width: double.infinity,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: _TutorialVisual(
+                            key: ValueKey(_stepIndex),
+                            index: _stepIndex,
+                            cardWidth: cardWidth,
                           ),
                         ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZapitiColors.wineRed.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ZapitiColors.oldGold.withValues(alpha: 0.46),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('tutorialGuideTitle'),
+                              style: titleStyle,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              context.tr('tutorialGuideSubtitle'),
+                              style: bodyStyle,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    for (final section in _lessonSections) ...[
+                      _TutorialLessonCard(section: section),
+                      SizedBox(height: compact ? 8 : 12),
                     ],
-                  ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.56),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  step.icon,
+                                  color: ZapitiColors.wineRed,
+                                  size: compact ? 18 : 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    context.tr(step.title),
+                                    style: titleStyle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              context.tr(step.body),
+                              style: bodyStyle,
+                            ),
+                            if (showPrompt) ...[
+                              const SizedBox(height: 10),
+                              _TutorialDecisionPrompt(
+                                step: step,
+                                selectedIndex: selectedAnswer,
+                                onSelected: (index) {
+                                  setState(() {
+                                    _selectedAnswers[_stepIndex] = index;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Anterior',
+                                    onPressed: _previousStep,
+                                    icon: const Icon(Icons.chevron_left),
+                                    color: ZapitiColors.darkBrown,
+                                  ),
+                                  Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        context.tr(
+                                          'tutorialQuestion',
+                                          params: {
+                                            'current': _stepIndex + 1,
+                                            'total': _steps.length,
+                                          },
+                                        ),
+                                        style: bodyStyle,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Siguiente',
+                                    onPressed: _nextStep,
+                                    icon: const Icon(Icons.chevron_right),
+                                    color: ZapitiColors.darkBrown,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    ZapitiActionButton(
+                      label: context.tr('tutorialStartPractice'),
+                      icon: Icons.table_bar_outlined,
+                      onPressed: widget.onStartTableTutorial,
+                      primary: true,
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Siguiente',
-                  onPressed: _nextStep,
-                  icon: const Icon(Icons.chevron_right),
-                  color: ZapitiColors.darkBrown,
-                  constraints: BoxConstraints.tightFor(
-                    width: compact ? 30 : 44,
-                    height: compact ? 26 : 40,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
+              ),
             ),
           ],
         );
@@ -1070,6 +1213,18 @@ class _TutorialStep {
   });
 }
 
+class _TutorialLessonSection {
+  final String title;
+  final List<String> body;
+  final IconData icon;
+
+  const _TutorialLessonSection({
+    required this.title,
+    required this.body,
+    required this.icon,
+  });
+}
+
 enum _TutorialMode { lessons, practice }
 
 class _PracticeChallenge {
@@ -1092,6 +1247,68 @@ class _PracticeChallenge {
     required this.correctIndex,
     required this.feedback,
   });
+}
+
+class _TutorialLessonCard extends StatelessWidget {
+  final _TutorialLessonSection section;
+
+  const _TutorialLessonCard({
+    required this.section,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: ZapitiColors.darkBrown,
+          fontWeight: FontWeight.w900,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.86),
+          height: 1.28,
+          fontWeight: FontWeight.w700,
+        );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.56),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: ZapitiColors.darkBrown.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  section.icon,
+                  color: ZapitiColors.wineRed,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    context.tr(section.title),
+                    style: titleStyle,
+                  ),
+                ),
+              ],
+            ),
+            for (final bodyKey in section.body) ...[
+              const SizedBox(height: 6),
+              Text(
+                context.tr(bodyKey),
+                style: bodyStyle,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PracticeDecisionPrompt extends StatelessWidget {
@@ -1805,7 +2022,7 @@ class _MainMenuMultiplayerContent extends StatefulWidget {
 class _MainMenuMultiplayerContentState
     extends State<_MainMenuMultiplayerContent> {
   static const _maxPlayerNameLength = 18;
-  static const _maxUsernameLength = 24;
+  static const _maxUsernameLength = 20;
   static const _maxTeamNameLength = 22;
 
   final TextEditingController _nameController = TextEditingController();
@@ -1830,6 +2047,7 @@ class _MainMenuMultiplayerContentState
   bool _ready = false;
   bool _profileReady = false;
   bool _showCreateAccount = false;
+  bool _profileLoginInProgress = false;
   bool _teamModalShownForCurrentRoom = false;
   bool _teamDialogAutoClosed = false;
   bool _allowPassHandForRoom = false;
@@ -1853,9 +2071,14 @@ class _MainMenuMultiplayerContentState
   bool _teamsLoaded = false;
   bool _rankingRequested = false;
   bool _didInitializeLocalizedTexts = false;
+  static const bool _teamSelectionFlowEnabled = false;
 
   String _tr(String key, {Map<String, Object?> params = const {}}) {
     return context.tr(key, params: params);
+  }
+
+  void _logTeamFlow(String event, Map<String, Object?> fields) {
+    ZapitiLogger.debug('team_flow', event, fields: fields);
   }
 
   @override
@@ -1869,11 +2092,11 @@ class _MainMenuMultiplayerContentState
       _socket = session.socket;
       _playerId = session.localGamePlayerId;
       _roomSnapshot = session.roomSnapshot;
-      _connectedRoomId = session.roomSnapshot?.roomId;
-      if (session.roomSnapshot?.roomId != null) {
-        _roomController.text = session.roomSnapshot!.roomId;
+      _connectedRoomId = session.activeRoomId;
+      if (session.activeRoomId != null) {
+        _roomController.text = session.activeRoomId!;
       }
-      _sessionStarted = session.roomSnapshot?.phase != 'lobby';
+      _sessionStarted = _snapshotStartsGame(session.roomSnapshot);
       _connectionState = _ServerConnectionState.connected;
       _status = _tr('multiplayerConnectedToRoom');
 
@@ -1909,7 +2132,6 @@ class _MainMenuMultiplayerContentState
     super.didChangeDependencies();
     if (_didInitializeLocalizedTexts) return;
     _didInitializeLocalizedTexts = true;
-    _nameController.text = _tr('defaultPlayerName');
     _status = _tr('multiplayerReadyToConnect');
     _profileStatus = _tr('multiplayerProfileSetup');
   }
@@ -1945,6 +2167,7 @@ class _MainMenuMultiplayerContentState
     if (password.isNotEmpty) return password;
     return _profilePasswordFallback;
   }
+
   String get _teamName => _cleanTeamName(_teamNameController.text);
   String get _selectedTeamName {
     final selected = _selectedTeam;
@@ -1972,7 +2195,7 @@ class _MainMenuMultiplayerContentState
 
   void _setPlayerNameField(String value) {
     final cleaned = _cleanPlayerName(value);
-    if (cleaned.isEmpty || _nameController.text == cleaned) return;
+    if (_nameController.text == cleaned) return;
     _nameController.text = cleaned;
     _nameController.selection = TextSelection.collapsed(
       offset: _nameController.text.length,
@@ -2010,100 +2233,43 @@ class _MainMenuMultiplayerContentState
   }
 
   Future<void> _loadSavedPlayerProfile() async {
-    final prefs = await SharedPreferences.getInstance();
+    await AccountPrivacyService.clearLocalMultiplayerProfile();
     if (!mounted || _roomSnapshot != null) return;
-    _setPlayerNameField(
-      prefs.getString(_GameScreenState._multiplayerPlayerNamePrefsKey) ??
-          _nameController.text,
-    );
-    _setUsernameField(
-      prefs.getString(_GameScreenState._multiplayerUsernamePrefsKey) ??
-          _defaultUsernameFromName(_nameController.text),
-    );
-    _playerId = prefs.getString(_GameScreenState._multiplayerPlayerIdPrefsKey);
-    _sessionToken = prefs.getString(
-      _GameScreenState._multiplayerSessionTokenPrefsKey,
-    );
-    if (_playerId == null || _playerId!.isEmpty) {
-      _playerId = _createPersistentPlayerId();
-      await prefs.setString(
-        _GameScreenState._multiplayerPlayerIdPrefsKey,
-        _playerId!,
-      );
-    }
-    final savedPin = prefs.getString(
-      _GameScreenState._multiplayerPlayerPinPrefsKey,
-    );
-    _passwordController.text =
-        prefs.getString(_GameScreenState._multiplayerPasswordPrefsKey) ??
-            savedPin ??
-            '';
-    _setTeamNameField(
-      prefs.getString(_GameScreenState._multiplayerTeamNamePrefsKey) ?? '',
-    );
+    _playerId = null;
+    _sessionToken = null;
+    _setUsernameField('');
+    _passwordController.clear();
+    _setTeamNameField('');
     if (mounted) {
       setState(() {
-        _profileReady = _sessionToken != null && _sessionToken!.isNotEmpty;
-        _profileStatus = _profileReady
-            ? _tr('multiplayerProfileActive')
-            : _tr('multiplayerProfileRecover');
+        _profileReady = false;
+        _profileStatus = _tr('multiplayerProfileRecover');
       });
     }
   }
 
-  String _defaultUsernameFromName(String name) {
-    final normalized = name
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), '.')
-        .replaceAll(RegExp(r'[^a-z0-9_.-]'), '');
-    if (normalized.length >= 3) return _cleanUsername(normalized);
-    return '';
-  }
-
   Future<void> _savePlayerName(String playerName) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerPlayerNamePrefsKey,
-      playerName,
-    );
+    return;
   }
 
   Future<void> _savePlayerId(String playerId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerPlayerIdPrefsKey,
-      playerId,
-    );
+    return;
   }
 
   Future<void> _saveUsername(String username) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerUsernamePrefsKey,
-      username,
-    );
+    return;
   }
 
   Future<void> _saveSessionToken(String sessionToken) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerSessionTokenPrefsKey,
-      sessionToken,
-    );
+    return;
   }
 
   Future<void> _clearSavedSessionToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_GameScreenState._multiplayerSessionTokenPrefsKey);
+    return;
   }
 
   Future<void> _saveTeamName(String teamName) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _GameScreenState._multiplayerTeamNamePrefsKey,
-      teamName,
-    );
+    return;
   }
 
   String _createPersistentPlayerId() {
@@ -2113,13 +2279,18 @@ class _MainMenuMultiplayerContentState
 
   String get _serverUrl => ServerConfig.websocketUrl;
 
-  String get _localPlayerId =>
-      _playerId ??= _createPersistentPlayerId();
+  String get _localPlayerId => _playerId ??= _createPersistentPlayerId();
 
   void _setConnectionState(
     _ServerConnectionState state, {
     required String status,
   }) {
+    ZapitiLogger.info('lobby', 'connection_state_changed', fields: {
+      'state': state.name,
+      'status': status,
+      'roomId': _connectedRoomId,
+      'sessionStarted': _sessionStarted,
+    });
     if (!mounted) return;
     setState(() {
       _connectionState = state;
@@ -2136,6 +2307,24 @@ class _MainMenuMultiplayerContentState
     _ServerConnectionState connectionState =
         _ServerConnectionState.disconnected,
   }) {
+    ZapitiLogger.warn('lobby', 'session_cleared_after_connection_loss',
+        fields: {
+          'status': status,
+          'preserveSocket': preserveSocket,
+          'connectionState': connectionState.name,
+          'roomId': _connectedRoomId,
+          'sessionStarted': _sessionStarted,
+        });
+    if (!preserveSocket) {
+      final socket = _socket;
+      socket?.onMessage = null;
+      socket?.onError = null;
+      socket?.onDone = null;
+      MultiplayerSessionStore.instance.clearAll();
+    } else {
+      MultiplayerSessionStore.instance.socket = _socket;
+      MultiplayerSessionStore.instance.roomSnapshot = _roomSnapshot;
+    }
     _closeCreateTeamDialog();
     setState(() {
       if (!preserveSocket) {
@@ -2158,6 +2347,10 @@ class _MainMenuMultiplayerContentState
   void _closeSocketIntentionally() {
     final socket = _socket;
     if (socket == null) return;
+    ZapitiLogger.info('lobby', 'socket_close_intentional', fields: {
+      'roomId': _connectedRoomId,
+      'sessionStarted': _sessionStarted,
+    });
     _connectionGeneration += 1;
     _pendingConnection = null;
     _socket = null;
@@ -2203,7 +2396,9 @@ class _MainMenuMultiplayerContentState
     final localSeat = _localSeatFor(snapshot);
     if (localSeat == null) return;
     final characterId = localSeat.characterId;
-    if (characterId == null || characterId.isEmpty) {
+    if (characterId == null ||
+        characterId.isEmpty ||
+        !CharacterAssets.characterIds.contains(characterId)) {
       setState(() {
         _characterSelectionReleased = true;
         _confirmedCharacterId = null;
@@ -2329,11 +2524,17 @@ class _MainMenuMultiplayerContentState
   Future<bool> _ensureConnected() async {
     final socket = _socket;
     if (socket != null && socket.isConnected) {
+      ZapitiLogger.debug('lobby', 'ensure_connected_reuse_socket', fields: {
+        'roomId': _connectedRoomId,
+      });
       return true;
     }
 
     final pending = _pendingConnection;
     if (pending != null) {
+      ZapitiLogger.debug('lobby', 'ensure_connected_wait_pending', fields: {
+        'roomId': _connectedRoomId,
+      });
       return pending;
     }
 
@@ -2352,6 +2553,11 @@ class _MainMenuMultiplayerContentState
     bool fromConnectionLoss = false,
   }) async {
     final serverUrl = _serverUrl;
+    ZapitiLogger.info('lobby', 'connect_with_retries_begin', fields: {
+      'serverUrl': serverUrl,
+      'fromConnectionLoss': fromConnectionLoss,
+      'roomId': _connectedRoomId,
+    });
     if (serverUrl.isEmpty) {
       _setConnectionState(
         _ServerConnectionState.error,
@@ -2397,6 +2603,13 @@ class _MainMenuMultiplayerContentState
       }
 
       final delay = attemptDelays[attempt];
+      ZapitiLogger.info('lobby', 'connect_attempt_begin', fields: {
+        'attempt': attempt + 1,
+        'delayMs': delay.inMilliseconds,
+        'timeoutMs': attemptTimeout.inMilliseconds,
+        'generation': generation,
+        'fromConnectionLoss': fromConnectionLoss,
+      });
       if (delay > Duration.zero) {
         await Future<void>.delayed(delay);
         if (!mounted || generation != _connectionGeneration) {
@@ -2428,6 +2641,11 @@ class _MainMenuMultiplayerContentState
         }
 
         _socket = nextSocket;
+        ZapitiLogger.info('lobby', 'connect_attempt_success', fields: {
+          'attempt': attempt + 1,
+          'generation': generation,
+          'fromConnectionLoss': fromConnectionLoss,
+        });
         _setConnectionState(
           _ServerConnectionState.connected,
           status: fromConnectionLoss
@@ -2435,7 +2653,18 @@ class _MainMenuMultiplayerContentState
               : _tr('multiplayerConnectedWaitingRoom'),
         );
         return true;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        ZapitiLogger.error(
+          'lobby',
+          'connect_attempt_failed',
+          error: error,
+          stackTrace: stackTrace,
+          fields: {
+            'attempt': attempt + 1,
+            'generation': generation,
+            'fromConnectionLoss': fromConnectionLoss,
+          },
+        );
         nextSocket.close();
         if (attempt == attemptDelays.length - 1) {
           break;
@@ -2456,6 +2685,11 @@ class _MainMenuMultiplayerContentState
 
   void _handleSocketDropped(String reason) {
     final hadSession = _sessionStarted || _roomSnapshot != null;
+    ZapitiLogger.warn('lobby', 'socket_dropped', fields: {
+      'reason': reason,
+      'hadSession': hadSession,
+      'roomId': _connectedRoomId,
+    });
     if (hadSession) {
       _setConnectionState(
         _ServerConnectionState.reconnecting,
@@ -2469,16 +2703,27 @@ class _MainMenuMultiplayerContentState
   }
 
   Future<void> _recoverAfterConnectionLoss() async {
+    ZapitiLogger.info('lobby', 'recover_after_connection_loss_begin', fields: {
+      'roomId': _connectedRoomId,
+    });
     final reconnected = await _connectWithRetries(fromConnectionLoss: true);
     if (!mounted) return;
 
     if (!reconnected) {
+      ZapitiLogger.warn('lobby', 'recover_after_connection_loss_failed',
+          fields: {
+            'roomId': _connectedRoomId,
+          });
       _clearSessionAfterConnectionLoss(
         _tr('multiplayerCouldNotRecoverConnection'),
       );
       return;
     }
 
+    ZapitiLogger.info('lobby', 'recover_after_connection_loss_success',
+        fields: {
+          'roomId': _connectedRoomId,
+        });
     _clearSessionAfterConnectionLoss(
       _tr('multiplayerConnectionRestored'),
       preserveSocket: true,
@@ -2488,6 +2733,12 @@ class _MainMenuMultiplayerContentState
 
   void _handleSocketMessage(MultiplayerMessage message) {
     if (!mounted) return;
+    ZapitiLogger.info('lobby', 'message_received', fields: {
+      'type': message.type.wireName,
+      'roomId': message.roomId,
+      'playerId': message.playerId,
+      'payloadKeys': message.payload.keys.toList(),
+    });
 
     switch (message.type) {
       case MultiplayerMessageType.roomSnapshot:
@@ -2513,38 +2764,68 @@ class _MainMenuMultiplayerContentState
               _setTeamNameField(localTeamName);
             }
           }
-          _sessionStarted = snapshot.phase != 'lobby';
+          _sessionStarted = _snapshotStartsGame(snapshot);
           _connectionState = _ServerConnectionState.connected;
           _status = switch (snapshot.phase) {
             'starting' => _tr('multiplayerReadyToStart'),
             'playing' => _tr('multiplayerPhasePlaying'),
-            _ => _tr('roomWithPhase', params: {'room': snapshot.roomId, 'phase': _phaseLabel(snapshot.phase)}),
+            _ => _tr('roomWithPhase', params: {
+                'room': snapshot.roomId,
+                'phase': _phaseLabel(snapshot.phase)
+              }),
           };
         });
-        MultiplayerSessionStore.instance.roomSnapshot = snapshot;
+        _hydrateMultiplayerSessionFromSnapshot(snapshot);
+        if (message.playerId != null && message.playerId!.isNotEmpty) {
+          MultiplayerSessionStore.instance.localGamePlayerId = message.playerId;
+        }
+        final reconnectPlayerId = message.playerId ?? _playerId;
+        if (reconnectPlayerId != null && reconnectPlayerId.isNotEmpty) {
+          _rememberReconnectCredentials(
+            playerId: reconnectPlayerId,
+            roomId: snapshot.roomId,
+          );
+        }
         final allowPassHand = snapshot.match?['allowPassHand'];
         if (allowPassHand is bool) {
           MultiplayerSessionStore.instance.allowPassHand = allowPassHand;
         }
         _syncSelectedCharacterFromRoom();
-        _resolveTeamForRoomSnapshot(snapshot);
+        if (_teamSelectionFlowEnabled) {
+          _resolveTeamForRoomSnapshot(snapshot);
+        }
+        if (_snapshotStartsGame(snapshot) &&
+            MultiplayerSessionStore.instance.localGamePlayerId != null &&
+            MultiplayerSessionStore.instance.players.isNotEmpty) {
+          MultiplayerSessionStore.instance.controlledPlayerIds = [
+            MultiplayerSessionStore.instance.localGamePlayerId!,
+          ];
+        }
         _maybeAutoEnterGame();
         break;
       case MultiplayerMessageType.error:
         var shouldRetryRoomActionWithoutSession = false;
         setState(() {
           final code = message.payload['code']?.toString() ?? 'error';
-          final text = message.payload['message']?.toString() ?? _tr('multiplayerConnectionError');
+          final text = message.payload['message']?.toString() ??
+              _tr('multiplayerConnectionError');
           if (code == 'profile_not_found') {
-            _profileStatus = _tr('multiplayerProfileRecover');
-            _showCreateAccount = true;
+            if (_profileLoginInProgress) {
+              _profileReady = false;
+              _showCreateAccount = false;
+              _profileStatus = _tr('multiplayerProfilePasswordIncorrect');
+            } else {
+              _profileStatus = _tr('multiplayerProfileRecover');
+              _showCreateAccount = true;
+            }
+            _profileLoginInProgress = false;
           } else if (code == 'auth_failed') {
             _sessionToken = null;
+            _profileLoginInProgress = false;
             unawaited(_clearSavedSessionToken());
-            shouldRetryRoomActionWithoutSession =
-                _pendingRoomAction != null &&
-                    !_roomActionRetriedWithoutSession &&
-                    _usableProfilePassword != null;
+            shouldRetryRoomActionWithoutSession = _pendingRoomAction != null &&
+                !_roomActionRetriedWithoutSession &&
+                _usableProfilePassword != null;
             if (shouldRetryRoomActionWithoutSession) {
               _profileReady = true;
               _showCreateAccount = false;
@@ -2555,24 +2836,25 @@ class _MainMenuMultiplayerContentState
               _teamsLoaded = false;
               _playerTeams = const [];
               _selectedPairId = null;
-              _profileStatus = _tr('multiplayerRemoteErrorExpired');
+              _profileStatus = _tr('multiplayerProfilePasswordIncorrect');
             }
           } else if (code == 'invalid_payload' && !_profileReady) {
+            _profileLoginInProgress = false;
             _profileStatus = _tr('multiplayerProfileReviewCredentials');
           }
           _status = switch (code) {
             'room_not_found' => _tr('multiplayerJoinFailed'),
             'team_required' => _tr('multiplayerTeamSelectionFailed'),
             'invalid_team_for_room' => _tr('multiplayerRemoteErrorTeamUpdate'),
-            'auth_failed' => _tr('multiplayerRemoteErrorExpired'),
-            'character_taken' => _tr('multiplayerCharacterOccupied', params: {'name': _selectedCharacterId}),
+            'auth_failed' => _tr('multiplayerProfilePasswordIncorrect'),
+            'character_taken' => _tr('multiplayerCharacterOccupied',
+                params: {'name': _selectedCharacterId}),
             'player_already_in_room' => _tr('multiplayerJoinFailed'),
             _ => _friendlyRemoteError(code, text),
           };
         });
         final errorCode = message.payload['code']?.toString();
-        if (errorCode == 'auth_failed' &&
-            shouldRetryRoomActionWithoutSession) {
+        if (errorCode == 'auth_failed' && shouldRetryRoomActionWithoutSession) {
           if (_retryPendingRoomActionWithoutSession()) {
             break;
           }
@@ -2590,17 +2872,36 @@ class _MainMenuMultiplayerContentState
         }
         break;
       case MultiplayerMessageType.startGame:
-        MultiplayerSessionStore.instance.localGamePlayerId = message.playerId;
+        if (message.playerId != null && message.playerId!.isNotEmpty) {
+          MultiplayerSessionStore.instance.localGamePlayerId = message.playerId;
+        }
         MultiplayerSessionStore.instance.matchStarted = true;
-        MultiplayerSessionStore.instance.players =
-            _parsePlayers(message.payload['players']);
-        MultiplayerSessionStore.instance.characterIdsByPlayer =
+        final parsedPlayers = _parsePlayers(message.payload['players']);
+        if (parsedPlayers.isNotEmpty) {
+          MultiplayerSessionStore.instance.players = parsedPlayers;
+        }
+        final parsedCharacterIds =
             _parseCharacterIdsByPlayer(message.payload['players']);
+        if (parsedCharacterIds.isNotEmpty) {
+          MultiplayerSessionStore.instance.characterIdsByPlayer =
+              parsedCharacterIds;
+        }
         MultiplayerSessionStore.instance.botDifficulty =
             _parseBotDifficulty(message.payload['players']);
         MultiplayerSessionStore.instance.seed = message.payload['seed'] as int?;
+        final rawControlledPlayerIds = message.payload['controlledPlayerIds'];
+        final controlledPlayerIds = rawControlledPlayerIds is List
+            ? [
+                for (final rawPlayerId in rawControlledPlayerIds)
+                  if (rawPlayerId.toString().isNotEmpty) rawPlayerId.toString(),
+              ]
+            : const <String>[];
         MultiplayerSessionStore.instance.controlledPlayerIds =
-            message.playerId == null ? const [] : [message.playerId!];
+            controlledPlayerIds.isNotEmpty
+                ? controlledPlayerIds
+                : message.playerId == null
+                    ? const []
+                    : [message.playerId!];
         MultiplayerSessionStore.instance.fixedHands =
             _parseFixedHands(message.payload['fixedHands']);
         setState(() {
@@ -2629,11 +2930,12 @@ class _MainMenuMultiplayerContentState
           ];
           final localPlayerId = _playerId;
           if (localPlayerId != null) {
-            final playerStats = rankingPlayers.cast<Map<String, dynamic>?>()
-                .firstWhere(
-                  (entry) => entry?['playerId']?.toString() == localPlayerId,
-                  orElse: () => null,
-                );
+            final playerStats =
+                rankingPlayers.cast<Map<String, dynamic>?>().firstWhere(
+                      (entry) =>
+                          entry?['playerId']?.toString() == localPlayerId,
+                      orElse: () => null,
+                    );
             if (playerStats != null) {
               _playerStats = playerStats;
             }
@@ -2650,6 +2952,21 @@ class _MainMenuMultiplayerContentState
               in (message.payload['teams'] as List<dynamic>? ?? const []))
             if (entry is Map) Map<String, dynamic>.from(entry),
         ];
+        _logTeamFlow('teams_message_received', {
+          'teamCount': teams.length,
+          'selectedPairId': _selectedPairId,
+          'roomId': _roomSnapshot?.roomId,
+          'localPlayerId': _playerId,
+          'pairs': [
+            for (final team in teams)
+              {
+                'pairId': team['pairId'],
+                'teamName': team['teamName'],
+                'teammateIds': team['teammateIds'],
+                'teammateUsernames': team['teammateUsernames'],
+              },
+          ],
+        });
         setState(() {
           _playerTeams = teams;
           _teamsLoaded = true;
@@ -2658,24 +2975,31 @@ class _MainMenuMultiplayerContentState
                 (team) => team['pairId']?.toString() == _selectedPairId,
               )) {
             final snapshot = _roomSnapshot;
-            final teammate = snapshot == null ? null : _teammateSeatFor(snapshot);
-            _selectedPairId = teammate == null
-                ? teams.isEmpty
-                    ? null
-                    : teams.first['pairId']?.toString()
+            final teammate =
+                snapshot == null ? null : _teammateSeatFor(snapshot);
+            final teammatePairId = teammate == null
+                ? null
                 : _teamForTeammate(teammate.playerId)?['pairId']?.toString();
+            _selectedPairId =
+                teammatePairId != null && teammatePairId.isNotEmpty
+                    ? teammatePairId
+                    : null;
           }
-          final selectedName = _selectedTeamName;
-          if (selectedName.isNotEmpty) {
-            _setTeamNameField(selectedName);
-            unawaited(_saveTeamName(selectedName));
+          final selectedTeam = _selectedTeam;
+          if (selectedTeam != null) {
+            final selectedName =
+                selectedTeam['teamName']?.toString().trim() ?? '';
+            if (selectedName.isNotEmpty) {
+              _setTeamNameField(selectedName);
+              unawaited(_saveTeamName(selectedName));
+            }
           }
           _status = teams.isEmpty
               ? _tr('multiplayerTeamsLoadingFailed')
               : _tr('multiplayerTeamSynced');
         });
         final snapshot = _roomSnapshot;
-        if (snapshot != null) {
+        if (_teamSelectionFlowEnabled && snapshot != null) {
           _resolveTeamForRoomSnapshot(snapshot);
         }
         break;
@@ -2685,8 +3009,7 @@ class _MainMenuMultiplayerContentState
         final profileUsername = message.payload['username']?.toString();
         final profileName = message.payload['name']?.toString();
         final profileTeamName = message.payload['teamName']?.toString() ?? '';
-        final profileSessionToken =
-            message.payload['sessionToken']?.toString();
+        final profileSessionToken = message.payload['sessionToken']?.toString();
         if (profilePlayerId == null || profileName == null) {
           setState(() {
             _profileStatus = _tr('multiplayerProfileRecoverFailed');
@@ -2712,6 +3035,7 @@ class _MainMenuMultiplayerContentState
           _passwordController.clear();
         }
         setState(() {
+          _profileLoginInProgress = false;
           _playerStats = Map<String, dynamic>.from(message.payload);
           _profileReady = _hasUsableSessionOrCredentials();
           _showCreateAccount = false;
@@ -2719,10 +3043,13 @@ class _MainMenuMultiplayerContentState
               ? _tr('multiplayerProfileSessionStarted')
               : _tr('multiplayerProfileSessionStartedCredentials');
           _status = _profileReady
-              ? _tr('multiplayerProfileSynced', params: {'name': _cleanPlayerName(profileName)})
+              ? _tr('multiplayerProfileSynced',
+                  params: {'name': _cleanPlayerName(profileName)})
               : _tr('multiplayerProfileSyncedNeedsLogin');
         });
-        _requestTeamsIfReady();
+        if (_teamSelectionFlowEnabled) {
+          _requestTeamsIfReady();
+        }
         break;
       default:
         setState(() {
@@ -2742,30 +3069,22 @@ class _MainMenuMultiplayerContentState
     if (code.contains('team')) {
       return _tr('multiplayerRemoteErrorTeamUpdate');
     }
-    if (text.trim().isNotEmpty && text.length < 72 && !_looksTechnical(text)) {
-      return text;
-    }
     return _tr('multiplayerRemoteErrorServiceUnavailable');
-  }
-
-  bool _looksTechnical(String text) {
-    final lower = text.toLowerCase();
-    return lower.contains('websocket') ||
-        lower.contains('socket') ||
-        lower.contains('http') ||
-        lower.contains('api') ||
-        lower.contains('backend') ||
-        lower.contains('endpoint') ||
-        lower.contains('exception') ||
-        lower.contains('stack') ||
-        lower.contains('localhost') ||
-        lower.contains('10.0.2.2') ||
-        lower.contains('://');
   }
 
   Future<void> _createRoom() async {
     final playerName = _playerName;
     final username = _username;
+    ZapitiLogger.info('lobby', 'create_room_requested', fields: {
+      'playerId': _playerId,
+      'playerName': playerName,
+      'username': username,
+      'teamName': _selectedTeamName,
+      'characterId': _characterSelectionReleased ? null : _selectedCharacterId,
+      'allowPassHand': _allowPassHandForRoom,
+      'hasSessionToken': _sessionToken != null && _sessionToken!.isNotEmpty,
+      'hasPassword': _usableProfilePassword != null,
+    });
     if (playerName.isEmpty) {
       setState(() {
         _status = _tr('multiplayerProfileNameRequired');
@@ -2812,6 +3131,10 @@ class _MainMenuMultiplayerContentState
       _roomActionRetriedWithoutCharacter = false;
       _roomActionRetriedWithoutSession = false;
       MultiplayerSessionStore.instance.allowPassHand = _allowPassHandForRoom;
+      _rememberReconnectCredentials(
+        playerId: localPlayerId,
+        roomId: _connectedRoomId,
+      );
       socket.createRoom(
         playerId: localPlayerId,
         username: username,
@@ -2819,14 +3142,23 @@ class _MainMenuMultiplayerContentState
         password: _sessionToken == null ? _usableProfilePassword : null,
         teamName: _selectedTeamName,
         sessionToken: _sessionToken,
-        characterId:
-            _characterSelectionReleased ? null : _selectedCharacterId,
+        characterId: _characterSelectionReleased ? null : _selectedCharacterId,
         allowPassHand: _allowPassHandForRoom,
       );
       setState(() {
         _status = _tr('multiplayerCreateRoomRequested');
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      ZapitiLogger.error(
+        'lobby',
+        'create_room_failed',
+        error: error,
+        stackTrace: stackTrace,
+        fields: {
+          'playerId': _playerId,
+          'teamName': _selectedTeamName,
+        },
+      );
       setState(() {
         _status = _tr('multiplayerCreateRoomFailed');
       });
@@ -2837,6 +3169,16 @@ class _MainMenuMultiplayerContentState
     final roomCode = _roomController.text.trim();
     final playerName = _playerName;
     final username = _username;
+    ZapitiLogger.info('lobby', 'join_room_requested', fields: {
+      'roomId': roomCode,
+      'playerId': _playerId,
+      'playerName': playerName,
+      'username': username,
+      'teamName': _selectedTeamName,
+      'characterId': _characterSelectionReleased ? null : _selectedCharacterId,
+      'hasSessionToken': _sessionToken != null && _sessionToken!.isNotEmpty,
+      'hasPassword': _usableProfilePassword != null,
+    });
 
     if (roomCode.isEmpty) {
       setState(() {
@@ -2890,6 +3232,10 @@ class _MainMenuMultiplayerContentState
       _pendingRoomAction = 'join';
       _roomActionRetriedWithoutCharacter = false;
       _roomActionRetriedWithoutSession = false;
+      _rememberReconnectCredentials(
+        playerId: localPlayerId,
+        roomId: roomCode,
+      );
       socket.joinRoom(
         roomId: roomCode,
         playerId: localPlayerId,
@@ -2898,13 +3244,22 @@ class _MainMenuMultiplayerContentState
         password: _sessionToken == null ? _usableProfilePassword : null,
         teamName: _selectedTeamName,
         sessionToken: _sessionToken,
-        characterId:
-            _characterSelectionReleased ? null : _selectedCharacterId,
+        characterId: _characterSelectionReleased ? null : _selectedCharacterId,
       );
       setState(() {
         _status = _tr('multiplayerJoinRequested', params: {'room': roomCode});
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      ZapitiLogger.error(
+        'lobby',
+        'join_room_failed',
+        error: error,
+        stackTrace: stackTrace,
+        fields: {
+          'roomId': roomCode,
+          'playerId': _playerId,
+        },
+      );
       setState(() {
         _status = _tr('multiplayerJoinFailed');
       });
@@ -2962,6 +3317,25 @@ class _MainMenuMultiplayerContentState
       });
     }
     return false;
+  }
+
+  void _rememberReconnectCredentials({
+    required String playerId,
+    String? roomId,
+  }) {
+    final selectedCharacterId =
+        _characterSelectionReleased ? null : _selectedCharacterId;
+    MultiplayerSessionStore.instance.rememberReconnectCredentials(
+      roomId: roomId ?? _connectedRoomId ?? _roomSnapshot?.roomId ?? '',
+      playerId: playerId,
+      username: _username,
+      playerName: _playerName,
+      teamName: _selectedTeamName,
+      password: _sessionToken == null ? _usableProfilePassword : null,
+      sessionToken: _sessionToken,
+      pairId: _selectedPairId,
+      characterId: selectedCharacterId,
+    );
   }
 
   bool _retryPendingRoomActionWithoutSession() {
@@ -3035,7 +3409,11 @@ class _MainMenuMultiplayerContentState
       return;
     }
     final snapshot = _roomSnapshot;
-    if (snapshot != null &&
+    if (_teamSelectionFlowEnabled && snapshot != null) {
+      _resolveTeamForRoomSnapshot(snapshot);
+    }
+    if (_teamSelectionFlowEnabled &&
+        snapshot != null &&
         snapshot.seats.length >= 4 &&
         _teammateSeatFor(snapshot)?.playerId.isNotEmpty == true &&
         (_selectedPairId == null || _selectedPairId!.isEmpty)) {
@@ -3045,7 +3423,24 @@ class _MainMenuMultiplayerContentState
       _resolveTeamForRoomSnapshot(snapshot);
       return;
     }
-    _sendTeamSelectionIfReady(roomId: roomId);
+    final syncedPairId =
+        snapshot == null ? null : _localSeatFor(snapshot)?.pairId;
+    if (_teamSelectionFlowEnabled &&
+        (_selectedPairId ?? '').isNotEmpty &&
+        syncedPairId != _selectedPairId) {
+      _logTeamFlow('ready_requires_select_team_first', {
+        'roomId': roomId,
+        'selectedPairId': _selectedPairId,
+        'syncedPairId': syncedPairId,
+      });
+      _sendTeamSelectionIfReady(roomId: roomId);
+    } else {
+      _logTeamFlow('ready_select_team_not_needed', {
+        'roomId': roomId,
+        'selectedPairId': _selectedPairId,
+        'syncedPairId': syncedPairId,
+      });
+    }
 
     final nextReady = !_ready;
     setState(() {
@@ -3088,6 +3483,7 @@ class _MainMenuMultiplayerContentState
   }
 
   void _requestTeamsIfReady() {
+    if (!_teamSelectionFlowEnabled) return;
     final socket = _socket;
     final playerId = _playerId;
     final sessionToken = _sessionToken;
@@ -3096,9 +3492,18 @@ class _MainMenuMultiplayerContentState
         playerId == null ||
         sessionToken == null ||
         sessionToken.isEmpty) {
+      _logTeamFlow('request_teams_skipped', {
+        'socketConnected': socket?.isConnected,
+        'hasPlayerId': playerId != null,
+        'hasSessionToken': sessionToken != null && sessionToken.isNotEmpty,
+      });
       return;
     }
     try {
+      _logTeamFlow('request_teams_sent', {
+        'playerId': playerId,
+        'roomId': _connectedRoomId ?? _roomController.text.trim(),
+      });
       socket.requestTeams(playerId: playerId, sessionToken: sessionToken);
     } catch (error) {
       setState(() {
@@ -3108,57 +3513,120 @@ class _MainMenuMultiplayerContentState
   }
 
   void _resolveTeamForRoomSnapshot(MultiplayerRoomSnapshot snapshot) {
+    if (!_teamSelectionFlowEnabled) {
+      _closeCreateTeamDialog();
+      return;
+    }
     if (snapshot.phase != 'lobby') return;
     if (snapshot.seats.length < 4) return;
     final localSeat = _localSeatFor(snapshot);
     final teammate = _teammateSeatFor(snapshot);
     final teammateUsername = teammate?.username?.trim() ?? '';
-    if (teammate == null || teammateUsername.isEmpty) return;
+    _logTeamFlow('resolve_team_start', {
+      'roomId': snapshot.roomId,
+      'localPlayerId': _playerId,
+      'localSeat': localSeat == null
+          ? null
+          : {
+              'seatIndex': localSeat.seatIndex,
+              'username': localSeat.username,
+              'pairId': localSeat.pairId,
+              'teamName': localSeat.teamName,
+              'teamId': localSeat.teamId,
+            },
+      'teammate': teammate == null
+          ? null
+          : {
+              'playerId': teammate.playerId,
+              'seatIndex': teammate.seatIndex,
+              'username': teammate.username,
+              'pairId': teammate.pairId,
+              'teamName': teammate.teamName,
+              'teamId': teammate.teamId,
+            },
+      'teamsLoaded': _teamsLoaded,
+      'teamCount': _playerTeams.length,
+      'selectedPairId': _selectedPairId,
+    });
+    if (teammate == null || teammateUsername.isEmpty) {
+      _logTeamFlow('resolve_team_stop', {
+        'reason':
+            teammate == null ? 'missing_teammate' : 'missing_teammate_username',
+      });
+      return;
+    }
     if (_teamDialogContext != null &&
         _teamDialogTeammatePlayerId != null &&
         _teamDialogTeammatePlayerId != teammate.playerId) {
       _closeCreateTeamDialog();
       _teamModalShownForCurrentRoom = false;
     }
-    final selectedTeam = _selectedTeam;
-    if (selectedTeam != null &&
-        _teamForTeammate(teammate.playerId)?['pairId']?.toString() !=
-            selectedTeam['pairId']?.toString()) {
-      setState(() {
-        _selectedPairId = null;
+    final localPairId = localSeat?.pairId?.trim() ?? '';
+    if (localPairId.isNotEmpty) {
+      final localTeamName = localSeat?.teamName?.trim() ?? '';
+      _logTeamFlow('resolve_team_room_pair', {
+        'pairId': localPairId,
+        'teamName': localTeamName,
+        'selectedPairId': _selectedPairId,
       });
-    }
-    final teammatePairId = teammate.pairId?.trim() ?? '';
-    if (teammatePairId.isNotEmpty) {
-      final teammateTeamName = teammate.teamName?.trim() ?? '';
-      final alreadySelected = _selectedPairId == teammatePairId;
-      final alreadySynced = localSeat?.pairId == teammatePairId;
-      if (!alreadySelected || !alreadySynced) {
+      if (_selectedPairId != localPairId) {
         setState(() {
-          _selectedPairId = teammatePairId;
-          if (teammateTeamName.isNotEmpty) {
-            _setTeamNameField(teammateTeamName);
-            unawaited(_saveTeamName(teammateTeamName));
+          _selectedPairId = localPairId;
+          if (localTeamName.isNotEmpty) {
+            _setTeamNameField(localTeamName);
+            unawaited(_saveTeamName(localTeamName));
           }
-          _status = teammateTeamName.isEmpty
+          _status = localTeamName.isEmpty
               ? _tr('multiplayerTeamSynced')
-              : _tr('multiplayerTeamNamedSynced', params: {'name': teammateTeamName});
+              : _tr('multiplayerTeamNamedSynced',
+                  params: {'name': localTeamName});
         });
-        _closeCreateTeamDialog();
-        _requestTeamsIfReady();
+      }
+      return;
+    }
+
+    final currentTeam = _teamForCurrentPair(snapshot);
+    if (currentTeam != null) {
+      final pairId = currentTeam['pairId']?.toString() ?? '';
+      final teamName = currentTeam['teamName']?.toString().trim() ?? '';
+      _logTeamFlow('resolve_team_existing_current_pair', {
+        'pairId': pairId,
+        'teamName': teamName,
+        'selectedPairId': _selectedPairId,
+      });
+      if (pairId.isNotEmpty && _selectedPairId != pairId) {
+        setState(() {
+          _selectedPairId = pairId;
+          if (teamName.isNotEmpty) {
+            _setTeamNameField(teamName);
+            unawaited(_saveTeamName(teamName));
+          }
+          _status = teamName.isEmpty
+              ? _tr('multiplayerTeamSynced')
+              : _tr('multiplayerTeamNamedSynced', params: {'name': teamName});
+        });
         _sendTeamSelectionIfReady(roomId: snapshot.roomId);
       }
       return;
     }
+
+    final teammateTeam = _teamForTeammate(teammate.playerId);
     if (!_teamsLoaded) {
+      _logTeamFlow('resolve_team_waiting_teams', {
+        'teammatePlayerId': teammate.playerId,
+      });
       _requestTeamsIfReady();
       return;
     }
 
-    final existingTeam = _teamForTeammate(teammate.playerId);
-    if (existingTeam != null) {
-      final pairId = existingTeam['pairId']?.toString();
-      final teamName = existingTeam['teamName']?.toString().trim() ?? '';
+    if (teammateTeam != null) {
+      final pairId = teammateTeam['pairId']?.toString();
+      final teamName = teammateTeam['teamName']?.toString().trim() ?? '';
+      _logTeamFlow('resolve_team_existing_teammate', {
+        'pairId': pairId,
+        'teamName': teamName,
+        'teammatePlayerId': teammate.playerId,
+      });
       if (pairId != null && pairId.isNotEmpty) {
         setState(() {
           _selectedPairId = pairId;
@@ -3175,6 +3643,7 @@ class _MainMenuMultiplayerContentState
 
     final localCharacterId = localSeat?.characterId;
     if (localCharacterId == null || localCharacterId.isEmpty) {
+      _logTeamFlow('resolve_team_stop', {'reason': 'missing_character'});
       setState(() {
         _status =
             'Elige y confirma personaje antes de crear equipo con tu companero.';
@@ -3182,6 +3651,11 @@ class _MainMenuMultiplayerContentState
       return;
     }
     if (_teamPromptConfirmedCharacterId != localCharacterId) {
+      _logTeamFlow('resolve_team_confirm_character_first', {
+        'characterId': localCharacterId,
+        'confirmedCharacterId': _teamPromptConfirmedCharacterId,
+        'dismissedCharacterId': _teamPromptDismissedCharacterId,
+      });
       if (_teamPromptDismissedCharacterId != localCharacterId &&
           _characterConfirmDialogContext == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3192,9 +3666,27 @@ class _MainMenuMultiplayerContentState
       return;
     }
 
-    if (_teamModalShownForCurrentRoom) return;
+    if (_teamModalShownForCurrentRoom &&
+        _teamDialogTeammatePlayerId == teammate.playerId) {
+      _logTeamFlow('create_team_modal_skip', {
+        'reason': 'already_shown_for_teammate',
+        'teammatePlayerId': teammate.playerId,
+      });
+      return;
+    }
+    if (_teamModalShownForCurrentRoom &&
+        _teamDialogTeammatePlayerId != teammate.playerId) {
+      _teamModalShownForCurrentRoom = false;
+      _teamDialogTeammatePlayerId = null;
+    }
     _teamModalShownForCurrentRoom = true;
     _teamDialogTeammatePlayerId = teammate.playerId;
+    _logTeamFlow('create_team_modal_schedule', {
+      'roomId': snapshot.roomId,
+      'teammatePlayerId': teammate.playerId,
+      'teammateUsername': teammate.username,
+      'teammateName': teammate.name,
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
       _showCreateTeamDialog(teammate);
@@ -3252,7 +3744,28 @@ class _MainMenuMultiplayerContentState
     for (final team in _playerTeams) {
       final playerIds = team['playerIds'];
       if (playerIds is List &&
-          playerIds.map((entry) => entry.toString()).contains(teammatePlayerId)) {
+          playerIds
+              .map((entry) => entry.toString())
+              .contains(teammatePlayerId)) {
+        return team;
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _teamForCurrentPair(MultiplayerRoomSnapshot snapshot) {
+    final localSeat = _localSeatFor(snapshot);
+    final teammateSeat = _teammateSeatFor(snapshot);
+    final localUsername = localSeat?.username?.trim() ?? '';
+    final teammateUsername = teammateSeat?.username?.trim() ?? '';
+    if (localUsername.isEmpty || teammateUsername.isEmpty) return null;
+    for (final team in _playerTeams) {
+      final teammateUsernames = team['teammateUsernames'];
+      if (teammateUsernames is! List) continue;
+      final usernames =
+          teammateUsernames.map((entry) => entry.toString()).toSet();
+      if (usernames.contains(teammateUsername) &&
+          usernames.contains(localUsername)) {
         return team;
       }
     }
@@ -3260,6 +3773,7 @@ class _MainMenuMultiplayerContentState
   }
 
   void _sendTeamSelectionIfReady({String? roomId}) {
+    if (!_teamSelectionFlowEnabled) return;
     final socket = _socket;
     final playerId = _playerId;
     final sessionToken = _sessionToken;
@@ -3272,10 +3786,22 @@ class _MainMenuMultiplayerContentState
         sessionToken == null ||
         pairId == null ||
         targetRoomId.isEmpty) {
+      _logTeamFlow('select_team_skipped', {
+        'socketConnected': socket?.isConnected,
+        'hasPlayerId': playerId != null,
+        'hasSessionToken': sessionToken != null,
+        'pairId': pairId,
+        'roomId': targetRoomId,
+      });
       return;
     }
 
     try {
+      _logTeamFlow('select_team_sent', {
+        'roomId': targetRoomId,
+        'playerId': playerId,
+        'pairId': pairId,
+      });
       socket.selectTeam(
         roomId: targetRoomId,
         playerId: playerId,
@@ -3308,7 +3834,8 @@ class _MainMenuMultiplayerContentState
         _characterConfirmDialogContext = context;
         return AlertDialog(
           title: Text(_tr('confirmCharacterTitle')),
-          content: Text(_tr('confirmCharacterBody', params: {'name': characterName})),
+          content: Text(
+              _tr('confirmCharacterBody', params: {'name': characterName})),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -3328,7 +3855,8 @@ class _MainMenuMultiplayerContentState
       setState(() {
         _teamPromptConfirmedCharacterId = characterId;
         _teamPromptDismissedCharacterId = null;
-        _status = _tr('multiplayerCharacterConfirmed', params: {'name': characterName});
+        _status = _tr('multiplayerCharacterConfirmed',
+            params: {'name': characterName});
       });
       final snapshot = _roomSnapshot;
       if (snapshot != null) {
@@ -3362,7 +3890,8 @@ class _MainMenuMultiplayerContentState
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
               labelText: _tr('teamNameLabel'),
-              helperText: _tr('teammateNameHelper', params: {'name': teammate.name}),
+              helperText:
+                  _tr('teammateNameHelper', params: {'name': teammate.name}),
             ),
           ),
           actions: [
@@ -3410,6 +3939,11 @@ class _MainMenuMultiplayerContentState
     }
 
     try {
+      _logTeamFlow('create_team_sent', {
+        'playerId': playerId,
+        'teammateUsername': teammateUsername,
+        'teamName': teamName,
+      });
       socket.createTeam(
         playerId: playerId,
         sessionToken: sessionToken,
@@ -3418,8 +3952,17 @@ class _MainMenuMultiplayerContentState
       );
       setState(() {
         _setTeamNameField(teamName);
-        _status = _tr('multiplayerCreateTeamInProgress', params: {'username': teammateUsername});
+        _status = _tr('multiplayerCreateTeamInProgress',
+            params: {'username': teammateUsername});
       });
+      _requestTeamsIfReady();
+      final snapshot = _roomSnapshot;
+      if (snapshot != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _roomSnapshot?.roomId != snapshot.roomId) return;
+          _resolveTeamForRoomSnapshot(snapshot);
+        });
+      }
     } catch (error) {
       setState(() {
         _status = _tr('multiplayerCreateTeamFailed');
@@ -3459,6 +4002,7 @@ class _MainMenuMultiplayerContentState
     ]);
 
     setState(() {
+      _profileLoginInProgress = false;
       _profileStatus = _tr('multiplayerProfileCreatingUser');
       _status = _tr('multiplayerProfileSyncingUser');
     });
@@ -3509,6 +4053,7 @@ class _MainMenuMultiplayerContentState
     if (socket == null) return;
     _profilePasswordFallback = password;
     setState(() {
+      _profileLoginInProgress = true;
       _profileStatus = _tr('multiplayerProfileLoginInProgress');
     });
     try {
@@ -3518,6 +4063,7 @@ class _MainMenuMultiplayerContentState
       );
     } catch (error) {
       setState(() {
+        _profileLoginInProgress = false;
         _profileStatus = _tr('multiplayerProfileLoginFailed');
       });
     }
@@ -3592,7 +4138,7 @@ class _MainMenuMultiplayerContentState
     if (!_multiplayerSessionReadyForGame()) {
       return;
     }
-    if (_roomSnapshot == null || _keepSocketAliveOnDispose) {
+    if (_keepSocketAliveOnDispose) {
       return;
     }
 
@@ -3602,10 +4148,7 @@ class _MainMenuMultiplayerContentState
         _autoEnterQueued = false;
         return;
       }
-      if (_keepSocketAliveOnDispose ||
-          !_sessionStarted ||
-          _socket == null ||
-          _roomSnapshot == null) {
+      if (_keepSocketAliveOnDispose || !_sessionStarted || _socket == null) {
         _autoEnterQueued = false;
         return;
       }
@@ -3636,9 +4179,77 @@ class _MainMenuMultiplayerContentState
 
   bool _multiplayerSessionReadyForGame() {
     final session = MultiplayerSessionStore.instance;
+    _hydrateMultiplayerSessionFromSnapshot(_roomSnapshot);
     return session.matchStarted &&
         session.localGamePlayerId != null &&
-        session.players.isNotEmpty;
+        session.players.length >= 2;
+  }
+
+  bool _snapshotStartsGame(MultiplayerRoomSnapshot? snapshot) {
+    if (snapshot == null) return false;
+    return snapshot.phase == 'playing' || snapshot.match != null;
+  }
+
+  void _hydrateMultiplayerSessionFromSnapshot(
+    MultiplayerRoomSnapshot? snapshot,
+  ) {
+    if (snapshot == null) return;
+
+    final session = MultiplayerSessionStore.instance;
+    session.roomSnapshot = snapshot;
+    session.matchStarted = _snapshotStartsGame(snapshot);
+
+    final match = snapshot.match;
+    if (match == null) return;
+
+    final matchPlayers = _parsePlayers(match['players']);
+    if (matchPlayers.isNotEmpty &&
+        (session.players.isEmpty ||
+            matchPlayers.length > session.players.length)) {
+      session.players = _playersStartingWithLocal(matchPlayers);
+    }
+
+    final matchCharacterIds = _parseCharacterIdsByPlayer(match['players']);
+    if (matchCharacterIds.isNotEmpty) {
+      session.characterIdsByPlayer = matchCharacterIds;
+    }
+
+    final seed = match['seed'];
+    if (seed is int) {
+      session.seed = seed;
+    }
+
+    final allowPassHand = match['allowPassHand'];
+    if (allowPassHand is bool) {
+      session.allowPassHand = allowPassHand;
+    }
+
+    session.botDifficulty = _parseBotDifficulty(match['players']);
+
+    final localPlayerId = session.localGamePlayerId ?? _playerId;
+    if (localPlayerId != null &&
+        localPlayerId.isNotEmpty &&
+        session.players.any((player) => player.id == localPlayerId)) {
+      session.localGamePlayerId = localPlayerId;
+      session.controlledPlayerIds = [localPlayerId];
+    }
+  }
+
+  List<Player> _playersStartingWithLocal(List<Player> players) {
+    final localPlayerId =
+        MultiplayerSessionStore.instance.localGamePlayerId ?? _playerId;
+    if (localPlayerId == null || localPlayerId.isEmpty) {
+      return List<Player>.unmodifiable(players);
+    }
+    final localIndex =
+        players.indexWhere((player) => player.id == localPlayerId);
+    if (localIndex <= 0) {
+      return List<Player>.unmodifiable(players);
+    }
+    return List<Player>.unmodifiable([
+      ...players.skip(localIndex),
+      ...players.take(localIndex),
+    ]);
   }
 
   Map<String, List<SpanishCard>>? _parseFixedHands(dynamic rawHands) {
@@ -3676,7 +4287,8 @@ class _MainMenuMultiplayerContentState
       if (playerId == null ||
           playerId.isEmpty ||
           characterId == null ||
-          characterId.isEmpty) {
+          characterId.isEmpty ||
+          !CharacterAssets.characterIds.contains(characterId)) {
         continue;
       }
       parsed[playerId] = characterId;
@@ -3743,7 +4355,8 @@ class _MainMenuMultiplayerContentState
         onCreateAccount: () {
           setState(() {
             _showCreateAccount = true;
-            _profileStatus = _tr('multiplayerCreateAccountPrompt');
+            _setPlayerNameField('');
+            _profileStatus = _tr('multiplayerProfileNameRequiredCreate');
           });
         },
       );
@@ -3861,7 +4474,8 @@ class _MainMenuMultiplayerContentState
                               ),
                               if (_selectedTeamName.isNotEmpty)
                                 Text(
-                                  _tr('multiplayerTeamDisplay', params: {'name': _selectedTeamName}),
+                                  _tr('multiplayerTeamDisplay',
+                                      params: {'name': _selectedTeamName}),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: bodyStyle.copyWith(
@@ -3912,7 +4526,11 @@ class _MainMenuMultiplayerContentState
                 Text(
                   _characterSelectionReleased
                       ? context.tr('characterSelectionUnset')
-                      : context.tr('characterSelectionValue', params: {'name': CharacterAssets.displayNames[_selectedCharacterId] ?? _selectedCharacterId}),
+                      : context.tr('characterSelectionValue', params: {
+                          'name': CharacterAssets
+                                  .displayNames[_selectedCharacterId] ??
+                              _selectedCharacterId
+                        }),
                   style: bodyStyle.copyWith(
                     color: ZapitiColors.darkBrown,
                     fontWeight: FontWeight.w900,
@@ -4031,7 +4649,9 @@ class _MainMenuMultiplayerContentState
                 SizedBox(
                   height: 42,
                   child: ZapitiActionButton(
-                    label: _ready ? context.tr('readyUpper') : context.tr('markReadyUpper'),
+                    label: _ready
+                        ? context.tr('readyUpper')
+                        : context.tr('markReadyUpper'),
                     icon: _ready
                         ? Icons.check_circle
                         : Icons.radio_button_unchecked,
@@ -4363,7 +4983,8 @@ class _MultiplayerSessionView extends StatelessWidget {
             const Icon(Icons.groups_outlined, color: ZapitiColors.wineRed),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(context.tr('multiplayerMatchTitle'), style: titleStyle),
+              child:
+                  Text(context.tr('multiplayerMatchTitle'), style: titleStyle),
             ),
           ],
         ),
@@ -4487,7 +5108,8 @@ class _MultiplayerSessionView extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                context.tr('teamLabel', params: {'team': teamId}),
+                                context
+                                    .tr('teamLabel', params: {'team': teamId}),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: bodyStyle.copyWith(
@@ -4767,63 +5389,63 @@ class _RankingPanel extends StatelessWidget {
           height: panelHeight,
           child: ListView(
             children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.leaderboard_outlined,
-                  size: 16,
-                  color: ZapitiColors.wineRed,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Ranking de parejas',
-                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.leaderboard_outlined,
+                    size: 16,
+                    color: ZapitiColors.wineRed,
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ranking de parejas',
+                      style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (visiblePairs.isEmpty)
+                Text(context.tr('noMatchesRegistered'), style: bodyStyle)
+              else ...[
+                _RankingHeader(style: bodyStyle),
+                const SizedBox(height: 4),
+                for (var index = 0; index < visiblePairs.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+                    child: _RankingRow(
+                      position: index + 1,
+                      pair: visiblePairs[index],
+                    ),
+                  ),
               ],
-            ),
-            const SizedBox(height: 6),
-            if (visiblePairs.isEmpty)
-              Text(context.tr('noMatchesRegistered'), style: bodyStyle)
-            else ...[
-              _RankingHeader(style: bodyStyle),
-              const SizedBox(height: 4),
-              for (var index = 0; index < visiblePairs.length; index++)
-                Padding(
-                  padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
-                  child: _RankingRow(
-                    position: index + 1,
-                    pair: visiblePairs[index],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.history_outlined,
+                    size: 16,
+                    color: ZapitiColors.wineRed,
                   ),
-                ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(
-                  Icons.history_outlined,
-                  size: 16,
-                  color: ZapitiColors.wineRed,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Ultimas partidas',
-                    style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ultimas partidas',
+                      style: bodyStyle.copyWith(fontWeight: FontWeight.w900),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (visibleMatches.isEmpty)
-              Text(context.tr('noHistory'), style: bodyStyle)
-            else
-              for (var index = 0; index < visibleMatches.length; index++)
-                Padding(
-                  padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
-                  child: _MatchHistoryRow(match: visibleMatches[index]),
-                ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (visibleMatches.isEmpty)
+                Text(context.tr('noHistory'), style: bodyStyle)
+              else
+                for (var index = 0; index < visibleMatches.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+                    child: _MatchHistoryRow(match: visibleMatches[index]),
+                  ),
             ],
           ),
         ),
@@ -4978,9 +5600,7 @@ class _MultiplayerVersionBlockedView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              checking
-                  ? Icons.sync_outlined
-                  : Icons.system_update_alt_outlined,
+              checking ? Icons.sync_outlined : Icons.system_update_alt_outlined,
               color: ZapitiColors.wineRed,
               size: 30,
             ),
@@ -4994,9 +5614,7 @@ class _MultiplayerVersionBlockedView extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              message.isEmpty
-                  ? context.tr('preparingVersionCheck')
-                  : message,
+              message.isEmpty ? context.tr('preparingVersionCheck') : message,
               textAlign: TextAlign.center,
               style: bodyStyle,
             ),

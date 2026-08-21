@@ -1,4 +1,7 @@
+import 'al_ver_rules.dart';
+import 'bet_state.dart';
 import 'hand_rules.dart';
+import 'legal_actions.dart';
 import 'limited_history.dart';
 import 'played_card.dart';
 import 'player.dart';
@@ -76,6 +79,7 @@ class ZapitiGameController {
   bool handFinished = false;
   bool isRoundAwaitingContinue = false;
   String status = '';
+  late final LegalActionProvider legalActions;
 
   ZapitiGameController({
     this.targetScore = defaultTargetScore,
@@ -92,6 +96,7 @@ class ZapitiGameController {
         ),
         eventLog = eventLog ?? LimitedHistory(limit: 6),
         handSummaries = handSummaries ?? LimitedHistory(limit: 8) {
+    legalActions = ControllerLegalActionProvider(this);
     passedHandState = PassedHandState(originalLeaderId: players.first.id);
     if (autoStart) {
       startNewHand();
@@ -106,6 +111,16 @@ class ZapitiGameController {
   List<SpanishCard> get humanHand => hands[humanPlayer.id] ?? const [];
   bool get isGameFinished => winningTeamId != null;
   bool get isTrucoPending => pendingTrucoValue != null;
+  BetState get betState => BetState(
+        acceptedLevel: BetLevel.fromAcceptedValue(handValue),
+        proposedLevel: pendingTrucoValue == null
+            ? null
+            : BetLevel.fromProposedValue(pendingTrucoValue!),
+        proposingTeam: trucoCallerTeamId,
+        respondingTeam: respondingTrucoTeamId,
+        lastRaisingTeam: lastTrucoRaiserTeamId,
+        responsePending: trucoState == TrucoNegotiationState.awaitingResponse,
+      );
   int? get alVerTeamId => alVerTeamIds.length == 1 ? alVerTeamIds.first : null;
   bool get isTrucoAccepted =>
       trucoState == TrucoNegotiationState.acceptedClosed;
@@ -116,9 +131,42 @@ class ZapitiGameController {
             ? TrucoNegotiationState.notStarted
             : TrucoNegotiationState.awaitingResponse;
   }
+
   int? get respondingTrucoTeamId => trucoCallerTeamId == null
       ? null
       : TeamRules.opponentOf(trucoCallerTeamId!);
+  int? nextTrucoValueForPlayer(Player player) {
+    if (handFinished || isGameFinished) return null;
+    if (alVerState == AlVerState.awaitingDecision) return null;
+    if (alVerState != AlVerState.none && alVerTeamIds.contains(player.teamId)) {
+      return null;
+    }
+    if (trucoState == TrucoNegotiationState.awaitingResponse) {
+      if (respondingTrucoTeamId != player.teamId || pendingTrucoValue == null) {
+        return null;
+      }
+      return TrucoRules.nextRaiseValue(
+        currentAcceptedValue: pendingTrucoValue!,
+        maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
+      );
+    }
+    if (trucoState == TrucoNegotiationState.notStarted) {
+      if (currentPlayer.id != player.id) return null;
+      return TrucoRules.firstTrucoValue <=
+              maxAllowedTrucoValueForTeam(player.teamId)
+          ? TrucoRules.firstTrucoValue
+          : null;
+    }
+    if (trucoState == TrucoNegotiationState.acceptedClosed &&
+        lastTrucoRaiserTeamId != player.teamId) {
+      return TrucoRules.nextRaiseValue(
+        currentAcceptedValue: handValue,
+        maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
+      );
+    }
+    return null;
+  }
+
   int get displayedRoundNumber {
     final offset = isRoundAwaitingContinue || handFinished ? 0 : 1;
     final number = roundHistory.length + offset;
@@ -217,6 +265,9 @@ class ZapitiGameController {
           ? 'Equipo ${alVerTeamIds.first} está al ver.'
           : 'Ambos equipos están al ver.';
       status = '$status $summary Decide antes de jugar.';
+    } else if (alVerTeamIds.length == 2) {
+      status = '$status Ambos equipos estÃ¡n al ver. La mano vale '
+          '${AlVerRules.playPoints} chinos.';
     }
     _log(status);
   }
@@ -229,6 +280,9 @@ class ZapitiGameController {
     }
     if (alVerState == AlVerState.awaitingDecision) {
       throw StateError('La mano está al ver y debe decidirse antes de jugar.');
+    }
+    if (!canPlayCard(player, card)) {
+      throw StateError('La carta no es legal en el estado actual.');
     }
     if (handFinished || isRoundAwaitingContinue) {
       throw StateError('No se puede jugar en el estado actual.');
@@ -243,6 +297,18 @@ class ZapitiGameController {
     turnIndex = (turnIndex + 1) % players.length;
     status = 'Turno de ${currentPlayer.name}.';
     return false;
+  }
+
+  bool canPlayCard(Player player, SpanishCard card) {
+    return legalActions.legalCardsFor(player).contains(card);
+  }
+
+  List<SpanishCard> legalCardsForPlayer(Player player) {
+    return legalActions.legalCardsFor(player);
+  }
+
+  List<BetAction> legalBetActionsForPlayer(Player player) {
+    return legalActions.legalBetActionsFor(player);
   }
 
   /// Resuelve las cuatro cartas jugadas y congela la ronda hasta continuar.
@@ -381,7 +447,12 @@ class ZapitiGameController {
         pendingTrucoValue == null) {
       throw StateError('No hay truco pendiente que pasar.');
     }
-    final points = TrucoRules.passPoints(currentAcceptedValue: handValue);
+    final nominalPoints = TrucoRules.passPoints(currentAcceptedValue: handValue);
+    final points = TrucoRules.awardedPointsForTeam(
+      teamScore: score[callerTeamId]!,
+      targetScore: targetScore,
+      nominalValue: nominalPoints,
+    );
     trucoState = TrucoNegotiationState.rejectedHandFinished;
     _finishHandForTeam(
       callerTeamId,
@@ -410,9 +481,19 @@ class ZapitiGameController {
       return raiseOptionsForTeam(player.teamId).contains(value);
     }
 
-    if (trucoState != TrucoNegotiationState.notStarted) return false;
-
-    return TrucoRules.isOpeningValue(value);
+    if (trucoState == TrucoNegotiationState.notStarted) {
+      if (currentPlayer.id != player.id) return false;
+      return TrucoRules.isOpeningValue(value);
+    }
+    if (trucoState == TrucoNegotiationState.acceptedClosed) {
+      if (lastTrucoRaiserTeamId == player.teamId) return false;
+      return TrucoRules.isRaiseValue(
+        currentAcceptedValue: handValue,
+        value: value,
+        maxAllowedValue: maxAllowedTrucoValueForTeam(player.teamId),
+      );
+    }
+    return false;
   }
 
   bool canAcceptTruco({required int teamId, String? actorPlayerId}) {
@@ -449,7 +530,11 @@ class ZapitiGameController {
 
     if (play) {
       alVerState = AlVerState.playing;
+      status = 'Equipo $teamId decide jugar al ver. La mano vale '
+          '${AlVerRules.playPoints} chinos.';
       status = 'Equipo $teamId decide jugar al ver. La mano continúa.';
+      status = 'Equipo $teamId decide jugar al ver. La mano vale '
+          '${AlVerRules.playPoints} chinos.';
       _log(status);
       return;
     }
@@ -458,8 +543,9 @@ class ZapitiGameController {
     alVerState = AlVerState.conceded;
     _finishHandForTeam(
       rivalTeamId,
-      'Equipo $teamId se va a casa. Equipo $rivalTeamId suma 2 chinos.',
-      points: 2,
+      'Equipo $teamId se va a casa. Equipo $rivalTeamId suma '
+      '${AlVerRules.concedePoints} chinos.',
+      points: AlVerRules.concedePoints,
     );
   }
 
@@ -471,16 +557,8 @@ class ZapitiGameController {
     List<Player> players,
     String humanPlayerId,
   ) {
-    final humanTeamId = players
-        .firstWhere(
-          (player) => player.id == humanPlayerId,
-          orElse: () => players.first,
-        )
-        .teamId;
     return {
-      for (final player in players)
-        if (player.id == humanPlayerId || player.teamId != humanTeamId)
-          player.id,
+      for (final player in players) player.id,
     };
   }
 
@@ -493,7 +571,7 @@ class ZapitiGameController {
     if (progress.isFinished && progress.winningTeamId != null) {
       _finishHandForTeam(
         progress.winningTeamId!,
-        '${winner.player.name} gana con ${winner.card}. Equipo ${progress.winningTeamId} gana el reparto y suma $handValue chinos.',
+        '${winner.player.name} gana con ${winner.card}. Equipo ${progress.winningTeamId} gana el reparto y suma ${_awardedHandPoints()} chinos.',
       );
       return;
     }
@@ -521,7 +599,7 @@ class ZapitiGameController {
     if (progress.isFinished && progress.winningTeamId != null) {
       _finishHandForTeam(
         progress.winningTeamId!,
-        'Gana el reparto el Equipo ${progress.winningTeamId} por la primera ronda. Suma $handValue chinos.',
+        'Gana el reparto el Equipo ${progress.winningTeamId} por la primera ronda. Suma ${_awardedHandPoints()} chinos.',
       );
       return;
     }
@@ -534,7 +612,7 @@ class ZapitiGameController {
 
   void _finishHandForTeam(int teamId, String message, {int? points}) {
     if (handFinished) return;
-    final awardedPoints = points ?? handValue;
+    final awardedPoints = points ?? _awardedHandPoints();
     score[teamId] = (score[teamId]! + awardedPoints).clamp(0, targetScore);
     handFinished = true;
     isRoundAwaitingContinue = false;
@@ -573,16 +651,66 @@ class ZapitiGameController {
     alVerTeamIds.clear();
     final teamOneScore = score[TeamRules.teamOne]!;
     final teamTwoScore = score[TeamRules.teamTwo]!;
-    if (teamOneScore == 29) {
+    if (teamOneScore == AlVerRules.triggerScore) {
       alVerTeamIds.add(TeamRules.teamOne);
     }
-    if (teamTwoScore == 29) {
+    if (teamTwoScore == AlVerRules.triggerScore) {
       alVerTeamIds.add(TeamRules.teamTwo);
     }
+    alVerState = _normalizedAlVerState(
+      requestedState: null,
+      teamIds: alVerTeamIds,
+    );
+  }
 
-    alVerState = alVerTeamIds.isEmpty
-        ? AlVerState.none
-        : AlVerState.awaitingDecision;
+  void syncAlVerSnapshot({
+    required Iterable<int> teamIds,
+    AlVerState? requestedState,
+  }) {
+    alVerTeamIds
+      ..clear()
+      ..addAll(teamIds);
+    alVerState = _normalizedAlVerState(
+      requestedState: requestedState,
+      teamIds: alVerTeamIds,
+    );
+  }
+
+  AlVerState _normalizedAlVerState({
+    required AlVerState? requestedState,
+    required Set<int> teamIds,
+  }) {
+    if (requestedState == AlVerState.conceded) {
+      return AlVerState.conceded;
+    }
+    if (teamIds.isEmpty) {
+      return AlVerState.none;
+    }
+    if (requestedState == AlVerState.awaitingDecision &&
+        !AlVerRules.requiresDecision(teamIds)) {
+      return AlVerState.playing;
+    }
+    if (requestedState == AlVerState.playing) {
+      return AlVerState.playing;
+    }
+    return AlVerRules.requiresDecision(teamIds)
+        ? AlVerState.awaitingDecision
+        : AlVerState.playing;
+  }
+
+  int _awardedHandPoints() {
+    if (alVerState == AlVerState.playing && alVerTeamIds.isNotEmpty) {
+      return AlVerRules.playPoints;
+    }
+    final progress = HandRules.resolve(roundHistory);
+    if (progress.winningTeamId == null) {
+      return handValue;
+    }
+    return TrucoRules.awardedPointsForTeam(
+      teamScore: score[progress.winningTeamId]!,
+      targetScore: targetScore,
+      nominalValue: handValue,
+    );
   }
 
   Map<String, List<SpanishCard>> _dealRandomHands() {

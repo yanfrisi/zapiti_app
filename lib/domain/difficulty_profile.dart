@@ -10,6 +10,8 @@ class DifficultyProfile {
   final int callThresholdModifier;
   final bool readsOpponentSignals;
   final bool allowsPerfectCardPlay;
+  final bool rivalsGiveSignals;
+  final int rivalSignalRevealMilliseconds;
 
   const DifficultyProfile({
     required this.level,
@@ -23,6 +25,8 @@ class DifficultyProfile {
     required this.callThresholdModifier,
     required this.readsOpponentSignals,
     required this.allowsPerfectCardPlay,
+    required this.rivalsGiveSignals,
+    required this.rivalSignalRevealMilliseconds,
   });
 }
 
@@ -42,6 +46,8 @@ class DifficultyProfiles {
       callThresholdModifier: -8,
       readsOpponentSignals: false,
       allowsPerfectCardPlay: false,
+      rivalsGiveSignals: true,
+      rivalSignalRevealMilliseconds: 360,
     ),
     2: DifficultyProfile(
       level: 2,
@@ -55,6 +61,8 @@ class DifficultyProfiles {
       callThresholdModifier: -4,
       readsOpponentSignals: false,
       allowsPerfectCardPlay: false,
+      rivalsGiveSignals: true,
+      rivalSignalRevealMilliseconds: 300,
     ),
     3: DifficultyProfile(
       level: 3,
@@ -68,6 +76,8 @@ class DifficultyProfiles {
       callThresholdModifier: -2,
       readsOpponentSignals: true,
       allowsPerfectCardPlay: false,
+      rivalsGiveSignals: true,
+      rivalSignalRevealMilliseconds: 240,
     ),
     4: DifficultyProfile(
       level: 4,
@@ -81,6 +91,8 @@ class DifficultyProfiles {
       callThresholdModifier: 8,
       readsOpponentSignals: true,
       allowsPerfectCardPlay: false,
+      rivalsGiveSignals: true,
+      rivalSignalRevealMilliseconds: 170,
     ),
     5: DifficultyProfile(
       level: 5,
@@ -94,6 +106,8 @@ class DifficultyProfiles {
       callThresholdModifier: 10,
       readsOpponentSignals: true,
       allowsPerfectCardPlay: true,
+      rivalsGiveSignals: false,
+      rivalSignalRevealMilliseconds: 0,
     ),
   };
 
