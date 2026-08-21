@@ -16,8 +16,8 @@ import 'package:zapiti_app/services/app_version_check_service.dart';
 
 void main() {
   const musicChannel = MethodChannel('zapiti/music');
-  const companionOrderWindow = Duration(seconds: 2);
-  const beforeCompanionOrderWindow = Duration(milliseconds: 1999);
+  const companionOrderWindow = Duration(seconds: 4);
+  const beforeCompanionOrderWindow = Duration(milliseconds: 3999);
   const oneMillisecond = Duration(milliseconds: 1);
   const postOrderVisualDelay = Duration(milliseconds: 220);
   const rivalBotUnaffectedProbe = Duration(milliseconds: 1300);
@@ -1668,7 +1668,7 @@ void main() {
     expect(gameState.offlineRuntimeSnapshotForTesting()['pendingOrders'], 0);
   });
 
-  testWidgets('sin ven a mi el bot mantiene su politica normal',
+  testWidgets('sin ven a mi el bot sale bajo para dar vision',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
     tester.view.devicePixelRatio = 1;
@@ -1682,7 +1682,7 @@ void main() {
     await tester.pump();
 
     final chosenCard = gameState.chooseCurrentBotCardForTesting();
-    expect(chosenCard, const SpanishCard(value: 4, suit: Suit.bastos));
+    expect(chosenCard, const SpanishCard(value: 5, suit: Suit.espadas));
   });
 
   testWidgets('ven a mi manda tirar bajo en easy normal y hard',
@@ -1752,7 +1752,7 @@ void main() {
     await advance;
   });
 
-  testWidgets('sin orden el bot juega automaticamente al cerrar la ventana',
+  testWidgets('al salir de mano el bot espera una orden del humano',
       (tester) async {
     await startGame(tester);
 
@@ -1768,7 +1768,8 @@ void main() {
       0,
     );
 
-    await tester.pump(oneMillisecond);
+    gameState.sendComeToMeForTesting();
+    await tester.pump(postOrderVisualDelay);
 
     expect(gameState.gameController.playedCards, isNotEmpty);
     expect(
@@ -1779,7 +1780,7 @@ void main() {
     await advance;
   });
 
-  testWidgets('no fija carta antes de finalizar la ventana de orden',
+  testWidgets('la carta del compañero queda pendiente hasta recibir orden',
       (tester) async {
     await startGame(tester);
 
@@ -1794,7 +1795,8 @@ void main() {
       gameState.offlineRuntimeSnapshotForTesting()['botCardSelections'],
       0,
     );
-    await tester.pump(oneMillisecond);
+    gameState.sendComeToMeForTesting();
+    await tester.pump(postOrderVisualDelay);
     await tester.pump(finishAutoBotFlow);
     await advance;
   });
@@ -1854,6 +1856,7 @@ void main() {
       gameState.prepareCompanionBotOrderWindowScenarioForTesting(
         completedTricks: completedTricks,
       );
+      gameState.setBotBetRollForTesting(1.0);
       final advance = gameState.advanceBotsForTesting();
       await tester.pump(const Duration(milliseconds: 100));
       expect(

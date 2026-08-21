@@ -941,6 +941,7 @@ class _TrucoResponseOverlayState extends State<_TrucoResponseOverlay> {
 class _VisibleGameControls extends StatelessWidget {
   final bool compact;
   final bool signalsEnabled;
+  final bool companionCommandsEnabled;
   final bool isGameFinished;
   final bool isHandFinished;
   final bool isRoundAwaitingContinue;
@@ -973,6 +974,7 @@ class _VisibleGameControls extends StatelessWidget {
   const _VisibleGameControls({
     required this.compact,
     required this.signalsEnabled,
+    required this.companionCommandsEnabled,
     required this.isGameFinished,
     required this.isHandFinished,
     required this.isRoundAwaitingContinue,
@@ -1030,22 +1032,22 @@ class _VisibleGameControls extends StatelessWidget {
         final companionCommand = ZapitiActionButton(
           label: context.tr('voyATiUpper'),
           icon: Icons.record_voice_over_outlined,
-          onPressed: signalsEnabled ? onVoyATi : null,
+          onPressed: companionCommandsEnabled ? onVoyATi : null,
         );
         final comeToMeCommand = ZapitiActionButton(
           label: context.tr('comeToMeUpper'),
           icon: Icons.keyboard_double_arrow_down_outlined,
-          onPressed: signalsEnabled ? onComeToMe : null,
+          onPressed: companionCommandsEnabled ? onComeToMe : null,
         );
         final trucaTuCommand = ZapitiActionButton(
           label: context.tr('trucaTuUpper'),
           icon: Icons.campaign_outlined,
-          onPressed: signalsEnabled ? onTrucaTu : null,
+          onPressed: companionCommandsEnabled ? onTrucaTu : null,
         );
         final killCommand = ZapitiActionButton(
           label: context.tr('killUpper'),
           icon: Icons.local_fire_department_outlined,
-          onPressed: signalsEnabled ? onKill : null,
+          onPressed: companionCommandsEnabled ? onKill : null,
         );
         final options = ZapitiActionButton(
           label: context.tr('options'),
@@ -1706,6 +1708,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
   final String? companionMessage;
   final String characterId;
   final bool signalsEnabled;
+  final bool companionCommandsEnabled;
   final bool isGameFinished;
   final bool isHandFinished;
   final bool isRoundAwaitingContinue;
@@ -1741,6 +1744,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
     required this.companionMessage,
     required this.characterId,
     required this.signalsEnabled,
+    required this.companionCommandsEnabled,
     required this.isGameFinished,
     required this.isHandFinished,
     required this.isRoundAwaitingContinue,
@@ -1789,6 +1793,7 @@ class _LandscapeBottomBoard extends StatelessWidget {
                 scale: scale,
                 gap: gap,
                 signalsEnabled: signalsEnabled,
+                companionCommandsEnabled: companionCommandsEnabled,
                 isGameFinished: isGameFinished,
                 isHandFinished: isHandFinished,
                 isRoundAwaitingContinue: isRoundAwaitingContinue,
@@ -1863,6 +1868,7 @@ class _LandscapeActionPanel extends StatelessWidget {
   final double scale;
   final double gap;
   final bool signalsEnabled;
+  final bool companionCommandsEnabled;
   final bool isGameFinished;
   final bool isHandFinished;
   final bool isRoundAwaitingContinue;
@@ -1887,6 +1893,7 @@ class _LandscapeActionPanel extends StatelessWidget {
     required this.scale,
     required this.gap,
     required this.signalsEnabled,
+    required this.companionCommandsEnabled,
     required this.isGameFinished,
     required this.isHandFinished,
     required this.isRoundAwaitingContinue,
@@ -1920,17 +1927,17 @@ class _LandscapeActionPanel extends StatelessWidget {
     final comeToMeCommand = ZapitiActionButton(
       label: context.tr('comeToMeUpper'),
       icon: Icons.keyboard_double_arrow_down_outlined,
-      onPressed: signalsEnabled ? onComeToMe : null,
+      onPressed: companionCommandsEnabled ? onComeToMe : null,
     );
     final trucaTuCommand = ZapitiActionButton(
       label: context.tr('trucaTuUpper'),
       icon: Icons.campaign_outlined,
-      onPressed: signalsEnabled ? onTrucaTu : null,
+      onPressed: companionCommandsEnabled ? onTrucaTu : null,
     );
     final killCommand = ZapitiActionButton(
       label: context.tr('killUpper'),
       icon: Icons.local_fire_department_outlined,
-      onPressed: signalsEnabled ? onKill : null,
+      onPressed: companionCommandsEnabled ? onKill : null,
     );
 
     return Container(
@@ -1944,6 +1951,7 @@ class _LandscapeActionPanel extends StatelessWidget {
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(height: primaryHeight, child: _primaryAction(context)),
@@ -1976,7 +1984,8 @@ class _LandscapeActionPanel extends StatelessWidget {
                     child: ZapitiActionButton(
                       label: context.tr('voyATiUpper'),
                       icon: Icons.record_voice_over_outlined,
-                      onPressed: signalsEnabled ? onVoyATi : null,
+                      onPressed:
+                          companionCommandsEnabled ? onVoyATi : null,
                     ),
                   ),
                 ],
@@ -2034,7 +2043,6 @@ class _LandscapeActionPanel extends StatelessWidget {
               ],
             ),
           ),
-          const Spacer(),
         ],
       ),
     );

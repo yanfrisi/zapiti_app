@@ -46,4 +46,18 @@ class SignalRules {
   static bool isStrongSignal(String? signal) {
     return signal != null && signal != 'Mala';
   }
+
+  /// Resolves signals that identify one exact card. Group signals such as
+  /// "Treses" intentionally return null because they do not identify a
+  /// unique card.
+  static SpanishCard? exactCardForSignal(String? signal) {
+    final normalized = signal?.replaceAll(' de ', ' ');
+    return switch (normalized) {
+      '4 Bastos' => const SpanishCard(value: 4, suit: Suit.bastos),
+      '7 Copas' => const SpanishCard(value: 7, suit: Suit.copas),
+      '7 Oros' => const SpanishCard(value: 7, suit: Suit.oros),
+      'As Espadas' => const SpanishCard(value: 1, suit: Suit.espadas),
+      _ => null,
+    };
+  }
 }

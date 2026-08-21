@@ -398,6 +398,18 @@ extension _GameScreenTrucoLogic on _GameScreenState {
   }
 
   int? _botBetValue(Player bot) {
+    // Direct card orders must be resolved before any automatic truco call.
+    final hasVoyATiOrder = _activeStrategicSignals.any(
+      (signal) =>
+          signal.type == StrategicSignalType.voyATi &&
+          signal.teamId == bot.teamId &&
+          signal.handVersion == _handVersion &&
+          signal.trickIndex == _roundHistory.length,
+    );
+    if (_forceHighestRequestedPlayerIds.contains(bot.id) ||
+        hasVoyATiOrder) {
+      return null;
+    }
     final forcedByOrder = _forceBetEvaluationRequestedPlayerIds.remove(bot.id);
     final instructedToEvaluateBet =
         forcedByOrder && bot.teamId == _humanPlayer.teamId;

@@ -495,6 +495,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
     final shouldPlayHighest = _forceHighestRequestedPlayerIds.contains(bot.id);
     final shouldPlayLowest = _forceLowestRequestedPlayerIds.contains(bot.id);
+    final signaledCard = SignalRules.exactCardForSignal(teamSignal);
+    final requestedSignaledCard = _forceSignaledCardByPlayerId[bot.id];
+    final hasVoyATiOrder = _activeStrategicSignals.any(
+      (signal) =>
+          signal.type == StrategicSignalType.voyATi &&
+          signal.teamId == bot.teamId &&
+          signal.handVersion == _handVersion &&
+          signal.trickIndex == _roundHistory.length,
+    );
     if (shouldPlayLowest) {
       _forceWinRequestedPlayerIds.remove(bot.id);
       _forceHighestRequestedPlayerIds.remove(bot.id);
@@ -508,10 +517,30 @@ extension _GameScreenPlayLogic on _GameScreenState {
         legalCards: _game.legalCardsForPlayer(bot),
       );
     }
-    if ((shouldObeyVoyATi || shouldPlayHighest) &&
-        _shouldIgnoreAggressiveCompanionCommand(bot)) {
+    if (requestedSignaledCard != null && hand.contains(requestedSignaledCard)) {
+      _forceSignaledCardByPlayerId.remove(bot.id);
       _forceWinRequestedPlayerIds.remove(bot.id);
       _forceHighestRequestedPlayerIds.remove(bot.id);
+      _forceLowestRequestedPlayerIds.remove(bot.id);
+      return requestedSignaledCard;
+    }
+    if (shouldPlayHighest) {
+      _forceWinRequestedPlayerIds.remove(bot.id);
+      _forceHighestRequestedPlayerIds.remove(bot.id);
+      _forceLowestRequestedPlayerIds.remove(bot.id);
+      final legalCards = _game.legalCardsForPlayer(bot);
+      return ([...legalCards]..sort(BotStrategy.compareByStrength)).last;
+    }
+    if (hasVoyATiOrder &&
+        signaledCard != null &&
+        hand.contains(signaledCard)) {
+      _forceWinRequestedPlayerIds.remove(bot.id);
+      _forceHighestRequestedPlayerIds.remove(bot.id);
+      _forceLowestRequestedPlayerIds.remove(bot.id);
+      return signaledCard;
+    }
+    if (shouldObeyVoyATi && _shouldIgnoreAggressiveCompanionCommand(bot)) {
+      _forceWinRequestedPlayerIds.remove(bot.id);
       return BotVenAMiStrategy.chooseCard(
         bot: bot,
         hand: hand,
@@ -609,32 +638,23 @@ extension _GameScreenPlayLogic on _GameScreenState {
       return false;
     }
     if (_playedCards.any((card) => card.player.id == bot.id)) return false;
+    if (_game.players[_game.leadIndex].id != bot.id) return false;
     return _game.legalCardsForPlayer(bot).isNotEmpty;
   }
 
   void _beginCompanionBotOrderWindow(Player bot) {
+    final orderReceived = Completer<void>();
     _updateState(() {
-      final completer = Completer<void>();
       _companionBotOrderWindowPlayerId = bot.id;
-      _companionBotOrderWindowCompleter = completer;
-      _companionBotOrderWindowFuture = Future.any<bool>(
-        [
-          Future<void>.delayed(
-            _GameScreenState._companionBotOrderWindowDuration,
-          ).then((_) => false),
-          completer.future.then((_) => true),
-        ],
-      );
+      _companionBotOrderWindowCompleter = orderReceived;
+      _companionBotOrderWindowFuture = orderReceived.future.then((_) => true);
     });
   }
 
   Future<bool> _finishCompanionBotOrderWindow(Player bot, int version) async {
     final completer = _companionBotOrderWindowCompleter;
     final windowFuture = _companionBotOrderWindowFuture;
-    final wasOrderReceived = await (windowFuture ??
-        Future<void>.delayed(
-          _GameScreenState._companionBotOrderWindowDuration,
-        ).then((_) => false));
+    final wasOrderReceived = await (windowFuture ?? Future.value(false));
 
     if (!mounted || version != _handVersion) return false;
     _updateState(() {
@@ -647,6 +667,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     });
     return wasOrderReceived;
   }
+
 
   void _notifyCompanionBotOrderRegistered(String playerId) {
     if (_companionBotOrderWindowPlayerId != playerId) return;
@@ -758,15 +779,13 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final repartoIsExpensive =
         _handValue >= 4 || (_pendingTrucoValue ?? 0) >= 5;
     final teamIsBehind = _roundWins[botTeam]! < _roundWins[otherTeam]!;
-    final canCloseHand = _roundWins[botTeam]! > 0;
+    final canCloseHand =
+        _playedCards.isNotEmpty && _roundWins[botTeam]! > 0;
     final mustSaveHand = _roundWins[otherTeam]! > 0;
-    final companionMustProtectHuman =
-        botTeam == _humanPlayer.teamId && _playedCards.isNotEmpty;
     return repartoIsExpensive ||
         teamIsBehind ||
         canCloseHand ||
         mustSaveHand ||
-        companionMustProtectHuman ||
         memory.opponentsWonAnyRound;
   }
 

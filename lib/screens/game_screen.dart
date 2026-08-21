@@ -10,6 +10,7 @@ import '../domain/bot_agent_difficulty.dart';
 import '../domain/bot_bet_strategy.dart';
 import '../domain/bot_bluff_strategy.dart';
 import '../domain/bot_table_read.dart';
+import '../domain/bot_strategy.dart';
 import '../domain/bot_truco_raise_strategy.dart';
 import '../domain/bot_truco_response_strategy.dart';
 import '../domain/bot_truco_strategy.dart';
@@ -166,6 +167,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final Set<String> _forceWinRequestedPlayerIds = {};
   final Set<String> _forceHighestRequestedPlayerIds = {};
   final Set<String> _forceLowestRequestedPlayerIds = {};
+  final Map<String, SpanishCard> _forceSignaledCardByPlayerId = {};
   final Set<String> _forceBetEvaluationRequestedPlayerIds = {};
   final Set<int> _aiTeamsConsideredTrucoThisHand = {};
   String? _companionPrivateSignalStatus;
@@ -222,9 +224,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   int _companionVoyATiPromptedHandVersion = -1;
   static const _debugUsePresetHands = false;
   static const _debugPresetIndex = 0;
-  // Give the human enough time to issue a companion order, especially when
-  // playing last in the turn order. The timeout still lets the bot continue.
-  static const _companionBotOrderWindowDuration = Duration(seconds: 2);
+  // When the companion leads, play waits for an explicit order.
   static const _companionBotPostOrderVisualDelay = Duration(milliseconds: 220);
   static const _companionSignalFeedbackDuration = Duration(seconds: 3);
   static const _teammateBotSignalRevealDuration = Duration(milliseconds: 300);
@@ -1261,8 +1261,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     });
   }
 
+  bool get _canIssueCompanionCommand =>
+      !_playedCards.any((card) => card.player.id == _companionPlayer.id);
+
   void _humanVoyATi() {
     if (_handFinished || _isGameFinished) return;
+    if (!_canIssueCompanionCommand) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     final label = context.tr('voyATi');
     _updateState(() {
@@ -1276,6 +1280,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
         _forceWinRequestedPlayerIds.add(_companionPlayer.id);
+        final signaledCard = SignalRules.exactCardForSignal(
+          _teamSignalsByTeam[_companionPlayer.teamId],
+        );
+        if (signaledCard != null) {
+          _forceSignaledCardByPlayerId[_companionPlayer.id] = signaledCard;
+        }
         _notifyCompanionBotOrderRegistered(_companionPlayer.id);
       }
     });
@@ -1284,6 +1294,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _humanVenAMi() {
     if (_handFinished || _isGameFinished) return;
+    if (!_canIssueCompanionCommand) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     final label = context.tr('comeToMe');
     _updateState(() {
@@ -1309,6 +1320,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _humanMata() {
     if (_handFinished || _isGameFinished) return;
+    if (!_canIssueCompanionCommand) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     final label = context.tr('kill');
     _updateState(() {
@@ -1321,7 +1333,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       );
       if (!_controlledHumanPlayerIds.contains(_companionPlayer.id) &&
           !_playedCards.any((card) => card.player.id == _companionPlayer.id)) {
-        _forceWinRequestedPlayerIds.add(_companionPlayer.id);
+        _forceHighestRequestedPlayerIds.add(_companionPlayer.id);
         _notifyCompanionBotOrderRegistered(_companionPlayer.id);
       }
       _status = context.tr(
@@ -1334,6 +1346,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _humanTrucaTu() {
     if (_handFinished || _isGameFinished) return;
+    if (!_canIssueCompanionCommand) return;
     if (_isMultiplayerMatch && !_ensureMultiplayerActionConnection()) return;
     final label = context.tr('trucaTu');
     _updateState(() {
@@ -1503,6 +1516,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               signalsEnabled: canUseGameControls &&
                                   !_handFinished &&
                                   !_isGameFinished,
+                              companionCommandsEnabled: canUseGameControls &&
+                                  !_handFinished &&
+                                  !_isGameFinished &&
+                                  !_playedCards.any((card) =>
+                                      card.player.id == _companionPlayer.id),
                               isGameFinished: _isGameFinished,
                               isHandFinished:
                                   canUseGameControls && _handFinished,
@@ -1742,6 +1760,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                       signalsEnabled: canUseGameControls &&
                                           !_handFinished &&
                                           !_isGameFinished,
+                                      companionCommandsEnabled:
+                                          canUseGameControls &&
+                                              !_handFinished &&
+                                              !_isGameFinished &&
+                                              !_playedCards.any((card) =>
+                                                  card.player.id ==
+                                                      _companionPlayer.id),
                                       isGameFinished: _isGameFinished,
                                       isHandFinished:
                                           canUseGameControls && _handFinished,
