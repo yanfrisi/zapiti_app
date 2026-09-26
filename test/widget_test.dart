@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zapiti_app/domain/spanish_card.dart';
 import 'package:zapiti_app/domain/suit.dart';
 import 'package:zapiti_app/domain/zapiti_game_controller.dart';
+import 'package:zapiti_app/domain/zapiti_players.dart';
 import 'package:zapiti_app/domain/team_rules.dart';
 import 'package:zapiti_app/l10n/zapiti_localizations.dart';
 import 'package:zapiti_app/main.dart';
@@ -550,7 +551,7 @@ void main() {
     expect(find.text('Probar suerte'), findsOneWidget);
   });
 
-  testWidgets('tutorial al ver explica 2 3 y bloqueo de truco', (tester) async {
+  testWidgets('tutorial al ver explica 2 chinos y bloqueo de truco', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1200));
     addTearDown(() async {
       await tester.binding.setSurfaceSize(null);
@@ -558,8 +559,8 @@ void main() {
 
     await openTutorialAlVerStep(tester);
 
-    expect(find.textContaining('2 chinos'), findsOneWidget);
-    expect(find.textContaining('juega por 3'), findsOneWidget);
+    expect(find.textContaining('2 chinos'), findsWidgets);
+    expect(find.textContaining('juega por 2'), findsOneWidget);
     expect(find.textContaining('No se puede cantar Truco'), findsOneWidget);
   });
 
@@ -998,6 +999,21 @@ void main() {
     await tester.pump(incomingBetCardPreviewFadeDuration);
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('la UI muestra Ahorrisi como 30 tras Quince', (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.prepareIncomingTrucoResponseForTesting(
+      value: 30,
+      currentAcceptedValue: 15,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Te cantan 30'), findsOneWidget);
+    expect(find.text('No hay subida legal disponible'), findsOneWidget);
+    expect(find.text('SUBIR A 18'), findsNothing);
   });
 
   testWidgets('opciones permite cambiar idioma', (tester) async {
@@ -2049,7 +2065,7 @@ void main() {
     expect(find.text('Estás al ver'), findsOneWidget);
     expect(
       find.text(
-        'Tu equipo tiene 29 chinos. Puedes jugar la mano por 3 chinos o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
+        'Tu equipo tiene 29 chinos. Puedes jugar la mano por 2 chinos o irte a casa. Si te vas a casa, el equipo rival suma 2 chinos.',
       ),
       findsOneWidget,
     );
@@ -2083,6 +2099,25 @@ void main() {
     expect(gameState.gameController.alVerState, AlVerState.conceded);
     expect(gameState.gameController.score[TeamRules.teamTwo], 2);
     expect(gameState.gameController.handFinished, isTrue);
+  });
+
+  testWidgets('29-28 no muestra decision de irse a casa', (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.gameController.score[TeamRules.teamOne] = 29;
+    gameState.gameController.score[TeamRules.teamTwo] = 28;
+    gameState.gameController.startNewHand();
+
+    gameState.showAlVerDecisionDialogForTesting();
+    await tester.pumpAndSettle();
+
+    expect(gameState.gameController.alVerState, AlVerState.playing);
+    expect(find.text('Estás al ver'), findsNothing);
+    expect(find.text('IRSE A CASA'), findsNothing);
+    expect(gameState.gameController.legalBetActionsForPlayer(
+      ZapitiPlayers.human,
+    ), isEmpty);
   });
 
   testWidgets('la IA resuelve al ver sin mostrar dialogo', (tester) async {

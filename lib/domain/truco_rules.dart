@@ -3,7 +3,8 @@ class TrucoRules {
 
   static const int firstTrucoValue = 3;
   static const int raiseStep = 3;
-  static const int maxTrucoValue = 18;
+  static const int maxTrucoValue = 30;
+  static const List<int> ladder = [3, 6, 9, 12, 15, 30];
 
   /// Devuelve el valor máximo que puede proponer un equipo concreto.
   ///
@@ -58,7 +59,11 @@ class TrucoRules {
     required int pendingValue,
     required int maxAllowedValue,
   }) {
-    final nextValue = pendingValue + raiseStep;
+    final currentIndex = ladder.indexOf(pendingValue);
+    if (currentIndex < 0 || currentIndex == ladder.length - 1) {
+      return const [];
+    }
+    final nextValue = ladder[currentIndex + 1];
     if (nextValue > maxAllowedValue || nextValue > maxTrucoValue) {
       return const [];
     }
@@ -116,6 +121,9 @@ class TrucoRules {
     required int targetScore,
     required int nominalValue,
   }) {
+    if (nominalValue >= targetScore) {
+      return (targetScore - teamScore).clamp(0, targetScore);
+    }
     final maxAllowedPoints = maxPointsBeforeTarget(
       teamScore: teamScore,
       targetScore: targetScore,

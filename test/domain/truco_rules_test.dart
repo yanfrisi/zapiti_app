@@ -12,7 +12,7 @@ void main() {
         currentAcceptedValue: 3,
       );
 
-      expect(maxValue, 18);
+      expect(maxValue, 30);
     });
 
     test(
@@ -25,7 +25,7 @@ void main() {
         currentAcceptedValue: 1,
       );
 
-      expect(maxValue, 18);
+      expect(maxValue, 30);
     });
 
     test('a 27 y 28 se permite truco pero se bloquean subidas mayores', () {
@@ -46,7 +46,7 @@ void main() {
         currentAcceptedValue: 1,
       );
 
-      expect(teamWithMargin, 18);
+      expect(teamWithMargin, 30);
       expect(teamNearEnd, 3);
       expect(teamAt28, 3);
     });
@@ -77,6 +77,15 @@ void main() {
       );
 
       expect(options, [6]);
+    });
+
+    test('despues de quince solo ofrece Ahorrisi a 30', () {
+      final options = TrucoRules.raiseOptions(
+        pendingValue: 15,
+        maxAllowedValue: 30,
+      );
+
+      expect(options, [30]);
     });
 
     test('no ajusta una subida a valores fuera de la escalera oficial', () {

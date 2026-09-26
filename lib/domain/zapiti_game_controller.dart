@@ -12,6 +12,7 @@ import 'team_rules.dart';
 import 'truco_rules.dart';
 import 'zapiti_deck.dart';
 import 'zapiti_players.dart';
+import 'zapiti_rules.dart';
 
 enum AlVerState {
   none,
@@ -138,9 +139,7 @@ class ZapitiGameController {
   int? nextTrucoValueForPlayer(Player player) {
     if (handFinished || isGameFinished) return null;
     if (alVerState == AlVerState.awaitingDecision) return null;
-    if (alVerState != AlVerState.none && alVerTeamIds.contains(player.teamId)) {
-      return null;
-    }
+    if (alVerState != AlVerState.none) return null;
     if (trucoState == TrucoNegotiationState.awaitingResponse) {
       if (respondingTrucoTeamId != player.teamId || pendingTrucoValue == null) {
         return null;
@@ -205,12 +204,7 @@ class ZapitiGameController {
   }
 
   List<int> raiseOptionsForTeam(int teamId) {
-    if (alVerState == AlVerState.awaitingDecision) {
-      return const [];
-    }
-    if (alVerState != AlVerState.none && alVerTeamIds.contains(teamId)) {
-      return const [];
-    }
+    if (alVerState != AlVerState.none) return const [];
     final pending = pendingTrucoValue;
     if (pending == null ||
         respondingTrucoTeamId != teamId ||
@@ -468,10 +462,7 @@ class ZapitiGameController {
   }) {
     if (!_isAuthorizedTrucoActor(actorPlayerId ?? player.id)) return false;
     if (handFinished || isGameFinished) return false;
-    if (alVerState == AlVerState.awaitingDecision) return false;
-    if (alVerState != AlVerState.none && alVerTeamIds.contains(player.teamId)) {
-      return false;
-    }
+    if (alVerState != AlVerState.none) return false;
     if (value > maxAllowedTrucoValueForTeam(player.teamId)) return false;
 
     if (trucoState == TrucoNegotiationState.awaitingResponse) {
@@ -604,10 +595,25 @@ class ZapitiGameController {
       return;
     }
 
-    turnIndex = leadIndex;
+    if (roundNumber == 1) {
+      final nextLeader = _lastPlayerWhoTiedBestCard(result);
+      leadIndex = players.indexWhere((player) => player.id == nextLeader.id);
+      turnIndex = leadIndex;
+    } else {
+      turnIndex = leadIndex;
+    }
     status =
         'Ronda $roundNumber empatada: un chico para cada equipo. Repite ${currentPlayer.name}.';
     _log(status);
+  }
+
+  Player _lastPlayerWhoTiedBestCard(RoundResult result) {
+    final bestStrength = result.playedCards
+        .map((playedCard) => ZapitiRules.strength(playedCard.card))
+        .reduce((best, current) => current > best ? current : best);
+    return result.playedCards.lastWhere(
+      (playedCard) => ZapitiRules.strength(playedCard.card) == bestStrength,
+    ).player;
   }
 
   void _finishHandForTeam(int teamId, String message, {int? points}) {
@@ -686,6 +692,9 @@ class ZapitiGameController {
     if (teamIds.isEmpty) {
       return AlVerState.none;
     }
+    if (_alVerForcesPlay(teamIds)) {
+      return AlVerState.playing;
+    }
     if (requestedState == AlVerState.awaitingDecision &&
         !AlVerRules.requiresDecision(teamIds)) {
       return AlVerState.playing;
@@ -696,6 +705,17 @@ class ZapitiGameController {
     return AlVerRules.requiresDecision(teamIds)
         ? AlVerState.awaitingDecision
         : AlVerState.playing;
+  }
+
+  bool _alVerForcesPlay(Set<int> teamIds) {
+    if (teamIds.length != 1) return false;
+    final teamId = teamIds.first;
+    final opponentId = TeamRules.opponentOf(teamId);
+    return AlVerRules.forcesPlayAtScore(
+      alVerTeamScore: score[teamId]!,
+      opponentScore: score[opponentId]!,
+      targetScore: targetScore,
+    );
   }
 
   int _awardedHandPoints() {

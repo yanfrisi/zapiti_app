@@ -556,7 +556,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @visibleForTesting
-  void prepareIncomingTrucoResponseForTesting({int value = 3}) {
+  void prepareIncomingTrucoResponseForTesting({
+    int value = 3,
+    int currentAcceptedValue = 1,
+  }) {
     _isGuidedTutorialMatch = false;
     _guidedTutorialCompleted = false;
     _updateState(() {
@@ -593,6 +596,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ],
         },
       );
+      if (currentAcceptedValue > 1) {
+        _game.handValue = currentAcceptedValue;
+        _game.lastTrucoRaiserTeamId = TeamRules.teamOne;
+        _game.trucoState = TrucoNegotiationState.acceptedClosed;
+      }
       _callTruco(
         ZapitiPlayers.rightRival,
         value: value,

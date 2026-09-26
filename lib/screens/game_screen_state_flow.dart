@@ -709,7 +709,10 @@ extension _GameScreenStateFlow on _GameScreenState {
   }
 
   Future<void> _presentAlVerDecisionDialog(int teamId) async {
-    if (_isAlVerDecisionDialogOpen || !mounted) {
+    if (_isAlVerDecisionDialogOpen ||
+        !mounted ||
+        _game.alVerState != AlVerState.awaitingDecision ||
+        _game.alVerTeamId != teamId) {
       return;
     }
 
@@ -1815,7 +1818,7 @@ extension _GameScreenStateFlow on _GameScreenState {
         'nine' => 9,
         'twelve' => 12,
         'fifteen' => 15,
-        'ahorrisi' => 18,
+        'ahorrisi' => 30,
         _ => null,
       };
       _trucoCallerTeamId = _parseNullableInt(betState['proposingTeam']);
@@ -1827,7 +1830,7 @@ extension _GameScreenStateFlow on _GameScreenState {
         'nine' => 9,
         'twelve' => 12,
         'fifteen' => 15,
-        'ahorrisi' => 18,
+        'ahorrisi' => 30,
         _ => 1,
       };
     } else {

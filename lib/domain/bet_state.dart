@@ -5,7 +5,7 @@ enum BetLevel {
   nine(9),
   twelve(12),
   fifteen(15),
-  ahorrisi(18);
+  ahorrisi(30);
 
   final int value;
 
