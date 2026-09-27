@@ -53,12 +53,16 @@ class MultiplayerMessage {
   final MultiplayerMessageType type;
   final String? roomId;
   final String? playerId;
+  final String? messageId;
+  final String? correlationId;
   final JsonMap payload;
 
   const MultiplayerMessage({
     required this.type,
     this.roomId,
     this.playerId,
+    this.messageId,
+    this.correlationId,
     this.payload = const {},
   });
 
@@ -67,7 +71,27 @@ class MultiplayerMessage {
       type: MultiplayerMessageType.fromWireName(json['type'] as String),
       roomId: json['roomId'] as String?,
       playerId: json['playerId'] as String?,
+      messageId: json['messageId'] as String?,
+      correlationId: json['correlationId'] as String?,
       payload: (json['payload'] as JsonMap?) ?? const {},
+    );
+  }
+
+  MultiplayerMessage copyWith({
+    MultiplayerMessageType? type,
+    String? roomId,
+    String? playerId,
+    String? messageId,
+    String? correlationId,
+    JsonMap? payload,
+  }) {
+    return MultiplayerMessage(
+      type: type ?? this.type,
+      roomId: roomId ?? this.roomId,
+      playerId: playerId ?? this.playerId,
+      messageId: messageId ?? this.messageId,
+      correlationId: correlationId ?? this.correlationId,
+      payload: payload ?? this.payload,
     );
   }
 
@@ -75,6 +99,8 @@ class MultiplayerMessage {
         'type': type.wireName,
         if (roomId != null) 'roomId': roomId,
         if (playerId != null) 'playerId': playerId,
+        if (messageId != null) 'messageId': messageId,
+        if (correlationId != null) 'correlationId': correlationId,
         if (payload.isNotEmpty) 'payload': payload,
       };
 }

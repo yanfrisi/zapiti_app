@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 enum ZapitiLanguage {
   es('es', 'Español'),
   pt('pt', 'Português'),
+  pl('pl', 'Polski'),
   en('en', 'English'),
   fr('fr', 'Français');
 

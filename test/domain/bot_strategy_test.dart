@@ -10,6 +10,7 @@ void main() {
     const bot = Player(id: 'bot', name: 'Bot', teamId: 2);
     const teammate = Player(id: 'mate', name: 'Mate', teamId: 2);
     const rival = Player(id: 'rival', name: 'Rival', teamId: 1);
+    const rearRival = Player(id: 'rearRival', name: 'Rear rival', teamId: 1);
 
     test('gana con la carta mas baja posible', () {
       const hand = [
@@ -115,6 +116,59 @@ void main() {
       );
 
       expect(chosen, const SpanishCard(value: 11, suit: Suit.oros));
+    });
+
+    test('si su pareja gana flojo y queda rival detras protege con la minima',
+        () {
+      const hand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      const table = [
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 6, suit: Suit.bastos),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCard(
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        opponentStillToPlay: true,
+      );
+
+      expect(chosen, const SpanishCard(value: 2, suit: Suit.copas));
+    });
+
+    test('si su pareja ya gana muy alto no gasta carta por cubrir de mas', () {
+      const hand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      const table = [
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 3, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 12, suit: Suit.bastos),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCard(
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        opponentStillToPlay: true,
+      );
+
+      expect(chosen, const SpanishCard(value: 12, suit: Suit.oros));
     });
 
     test('tira la peor si no puede ganar la ronda', () {
@@ -280,6 +334,24 @@ void main() {
       expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
     });
 
+    test('sin ven a mi mantiene la politica normal de dificultad', () {
+      const hand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 5, suit: Suit.copas),
+      ];
+
+      final chosen = BotStrategy.chooseCard(
+        player: bot,
+        hand: hand,
+        playedCards: const [],
+        preserveStrongCards: true,
+        opponentRoundWins: 1,
+      );
+
+      expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
+    });
+
     test('con seña fuerte del compañero evita gastar carta al inicio', () {
       const hand = [
         SpanishCard(value: 2, suit: Suit.copas),
@@ -385,6 +457,252 @@ void main() {
       );
 
       expect(chosen, const SpanishCard(value: 2, suit: Suit.copas));
+    });
+
+    test('lookahead normal mantiene la heuristica base', () {
+      const hand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 3, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      const table = [
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 3,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        opponentStillToPlay: true,
+      );
+
+      expect(chosen, const SpanishCard(value: 2, suit: Suit.copas));
+    });
+
+    test('lookahead experto protege mejor si queda un rival por jugar', () {
+      const hand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 3, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      const table = [
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        opponentStillToPlay: true,
+      );
+
+      expect(chosen, const SpanishCard(value: 3, suit: Suit.oros));
+    });
+
+    test('lookahead experto no gasta premium si su equipo ya gana', () {
+      const hand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      const table = [
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 3, suit: Suit.copas),
+        ),
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+      );
+
+      expect(chosen, const SpanishCard(value: 12, suit: Suit.oros));
+    });
+
+    test('lookahead experto conserva la carta baja si ya gana y es el ultimo',
+        () {
+      const hand = [
+        SpanishCard(value: 11, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      const table = [
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 3, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 4, suit: Suit.bastos),
+        ),
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.espadas),
+        ),
+      ];
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        opponentStillToPlay: false,
+      );
+
+      expect(chosen, const SpanishCard(value: 11, suit: Suit.oros));
+    });
+
+    test('experto con minimax evita ganar flojo si el rival lo mata detras',
+        () {
+      const players = [rival, teammate, bot, rearRival];
+      const hand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 3, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      const table = [
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 12, suit: Suit.copas),
+        ),
+      ];
+      const hands = {
+        'bot': hand,
+        'rearRival': [
+          SpanishCard(value: 2, suit: Suit.espadas),
+          SpanishCard(value: 5, suit: Suit.oros),
+          SpanishCard(value: 4, suit: Suit.copas),
+        ],
+      };
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        players: players,
+        hands: hands,
+        opponentStillToPlay: true,
+        allowPerfectInformation: true,
+      );
+
+      expect(chosen, const SpanishCard(value: 3, suit: Suit.oros));
+    });
+
+    test('experto con minimax tira barato si la ronda ya esta blindada', () {
+      const players = [teammate, rival, bot, rearRival];
+      const hand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      const table = [
+        PlayedCard(
+          player: teammate,
+          card: SpanishCard(value: 3, suit: Suit.copas),
+        ),
+        PlayedCard(
+          player: rival,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+      ];
+      const hands = {
+        'bot': hand,
+        'rearRival': [
+          SpanishCard(value: 2, suit: Suit.espadas),
+          SpanishCard(value: 5, suit: Suit.oros),
+        ],
+      };
+
+      final chosen = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: table,
+        players: players,
+        hands: hands,
+        allowPerfectInformation: true,
+      );
+
+      expect(chosen, const SpanishCard(value: 12, suit: Suit.oros));
+    });
+
+    test('lookahead oculto no depende de la identidad real de cartas rivales', () {
+      const players = [rival, teammate, bot, rearRival];
+      const hand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 3, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      const handsA = {
+        'bot': hand,
+        'rival': [
+          SpanishCard(value: 1, suit: Suit.oros),
+          SpanishCard(value: 6, suit: Suit.oros),
+          SpanishCard(value: 5, suit: Suit.espadas),
+        ],
+        'mate': [
+          SpanishCard(value: 2, suit: Suit.bastos),
+          SpanishCard(value: 11, suit: Suit.copas),
+        ],
+        'rearRival': [
+          SpanishCard(value: 2, suit: Suit.espadas),
+          SpanishCard(value: 5, suit: Suit.oros),
+        ],
+      };
+      const handsB = {
+        'bot': hand,
+        'rival': [
+          SpanishCard(value: 1, suit: Suit.oros),
+          SpanishCard(value: 6, suit: Suit.oros),
+          SpanishCard(value: 5, suit: Suit.espadas),
+        ],
+        'mate': [
+          SpanishCard(value: 2, suit: Suit.bastos),
+          SpanishCard(value: 11, suit: Suit.copas),
+        ],
+        'rearRival': [
+          SpanishCard(value: 4, suit: Suit.bastos),
+          SpanishCard(value: 7, suit: Suit.copas),
+          SpanishCard(value: 6, suit: Suit.espadas),
+        ],
+      };
+
+      final chosenA = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: const [],
+        players: players,
+        hands: handsA,
+      );
+      final chosenB = BotStrategy.chooseCardWithLookahead(
+        difficulty: 5,
+        player: bot,
+        hand: hand,
+        playedCards: const [],
+        players: players,
+        hands: handsB,
+      );
+
+      expect(chosenA, isIn(hand));
+      expect(chosenB, isIn(hand));
     });
   });
 }

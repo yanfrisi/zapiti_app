@@ -22,6 +22,7 @@ class ZapitiGameTable extends StatelessWidget {
   final List<SpanishCard> humanHand;
   final List<PlayedCard> playedCards;
   final Map<String, String> playerMessages;
+  final Map<String, String> playerDisplayNames;
   final Map<String, String> characterIdsByPlayer;
   final Map<String, int> cardsRemaining;
   final int? turnSecondsRemaining;
@@ -37,6 +38,7 @@ class ZapitiGameTable extends StatelessWidget {
     required this.humanHand,
     required this.playedCards,
     required this.playerMessages,
+    required this.playerDisplayNames,
     required this.characterIdsByPlayer,
     required this.cardsRemaining,
     required this.turnSecondsRemaining,
@@ -76,7 +78,8 @@ class ZapitiGameTable extends StatelessWidget {
                 rect: metrics.seatRect(_SeatPosition.top),
                 child: _OpponentSeat(
                   position: _SeatPosition.top,
-                  playerName: topPlayer.name,
+                  playerName:
+                      playerDisplayNames[topPlayer.id] ?? topPlayer.name,
                   isCurrent: topPlayer.id == currentPlayer.id,
                   turnSecondsRemaining: topPlayer.id == currentPlayer.id
                       ? turnSecondsRemaining
@@ -92,7 +95,8 @@ class ZapitiGameTable extends StatelessWidget {
                 rect: metrics.seatRect(_SeatPosition.left),
                 child: _OpponentSeat(
                   position: _SeatPosition.left,
-                  playerName: leftPlayer.name,
+                  playerName:
+                      playerDisplayNames[leftPlayer.id] ?? leftPlayer.name,
                   isCurrent: leftPlayer.id == currentPlayer.id,
                   turnSecondsRemaining: leftPlayer.id == currentPlayer.id
                       ? turnSecondsRemaining
@@ -108,7 +112,8 @@ class ZapitiGameTable extends StatelessWidget {
                 rect: metrics.seatRect(_SeatPosition.right),
                 child: _OpponentSeat(
                   position: _SeatPosition.right,
-                  playerName: rightPlayer.name,
+                  playerName:
+                      playerDisplayNames[rightPlayer.id] ?? rightPlayer.name,
                   isCurrent: rightPlayer.id == currentPlayer.id,
                   turnSecondsRemaining: rightPlayer.id == currentPlayer.id
                       ? turnSecondsRemaining
@@ -123,8 +128,9 @@ class ZapitiGameTable extends StatelessWidget {
               if (showHumanSeat)
                 Positioned.fromRect(
                   rect: metrics.seatRect(_SeatPosition.bottom),
-                  child: _HumanSeat(
-                    playerName: bottomPlayer.name,
+                    child: _HumanSeat(
+                    playerName:
+                        playerDisplayNames[bottomPlayer.id] ?? bottomPlayer.name,
                     isCurrent: bottomPlayer.id == currentPlayer.id,
                     turnSecondsRemaining: bottomPlayer.id == currentPlayer.id
                         ? turnSecondsRemaining

@@ -66,5 +66,45 @@ void main() {
 
       expect(raiseValue, 6);
     });
+
+    test('experto no re-sube alto con mano media y truco ya caro', () {
+      final raiseValue = BotTrucoRaiseStrategy.chooseRaiseValue(
+        difficulty: 5,
+        pendingValue: 6,
+        maxAllowedValue: 9,
+        strengths: const [90, 70, 20],
+        teamScore: 118,
+        hasStrongSignal: false,
+        isWinningReparto: false,
+        sawOpponentStrongSignal: false,
+        canCloseHand: false,
+        mustSaveHand: false,
+        needsPoints: false,
+        scoreGap: 0,
+        roll: 0,
+      );
+
+      expect(raiseValue, isNull);
+    });
+
+    test('experto re-sube con cierre y mano muy fuerte', () {
+      final raiseValue = BotTrucoRaiseStrategy.chooseRaiseValue(
+        difficulty: 5,
+        pendingValue: 3,
+        maxAllowedValue: 9,
+        strengths: const [112, 100, 80],
+        teamScore: 150,
+        hasStrongSignal: true,
+        isWinningReparto: true,
+        sawOpponentStrongSignal: false,
+        canCloseHand: true,
+        mustSaveHand: false,
+        needsPoints: false,
+        scoreGap: 4,
+        roll: 0,
+      );
+
+      expect(raiseValue, 6);
+    });
   });
 }

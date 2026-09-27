@@ -19,5 +19,7 @@
 - [x] Validacion integral con el servidor multijugador desplegado.
 - [x] Reconexión con recuperación automática de una sala anterior.
 - [x] Ranking.
+- [ ] Cierre completo del servidor `C:\ESD\zapiti_server` y sus tests.
+- [ ] Afinado final de la politica avanzada con benchmarks comparativos.
 - [ ] Publicacion Android.
 - [ ] Publicacion iOS.

@@ -3,28 +3,18 @@ import 'package:zapiti_app/domain/character_assets.dart';
 
 void main() {
   group('CharacterAssets', () {
-    test('asigna el personaje elegido al humano y reparte el resto sin repetir',
-        () {
-      final assignment = CharacterAssets.assignmentForHuman(
-        humanPlayerId: 'human',
-        playerIds: const ['human', 'rival1', 'companion', 'rival2'],
-        humanCharacterId: 'p3',
+    test('usa fallback seguro para ids remotos de multijugador', () {
+      expect(
+        CharacterAssets.neutral('player_1785685639317000_2073404750'),
+        'assets/characters/p1/front/neutral.png',
       );
-
-      expect(assignment['human'], 'p3');
-      expect(assignment.values.toSet(), hasLength(4));
-      expect(assignment.values.toSet(), CharacterAssets.characterIds.toSet());
-    });
-
-    test('usa un personaje seguro si el guardado ya no existe', () {
-      final assignment = CharacterAssets.assignmentForHuman(
-        humanPlayerId: 'human',
-        playerIds: const ['human', 'rival1', 'companion', 'rival2'],
-        humanCharacterId: 'desconocido',
+      expect(
+        CharacterAssets.frontForSignal(
+          'player_1785685639317000_2073404750',
+          'Ases',
+        ),
+        'assets/characters/p1/front/signal_ases_open_mouth.png',
       );
-
-      expect(assignment['human'], CharacterAssets.characterIds.first);
-      expect(assignment.values.toSet(), hasLength(4));
     });
   });
 }

@@ -1,9 +1,23 @@
-part of 'zapiti_game_table.dart';
+﻿part of 'zapiti_game_table.dart';
 
 enum _BubblePosition { above, right }
 
 double _bubbleScaleForAvatarHeight(double avatarHeight) {
   return (avatarHeight / 180).clamp(0.46, 0.9).toDouble();
+}
+
+String? _extractSignalMessage(String? message) {
+  if (message == null) return null;
+  const prefix = 'SENAL: ';
+  if (message.startsWith(prefix)) {
+    return message.substring(prefix.length);
+  }
+
+  final separatorIndex = message.indexOf(': ');
+  if (separatorIndex == -1 || !message.toLowerCase().startsWith('se')) {
+    return null;
+  }
+  return message.substring(separatorIndex + 2);
 }
 
 class _OpponentSeat extends StatelessWidget {
@@ -211,7 +225,7 @@ class _OpponentSeat extends StatelessWidget {
 
   String? _visibleMessageFrom(String? value) {
     if (value == null) return null;
-    if (value.startsWith('Seña: ')) return null;
+    if (_extractSignalMessage(value) != null) return null;
     return value;
   }
 }
@@ -554,15 +568,7 @@ class _SeatAvatar extends StatelessWidget {
   }
 
   String? _signalFromMessage(String? message) {
-    const prefix = 'Seña: ';
-    if (message == null) return null;
-    if (message.startsWith(prefix)) return message.substring(prefix.length);
-
-    final separatorIndex = message.indexOf(': ');
-    if (separatorIndex == -1 || !message.toLowerCase().startsWith('se')) {
-      return null;
-    }
-    return message.substring(separatorIndex + 2);
+    return _extractSignalMessage(message);
   }
 
   double _signalVerticalOffset(String? signal) {
