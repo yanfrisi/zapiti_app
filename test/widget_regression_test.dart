@@ -8,7 +8,7 @@ import 'package:zapiti_app/services/app_version_check_service.dart';
 
 void main() {
   const postOrderVisualDelay = Duration(milliseconds: 550);
-  const finishAutoBotFlow = Duration(seconds: 4);
+  const finishAutoBotFlow = Duration(seconds: 9);
 
   setUp(() async {
     await ZapitiI18n.load();
@@ -36,6 +36,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> pumpTimersInSlices(
+    WidgetTester tester,
+    Duration duration,
+  ) async {
+    var remainingMs = duration.inMilliseconds;
+    while (remainingMs > 0) {
+      final sliceMs = remainingMs < 100 ? remainingMs : 100;
+      await tester.pump(Duration(milliseconds: sliceMs));
+      remainingMs -= sliceMs;
+    }
+  }
+
   testWidgets('el companero IA siempre juega y cede el turno', (tester) async {
     await startGame(tester);
     final gameState = tester.state(find.byType(GameScreen)) as dynamic;
@@ -48,7 +60,8 @@ void main() {
     final advance = gameState.advanceBotsForTesting();
     await tester.pump(const Duration(milliseconds: 100));
     expect(
-      gameState.offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
+      gameState
+          .offlineRuntimeSnapshotForTesting()['companionOrderWindowPlayerId'],
       'p3',
     );
 
@@ -59,7 +72,7 @@ void main() {
     expect(gameState.gameController.playedCards.single.player.id, 'p3');
     expect(gameState.gameController.currentPlayer.id, isNot('p3'));
 
-    await tester.pump(finishAutoBotFlow);
+    await pumpTimersInSlices(tester, finishAutoBotFlow);
     await advance;
   });
 
@@ -75,7 +88,7 @@ void main() {
     await tester.tap(find.text('ACEPTAR'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1400));
-    await tester.pump(finishAutoBotFlow);
+    await pumpTimersInSlices(tester, finishAutoBotFlow);
     await tester.pumpAndSettle();
 
     final snapshot =

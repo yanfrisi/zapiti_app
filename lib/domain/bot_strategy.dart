@@ -38,6 +38,7 @@ class BotStrategy {
     bool teammateHasStrongSignal = false,
     bool opponentHasStrongSignal = false,
     bool forceWinIfPossible = false,
+    bool avoidOvertakingTeammate = false,
     bool teammateStillToPlay = false,
     bool opponentStillToPlay = false,
   }) {
@@ -55,6 +56,9 @@ class BotStrategy {
     }
 
     final currentWinningTeam = _currentWinningTeam(playedCards);
+    if (avoidOvertakingTeammate && currentWinningTeam == player.teamId) {
+      return sorted.first;
+    }
     final isLastToPlay = playedCards.length == 3;
     final handCanBeClosed = teamRoundWins > 0;
     final handMustBeSaved = opponentRoundWins > 0;
@@ -165,8 +169,7 @@ class BotStrategy {
       opponentStillToPlay: opponentStillToPlay,
     );
     final currentWinningTeam = _currentWinningTeam(playedCards);
-    if (currentWinningTeam == player.teamId &&
-        playedCards.length == 3) {
+    if (currentWinningTeam == player.teamId && playedCards.length == 3) {
       return baseline;
     }
 
@@ -720,5 +723,4 @@ class BotStrategy {
         .map((playedCard) => ZapitiRules.strength(playedCard.card))
         .reduce((best, current) => current > best ? current : best);
   }
-
 }

@@ -28,6 +28,7 @@ class HeuristicBotPolicy implements BotPolicy {
       teammateHasStrongSignal: context.teammateHasStrongSignal,
       opponentHasStrongSignal: context.opponentHasStrongSignal,
       forceWinIfPossible: context.forceWinIfPossible,
+      avoidOvertakingTeammate: context.prioritizeFirstTrick,
       teammateStillToPlay: context.teammateStillToPlay,
       opponentStillToPlay: context.opponentStillToPlay,
     );
@@ -84,10 +85,11 @@ class MonteCarloBotPolicy implements BotPolicy {
         for (final player in context.players)
           player.id: context.hands[player.id]?.length ?? 0,
       },
-      publiclyKnownCardsByPlayerId: const {},
+      publiclyKnownCardsByPlayerId: context.publiclyKnownCardsByPlayerId,
       currentPlayerId: context.bot.id,
-      trickLeaderId:
-          context.playedCards.isEmpty ? context.bot.id : context.playedCards.first.player.id,
+      trickLeaderId: context.playedCards.isEmpty
+          ? context.bot.id
+          : context.playedCards.first.player.id,
       betState: context.betState,
       score: context.score,
       roundWins: {
@@ -122,14 +124,15 @@ class IsmctsBotPolicy implements BotPolicy {
   @override
   SpanishCard chooseCard(BotDecisionContext context) {
     final sorted = [...context.hand]..sort(
-      (a, b) => BotStrategy.compareByStrength(a, b),
-    );
+        (a, b) => BotStrategy.compareByStrength(a, b),
+      );
     final stats = {
       for (final candidate in sorted) candidate: _RootActionStats(),
     };
 
     for (var step = 0; step < iterations; step++) {
-      final totalVisits = stats.values.fold<int>(0, (sum, stat) => sum + stat.visits);
+      final totalVisits =
+          stats.values.fold<int>(0, (sum, stat) => sum + stat.visits);
       final candidate = _selectAction(sorted, stats, totalVisits);
       final reward = BotRolloutEvaluator.evaluateCardOnce(
         player: context.bot,
@@ -150,7 +153,8 @@ class IsmctsBotPolicy implements BotPolicy {
     return sorted.reduce((best, candidate) {
       final bestStats = stats[best]!;
       final candidateStats = stats[candidate]!;
-      final bestValue = bestStats.meanValue - BotStrategy.strengthOf(best) / 1000;
+      final bestValue =
+          bestStats.meanValue - BotStrategy.strengthOf(best) / 1000;
       final candidateValue =
           candidateStats.meanValue - BotStrategy.strengthOf(candidate) / 1000;
       if (candidateStats.visits > bestStats.visits) return candidate;
@@ -207,6 +211,13 @@ class _RootActionStats {
 
 class BotPolicySelector {
   const BotPolicySelector._();
+
+  static SpanishCard chooseCard(BotDecisionContext context) {
+    if (context.prioritizeFirstTrick && context.trickIndex == 0) {
+      return const HeuristicBotPolicy().chooseCard(context);
+    }
+    return forDifficulty(context.difficulty).chooseCard(context);
+  }
 
   static BotPolicy forDifficulty(int difficulty) {
     final profile = DifficultyProfiles.byLevel(difficulty);

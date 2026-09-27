@@ -7,13 +7,8 @@ import 'package:flutter/services.dart';
 
 import '../domain/bot_al_ver_strategy.dart';
 import '../domain/bot_agent_difficulty.dart';
-import '../domain/bot_bet_strategy.dart';
-import '../domain/bot_bluff_strategy.dart';
-import '../domain/bot_table_read.dart';
+import '../domain/bot_bet_value_evaluator.dart';
 import '../domain/bot_strategy.dart';
-import '../domain/bot_truco_raise_strategy.dart';
-import '../domain/bot_truco_response_strategy.dart';
-import '../domain/bot_truco_strategy.dart';
 import '../domain/bot_ven_a_mi_strategy.dart';
 import '../domain/bot_voy_a_ti_strategy.dart';
 import '../domain/bet_state.dart';
@@ -25,6 +20,7 @@ import '../domain/debug_deals.dart';
 import '../domain/difficulty_profile.dart';
 import '../domain/difficulty_strategy.dart';
 import '../domain/limited_history.dart';
+import '../domain/legal_actions.dart';
 import '../domain/played_card.dart';
 import '../domain/player.dart';
 import '../domain/round_result.dart';
@@ -164,6 +160,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final Map<int, String> _opponentSignalsSeenByTeam = {};
   final List<StrategicSignal> _activeStrategicSignals = [];
   final Set<String> _playersSignaledThisHand = {};
+  final Set<String> _automaticBotSignalsThisHand = {};
   final Set<String> _forceWinRequestedPlayerIds = {};
   final Set<String> _forceHighestRequestedPlayerIds = {};
   final Set<String> _forceLowestRequestedPlayerIds = {};
@@ -173,6 +170,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   String? _companionPrivateSignalStatus;
   String? _companionPrivateSignalRequestId;
   int _localSignalRequestSequence = 0;
+  int _botSignalVisualGeneration = 0;
   Timer? _companionPrivateSignalTimer;
   Random _random = Random();
   final GamePreferencesStore _preferencesStore = const GamePreferencesStore();
@@ -226,15 +224,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static const _debugPresetIndex = 0;
   // When the companion leads, play waits for an explicit order.
   static const _companionBotPostOrderVisualDelay = Duration(milliseconds: 220);
-  static const _companionSignalFeedbackDuration = Duration(seconds: 3);
-  static const _teammateBotSignalRevealDuration = Duration(milliseconds: 300);
+  static const _botSignalDelay = Duration(milliseconds: 400);
+  static const _botSignalVisibleDuration = Duration(milliseconds: 1000);
+  static const _companionOrderWindowDuration = Duration(seconds: 3);
   Set<String> _controlledHumanPlayerIds = {ZapitiPlayers.human.id};
   String? _companionBotOrderWindowPlayerId;
-  Completer<void>? _companionBotOrderWindowCompleter;
+  Completer<bool>? _companionBotOrderWindowCompleter;
   Future<bool>? _companionBotOrderWindowFuture;
+  Timer? _companionBotOrderWindowTimer;
   int _botCardSelectionCountForTesting = 0;
   double? _nextBotBetRollForTesting;
   bool _advanceBotsInFlight = false;
+  final Map<Timer, Completer<void>> _botDelayTimers = {};
   int _advanceBotsActiveRunId = 0;
   int? _advanceBotsInFlightHandVersion;
   String? _advanceBotsInFlightPlayerId;
@@ -304,7 +305,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       'leadIndex': _game.leadIndex,
       'currentPlayerId': _currentPlayer.id,
       'playedCards': _playedCards.length,
-      'round': _roundHistory.length + 1,
+      'round': _displayedRoundNumber,
       'handValue': _handValue,
       'pendingTrucoValue': _pendingTrucoValue,
       'waitingHumanTrucoResponse': _isWaitingHumanTrucoResponse,
@@ -349,6 +350,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _incomingTrucoOverlayValue = null;
     _incomingTrucoOverlayCallerPlayerId = null;
   }
+
   @visibleForTesting
   ZapitiGameController get gameController => _game;
   @visibleForTesting
@@ -428,6 +430,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       'companionOrderWindowPlayerId': _companionBotOrderWindowPlayerId,
       'companionOrderWindowWaiting': _companionBotOrderWindowCompleter != null,
       'botCardSelections': _botCardSelectionCountForTesting,
+      'pendingBotDelays': _botDelayTimers.length,
     };
   }
 
@@ -615,6 +618,72 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @visibleForTesting
+  void prepareBotCounterRaiseResponseForTesting({int pendingValue = 6}) {
+    _isGuidedTutorialMatch = false;
+    _guidedTutorialCompleted = false;
+    _updateState(() {
+      _isAutoPlaying = false;
+      _isWaitingHumanTrucoResponse = false;
+      _game.nextLeadIndex = _players.indexWhere(
+        (player) => player.id == ZapitiPlayers.leftRival.id,
+      );
+      _game.startNewHand(
+        fixedHands: {
+          'p1': const [
+            SpanishCard(value: 12, suit: Suit.espadas),
+            SpanishCard(value: 6, suit: Suit.copas),
+            SpanishCard(value: 5, suit: Suit.oros),
+          ],
+          'p2': const [
+            SpanishCard(value: 12, suit: Suit.bastos),
+            SpanishCard(value: 11, suit: Suit.oros),
+            SpanishCard(value: 10, suit: Suit.copas),
+          ],
+          'p3': const [
+            SpanishCard(value: 2, suit: Suit.copas),
+            SpanishCard(value: 11, suit: Suit.bastos),
+            SpanishCard(value: 5, suit: Suit.espadas),
+          ],
+          'p4': const [
+            SpanishCard(value: 4, suit: Suit.bastos),
+            SpanishCard(value: 7, suit: Suit.copas),
+            SpanishCard(value: 7, suit: Suit.oros),
+          ],
+        },
+      );
+      _game.callTruco(
+        ZapitiPlayers.leftRival,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.leftRival.id,
+      );
+      _game.raiseTruco(
+        ZapitiPlayers.human,
+        value: 6,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      if (pendingValue >= 9) {
+        _game.raiseTruco(
+          ZapitiPlayers.leftRival,
+          value: 9,
+          actorPlayerId: ZapitiPlayers.leftRival.id,
+        );
+      }
+      if (pendingValue >= 12) {
+        _game.raiseTruco(
+          ZapitiPlayers.human,
+          value: 12,
+          actorPlayerId: ZapitiPlayers.human.id,
+        );
+      }
+      _status = 'Escenario de contra-subida aceptada listo.';
+    });
+  }
+
+  @visibleForTesting
+  Future<void> resolveBotTrucoResponseForTesting() =>
+      _resolveBotResponseToTruco();
+
+  @visibleForTesting
   void setDifficultyForTesting(int difficulty) {
     _selectedDifficulty = difficulty;
   }
@@ -752,13 +821,63 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _aiTeamsConsideredTrucoThisHand
         ..clear()
         ..addAll(const [TeamRules.teamOne, TeamRules.teamTwo]);
-      _companionBotOrderWindowPlayerId = null;
-      _companionBotOrderWindowCompleter = null;
-      _companionBotOrderWindowFuture = null;
+      _clearCompanionBotOrderWindow();
       _isAutoPlaying = false;
       _botCardSelectionCountForTesting = 0;
       _status = 'Ventana funcional Ven a mi lista.';
     });
+  }
+
+  @visibleForTesting
+  void prepareVoyATiThreeFivesScenarioForTesting() {
+    _isGuidedTutorialMatch = false;
+    _updateState(() {
+      _game.startNewHand(
+        fixedHands: {
+          'p1': const [
+            SpanishCard(value: 5, suit: Suit.oros),
+            SpanishCard(value: 7, suit: Suit.oros),
+            SpanishCard(value: 4, suit: Suit.oros),
+          ],
+          'p2': const [
+            SpanishCard(value: 5, suit: Suit.espadas),
+            SpanishCard(value: 2, suit: Suit.espadas),
+            SpanishCard(value: 6, suit: Suit.espadas),
+          ],
+          'p3': const [
+            SpanishCard(value: 4, suit: Suit.copas),
+            SpanishCard(value: 6, suit: Suit.copas),
+            SpanishCard(value: 3, suit: Suit.oros),
+          ],
+          'p4': const [
+            SpanishCard(value: 5, suit: Suit.copas),
+            SpanishCard(value: 1, suit: Suit.copas),
+            SpanishCard(value: 6, suit: Suit.bastos),
+          ],
+        },
+      );
+      _game.leadIndex = 1;
+      _game.turnIndex = 2;
+      _game.playedCards.addAll(const [
+        PlayedCard(
+          player: ZapitiPlayers.rightRival,
+          card: SpanishCard(value: 5, suit: Suit.espadas),
+        ),
+        PlayedCard(
+          player: ZapitiPlayers.human,
+          card: SpanishCard(value: 5, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: ZapitiPlayers.leftRival,
+          card: SpanishCard(value: 5, suit: Suit.copas),
+        ),
+      ]);
+      _forceWinRequestedPlayerIds.clear();
+      _forceHighestRequestedPlayerIds.clear();
+      _forceLowestRequestedPlayerIds.clear();
+      _forceSignaledCardByPlayerId.clear();
+    });
+    _humanVoyATi();
   }
 
   @visibleForTesting
@@ -839,19 +958,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             playedCards: [
               PlayedCard(
                 player: ZapitiPlayers.human,
-                card: SpanishCard(value: 5, suit: Suit.copas),
+                card: SpanishCard(value: 10, suit: Suit.bastos),
               ),
               PlayedCard(
                 player: ZapitiPlayers.rightRival,
-                card: SpanishCard(value: 5, suit: Suit.oros),
+                card: SpanishCard(value: 10, suit: Suit.copas),
               ),
               PlayedCard(
                 player: ZapitiPlayers.companion,
-                card: SpanishCard(value: 5, suit: Suit.bastos),
+                card: SpanishCard(value: 10, suit: Suit.oros),
               ),
               PlayedCard(
                 player: ZapitiPlayers.leftRival,
-                card: SpanishCard(value: 5, suit: Suit.espadas),
+                card: SpanishCard(value: 10, suit: Suit.espadas),
               ),
             ],
             winner: null,
@@ -958,19 +1077,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             playedCards: [
               PlayedCard(
                 player: ZapitiPlayers.human,
-                card: SpanishCard(value: 5, suit: Suit.copas),
+                card: SpanishCard(value: 10, suit: Suit.bastos),
               ),
               PlayedCard(
                 player: ZapitiPlayers.rightRival,
-                card: SpanishCard(value: 5, suit: Suit.oros),
+                card: SpanishCard(value: 10, suit: Suit.copas),
               ),
               PlayedCard(
                 player: ZapitiPlayers.companion,
-                card: SpanishCard(value: 5, suit: Suit.bastos),
+                card: SpanishCard(value: 10, suit: Suit.oros),
               ),
               PlayedCard(
                 player: ZapitiPlayers.leftRival,
-                card: SpanishCard(value: 5, suit: Suit.espadas),
+                card: SpanishCard(value: 10, suit: Suit.espadas),
               ),
             ],
             winner: null,
@@ -1007,11 +1126,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _forceHighestRequestedPlayerIds.clear();
       _forceLowestRequestedPlayerIds.clear();
       _forceBetEvaluationRequestedPlayerIds.clear();
-      _companionBotOrderWindowPlayerId = null;
-      _companionBotOrderWindowCompleter = null;
-      _companionBotOrderWindowFuture = null;
+      _clearCompanionBotOrderWindow();
       _botCardSelectionCountForTesting = 0;
-      _nextBotBetRollForTesting = null;
       _status = 'Escenario Truca tú listo.';
     });
   }
@@ -1246,6 +1362,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _clearCompanionBotOrderWindow();
     _endCurrentGameSession(reason: 'game_screen_dispose', notifyLeave: false);
     _musicPlayer.dispose();
     super.dispose();
@@ -1774,7 +1891,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                               !_isGameFinished &&
                                               !_playedCards.any((card) =>
                                                   card.player.id ==
-                                                      _companionPlayer.id),
+                                                  _companionPlayer.id),
                                       isGameFinished: _isGameFinished,
                                       isHandFinished:
                                           canUseGameControls && _handFinished,

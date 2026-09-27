@@ -308,6 +308,9 @@ class ZapitiGameController {
   /// Resuelve las cuatro cartas jugadas y congela la ronda hasta continuar.
   void resolveRound() {
     if (handFinished || isGameFinished) return;
+    if (roundHistory.length >= 3) {
+      throw StateError('Una mano no puede superar tres rondas.');
+    }
     if (playedCards.length != players.length) {
       throw StateError('La ronda necesita cuatro cartas para resolverse.');
     }
@@ -441,7 +444,8 @@ class ZapitiGameController {
         pendingTrucoValue == null) {
       throw StateError('No hay truco pendiente que pasar.');
     }
-    final nominalPoints = TrucoRules.passPoints(currentAcceptedValue: handValue);
+    final nominalPoints =
+        TrucoRules.passPoints(currentAcceptedValue: handValue);
     final points = TrucoRules.awardedPointsForTeam(
       teamScore: score[callerTeamId]!,
       targetScore: targetScore,
@@ -611,9 +615,11 @@ class ZapitiGameController {
     final bestStrength = result.playedCards
         .map((playedCard) => ZapitiRules.strength(playedCard.card))
         .reduce((best, current) => current > best ? current : best);
-    return result.playedCards.lastWhere(
-      (playedCard) => ZapitiRules.strength(playedCard.card) == bestStrength,
-    ).player;
+    return result.playedCards
+        .lastWhere(
+          (playedCard) => ZapitiRules.strength(playedCard.card) == bestStrength,
+        )
+        .player;
   }
 
   void _finishHandForTeam(int teamId, String message, {int? points}) {

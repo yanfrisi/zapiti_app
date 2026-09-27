@@ -17,7 +17,6 @@ class BotTrucoStrategy {
     required bool opponentHasStrongSignal,
     required bool isCompanion,
     required bool needsPoints,
-    bool firstRoundWasTie = false,
     int scoreGap = 0,
     bool opponentsSpentPower = false,
     bool teamSpentPower = false,
@@ -31,13 +30,6 @@ class BotTrucoStrategy {
     final hasTableInformation = cardsOnTable >= 2;
     final plansVeryStrongLead = startsRound && ownMaxStrength >= 112;
     final plansStrongLead = startsRound && ownMaxStrength >= 97;
-
-    if (firstRoundWasTie &&
-        profile.level >= 4 &&
-        ownMaxStrength >= 100 &&
-        hasSomeTableInformation) {
-      return true;
-    }
 
     if (handStrength < 0.40) return false;
     if (readsOpponentSignals && opponentHasStrongSignal && !canCloseHand) {

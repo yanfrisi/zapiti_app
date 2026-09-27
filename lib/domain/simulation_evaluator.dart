@@ -27,6 +27,11 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
         _observedSignalValue(state, rivalTeam);
     final tempoGap = _tempoBonus(state, botTeam) - _tempoBonus(state, rivalTeam);
     final trickGap = _currentTrickPressure(state, botTeam) - _currentTrickPressure(state, rivalTeam);
+    final trickImportance = state.completedTricks.isEmpty
+        ? 1.0
+        : state.completedTricks.length == 1 && state.completedTricks.first.isTie
+            ? 2.0
+            : 1.5;
 
     return scoreGap * 120 +
         roundGap * 24 +
@@ -34,7 +39,7 @@ class TeamSimulationEvaluator implements SimulationEvaluator {
         strongCardGap * 18 +
         signalGap * 12 +
         tempoGap * 14 +
-        trickGap * 0.9 +
+        trickGap * 0.9 * trickImportance +
         _teamShapeBonus(state, botTeam) +
         _signalComplianceBonus(state, botPlayerId);
   }

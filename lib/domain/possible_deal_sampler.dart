@@ -1,10 +1,9 @@
 import 'dart:math';
 
+import 'bot_belief_state.dart';
 import 'observable_game_state.dart';
-import 'player.dart';
 import 'spanish_card.dart';
 import 'zapiti_deck.dart';
-import 'zapiti_rules.dart';
 
 class PossibleDeal {
   final Map<String, List<SpanishCard>> handsByPlayerId;
@@ -32,138 +31,50 @@ class InferenceBiasedPossibleDealSampler implements PossibleDealSampler {
   final bool useActionInference;
   final bool usePartnerModel;
   final bool useOpponentProfiles;
+  final bool useSignalInference;
+  final bool useBetInference;
 
   const InferenceBiasedPossibleDealSampler({
     required this.useActionInference,
     required this.usePartnerModel,
     required this.useOpponentProfiles,
+    this.useSignalInference = false,
+    this.useBetInference = false,
   });
 
   @override
   PossibleDeal sample(ObservableGameState state, Random random) {
     final setup = _SamplerSetup.create(state);
-    final biases = _computeRetentionBiases(state);
-    final orderedDeck = [...setup.deck]
-      ..shuffle(random)
-      ..sort(
-        (a, b) => ZapitiRules.strength(b).compareTo(ZapitiRules.strength(a)),
-      );
-    final cardsToAssign = orderedDeck.take(setup.totalRemainingSlots).toList(growable: false);
+    final belief = BotBeliefState.fromObservable(
+      state,
+      useSignals: useSignalInference,
+      useActionInference: useActionInference,
+      useBetInference: useBetInference,
+      usePartnerModel: usePartnerModel,
+      useOpponentProfiles: useOpponentProfiles,
+    );
+    final cards = [...setup.deck]..shuffle(random);
 
-    for (final card in cardsToAssign) {
-      final targetPlayerId = _pickPlayerForCard(
-        state: state,
-        card: card,
-        biases: biases,
-        remainingSlots: setup.remainingSlots,
-        random: random,
-      );
-      setup.sampledHands.putIfAbsent(targetPlayerId, () => <SpanishCard>[]).add(card);
-      setup.remainingSlots[targetPlayerId] = setup.remainingSlots[targetPlayerId]! - 1;
+    for (final card in cards.take(setup.totalRemainingSlots)) {
+      final candidates = <String>[];
+      final weights = <double>[];
+      for (final player in state.players) {
+        final slots = setup.remainingSlots[player.id] ?? 0;
+        if (slots <= 0 || player.id == state.botPlayerId) continue;
+        final weight = belief.weightFor(player.id, card);
+        candidates.add(player.id);
+        weights.add(weight * slots);
+      }
+      if (candidates.isEmpty) {
+        throw StateError('No eligible player for hidden-card assignment.');
+      }
+      final recipient = _weightedChoice(candidates, weights, random);
+      setup.sampledHands
+          .putIfAbsent(recipient, () => <SpanishCard>[])
+          .add(card);
+      setup.remainingSlots[recipient] = setup.remainingSlots[recipient]! - 1;
     }
-
     return setup.buildDeal();
-  }
-
-  Map<String, double> _computeRetentionBiases(ObservableGameState state) {
-    final biases = <String, double>{};
-    for (final player in state.players) {
-      if (player.id == state.botPlayerId) continue;
-      var bias = 0.0;
-
-      if (useActionInference) {
-        bias += _actionInferenceBias(state, player);
-      }
-      if (usePartnerModel && player.teamId == _botTeamId(state)) {
-        bias += 0.10;
-      }
-      if (useOpponentProfiles && player.teamId != _botTeamId(state)) {
-        bias += _opponentProfileBias(state, player);
-      }
-
-      biases[player.id] = bias.clamp(-0.35, 0.35);
-    }
-    return biases;
-  }
-
-  double _actionInferenceBias(ObservableGameState state, Player player) {
-    final played = state.playedCards.where((card) => card.player.id == player.id).toList();
-    if (played.isEmpty) {
-      return 0.05;
-    }
-
-    final averageStrength = played
-            .map((entry) => ZapitiRules.strength(entry.card))
-            .fold<int>(0, (sum, value) => sum + value) /
-        played.length;
-    if (averageStrength <= 35) return 0.18;
-    if (averageStrength >= 80) return -0.14;
-    return 0.02;
-  }
-
-  double _opponentProfileBias(ObservableGameState state, Player player) {
-    final played = state.playedCards.where((card) => card.player.id == player.id).toList();
-    if (played.isEmpty) {
-      final seatIndex = state.players.indexWhere((entry) => entry.id == player.id);
-      return seatIndex.isEven ? 0.04 : -0.02;
-    }
-
-    final bestPlayed = played
-        .map((entry) => ZapitiRules.strength(entry.card))
-        .reduce((best, current) => current > best ? current : best);
-    if (bestPlayed >= 95) return -0.18;
-    if (bestPlayed <= 25) return 0.12;
-    return -0.03;
-  }
-
-  String _pickPlayerForCard({
-    required ObservableGameState state,
-    required SpanishCard card,
-    required Map<String, double> biases,
-    required Map<String, int> remainingSlots,
-    required Random random,
-  }) {
-    final cardStrength = ZapitiRules.strength(card) / 100.0;
-    final candidates = <String>[];
-    final weights = <double>[];
-
-    for (final player in state.players) {
-      final playerId = player.id;
-      final slots = remainingSlots[playerId] ?? 0;
-      if (playerId == state.botPlayerId || slots <= 0) continue;
-
-      final bias = biases[playerId] ?? 0.0;
-      final strengthPull = 1 + (bias * ((cardStrength - 0.5) * 2.0));
-      final slotWeight = 0.75 + (slots * 0.35);
-      final weight = max(0.05, slotWeight * strengthPull);
-      candidates.add(playerId);
-      weights.add(weight);
-    }
-
-    if (candidates.isEmpty) {
-      throw StateError('No hay jugador elegible para repartir carta oculta.');
-    }
-    return _weightedChoice(candidates, weights, random);
-  }
-
-  int _botTeamId(ObservableGameState state) {
-    return state.players.firstWhere((player) => player.id == state.botPlayerId).teamId;
-  }
-
-  String _weightedChoice(
-    List<String> candidates,
-    List<double> weights,
-    Random random,
-  ) {
-    final total = weights.fold<double>(0, (sum, value) => sum + value);
-    var roll = random.nextDouble() * total;
-    for (var index = 0; index < candidates.length; index++) {
-      roll -= weights[index];
-      if (roll <= 0) {
-        return candidates[index];
-      }
-    }
-    return candidates.last;
   }
 }
 
@@ -179,7 +90,7 @@ class _SamplerSetup {
   });
 
   int get totalRemainingSlots =>
-      remainingSlots.values.fold<int>(0, (sum, value) => sum + value);
+      remainingSlots.values.fold<int>(0, (sum, count) => sum + count);
 
   factory _SamplerSetup.create(ObservableGameState state) {
     final deck = ZapitiDeck.fullDeck();
@@ -187,45 +98,49 @@ class _SamplerSetup {
       state.botPlayerId: [...state.botHand],
     };
     final seen = <SpanishCard>{...state.botHand};
-
     for (final card in state.botHand) {
       deck.remove(card);
     }
-    for (final played in state.playedCards) {
+    for (final played in state.allObservedPlayedCards) {
       if (!seen.add(played.card)) {
-        throw StateError('Una carta no vista coincide con una carta propia.');
+        throw StateError('Played card ${played.card} duplicates a known card.');
       }
       deck.remove(played.card);
     }
+    final knownCards = <SpanishCard>{};
     for (final entry in state.publiclyKnownCardsByPlayerId.entries) {
       if (entry.key == state.botPlayerId) continue;
+      if (!state.players.any((player) => player.id == entry.key)) {
+        throw ArgumentError('Known cards belong to an unknown player.');
+      }
       sampledHands[entry.key] = [...entry.value];
       for (final card in entry.value) {
+        if (!knownCards.add(card) || seen.contains(card)) {
+          throw StateError('A known card has conflicting locations.');
+        }
+        seen.add(card);
         deck.remove(card);
       }
     }
 
     final remainingSlots = <String, int>{};
     for (final player in state.players) {
-      final targetCount = state.cardsRemainingByPlayerId[player.id] ?? 0;
-      if (targetCount < 0) {
-        throw ArgumentError('Un jugador no puede tener cartas pendientes negativas.');
-      }
-      final assigned = sampledHands.putIfAbsent(player.id, () => <SpanishCard>[]);
-      final missingCount = targetCount - assigned.length;
-      if (missingCount < 0) {
+      final count = state.cardsRemainingByPlayerId[player.id] ?? 0;
+      if (count < 0) throw ArgumentError('Negative pending-card count.');
+      final assigned =
+          sampledHands.putIfAbsent(player.id, () => <SpanishCard>[]);
+      final missing = count - assigned.length;
+      if (missing < 0) {
         throw ArgumentError(
-          'La informacion publica excede las cartas esperadas para ${player.id}.',
-        );
+            'Public information exceeds expected hand size for ${player.id}.');
       }
-      remainingSlots[player.id] = missingCount;
+      remainingSlots[player.id] = missing;
     }
-
-    final neededCards = remainingSlots.values.fold<int>(0, (sum, value) => sum + value);
-    if (neededCards > deck.length) {
-      throw StateError('No hay suficientes cartas para determinizacion.');
+    final needed =
+        remainingSlots.values.fold<int>(0, (sum, count) => sum + count);
+    if (needed > deck.length) {
+      throw StateError('Not enough cards for determinization.');
     }
-
     return _SamplerSetup(
       deck: deck,
       sampledHands: sampledHands,
@@ -233,23 +148,33 @@ class _SamplerSetup {
     );
   }
 
-  PossibleDeal buildDeal() {
-    return PossibleDeal({
-      for (final entry in sampledHands.entries)
-        entry.key: List.unmodifiable(entry.value),
-    });
-  }
+  PossibleDeal buildDeal() => PossibleDeal({
+        for (final entry in sampledHands.entries)
+          entry.key: List.unmodifiable(entry.value),
+      });
 }
 
 void _fillUniformly(_SamplerSetup setup) {
-  var deckIndex = 0;
+  var offset = 0;
   for (final entry in setup.remainingSlots.entries) {
-    final playerId = entry.key;
-    final missingCount = entry.value;
-    if (missingCount <= 0) continue;
-    setup.sampledHands[playerId]!.addAll(
-      setup.deck.sublist(deckIndex, deckIndex + missingCount),
+    if (entry.value <= 0) continue;
+    setup.sampledHands[entry.key]!.addAll(
+      setup.deck.sublist(offset, offset + entry.value),
     );
-    deckIndex += missingCount;
+    offset += entry.value;
   }
+}
+
+String _weightedChoice(
+    List<String> candidates, List<double> weights, Random random) {
+  final total = weights.fold<double>(0, (sum, value) => sum + value);
+  if (total <= 0) {
+    throw StateError('No positive belief weight for hidden card.');
+  }
+  var roll = random.nextDouble() * total;
+  for (var index = 0; index < candidates.length; index++) {
+    roll -= weights[index];
+    if (roll < 0) return candidates[index];
+  }
+  return candidates.last;
 }

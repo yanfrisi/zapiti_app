@@ -6,6 +6,8 @@ class MonteCarloDifficultyConfig {
   final bool useActionInference;
   final bool usePartnerModel;
   final bool useOpponentProfiles;
+  final bool useSignalInference;
+  final bool useBetInference;
 
   const MonteCarloDifficultyConfig({
     required this.simulationsPerMove,
@@ -15,6 +17,8 @@ class MonteCarloDifficultyConfig {
     required this.useActionInference,
     required this.usePartnerModel,
     required this.useOpponentProfiles,
+    this.useSignalInference = false,
+    this.useBetInference = false,
   });
 }
 
@@ -29,6 +33,8 @@ class MonteCarloDifficultyConfigs {
     useActionInference: false,
     usePartnerModel: false,
     useOpponentProfiles: false,
+    useSignalInference: false,
+    useBetInference: false,
   );
 
   static const normal = MonteCarloDifficultyConfig(
@@ -39,26 +45,32 @@ class MonteCarloDifficultyConfigs {
     useActionInference: true,
     usePartnerModel: false,
     useOpponentProfiles: false,
+    useSignalInference: true,
+    useBetInference: false,
   );
 
   static const hard = MonteCarloDifficultyConfig(
-    simulationsPerMove: 80,
+    simulationsPerMove: 240,
     rolloutDepth: 3,
     mistakeProbability: 0.01,
     topCandidateCount: 1,
     useActionInference: true,
     usePartnerModel: true,
     useOpponentProfiles: false,
+    useSignalInference: true,
+    useBetInference: true,
   );
 
   static const expert = MonteCarloDifficultyConfig(
-    simulationsPerMove: 120,
-    rolloutDepth: 3,
+    simulationsPerMove: 600,
+    rolloutDepth: 4,
     mistakeProbability: 0,
     topCandidateCount: 1,
     useActionInference: true,
     usePartnerModel: true,
     useOpponentProfiles: true,
+    useSignalInference: true,
+    useBetInference: true,
   );
 
   static MonteCarloDifficultyConfig forDifficulty(int difficulty) {

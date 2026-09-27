@@ -31,7 +31,8 @@ void main() {
 
   group('ControllerLegalActionProvider', () {
     test('solo ofrece cartas legales al jugador en turno', () {
-      final controller = ZapitiGameController(players: ZapitiPlayers.tableOrder);
+      final controller =
+          ZapitiGameController(players: ZapitiPlayers.tableOrder);
 
       expect(
         controller.legalCardsForPlayer(ZapitiPlayers.human),
@@ -44,7 +45,8 @@ void main() {
     });
 
     test('bloquea jugar carta fuera de turno', () {
-      final controller = ZapitiGameController(players: ZapitiPlayers.tableOrder);
+      final controller =
+          ZapitiGameController(players: ZapitiPlayers.tableOrder);
 
       expect(
         controller.canPlayCard(
@@ -63,7 +65,8 @@ void main() {
     });
 
     test('expone aceptar, pasar y contra-subir al equipo que responde', () {
-      final controller = ZapitiGameController(players: ZapitiPlayers.tableOrder);
+      final controller =
+          ZapitiGameController(players: ZapitiPlayers.tableOrder);
       controller.callTruco(
         ZapitiPlayers.human,
         value: 3,
@@ -85,7 +88,8 @@ void main() {
     });
 
     test('tras aceptar el equipo rival puede ver la subida legal', () {
-      final controller = ZapitiGameController(players: ZapitiPlayers.tableOrder);
+      final controller =
+          ZapitiGameController(players: ZapitiPlayers.tableOrder);
       controller.callTruco(
         ZapitiPlayers.human,
         value: 3,
@@ -104,6 +108,50 @@ void main() {
         controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
         contains(const BetAction.call(6)),
       );
+    });
+
+    test('BET-FLOW-005 vuelve a permitir subir tras jugar cartas', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+        autoStart: false,
+      )..nextLeadIndex = 3;
+      controller.startNewHand();
+
+      controller.callTruco(
+        ZapitiPlayers.leftRival,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.leftRival.id,
+      );
+      controller.raiseTruco(
+        ZapitiPlayers.human,
+        value: 6,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      controller.acceptTruco(
+        teamId: TeamRules.teamTwo,
+        actorPlayerId: ZapitiPlayers.leftRival.id,
+      );
+
+      for (var played = 0; played < 2; played++) {
+        final player = controller.currentPlayer;
+        controller.playCard(player, controller.hands[player.id]!.first);
+      }
+
+      expect(controller.currentPlayer, ZapitiPlayers.rightRival);
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
+        contains(const BetAction.call(9)),
+      );
+    });
+
+    test('BET-AI-010 / BET-FLOW-007 Al Ver no ofrece acciones de apuesta', () {
+      final controller =
+          ZapitiGameController(players: ZapitiPlayers.tableOrder);
+      controller.alVerState = AlVerState.awaitingDecision;
+
+      expect(controller.legalBetActionsForPlayer(ZapitiPlayers.human), isEmpty);
+      expect(controller.legalBetActionsForPlayer(ZapitiPlayers.rightRival),
+          isEmpty);
     });
   });
 }

@@ -57,6 +57,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('BET-AI-011 evalua y emite Truco antes de elegir carta',
+      (tester) async {
+    await startGame(tester);
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setDifficultyForTesting(4);
+    gameState.prepareBotBetScenarioForTesting(firstRoundTie: true);
+
+    final advance = gameState.advanceBotsForTesting();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.pump(const Duration(milliseconds: 200));
+    await advance;
+
+    final snapshot =
+        gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
+    expect(snapshot['pendingTrucoValue'], 3);
+    expect(snapshot['botCardSelections'], 0);
+    expect(gameState.gameController.playedCards, isEmpty);
+  });
+
   testWidgets('truca tu hace que el companero evalue truco antes de jugar',
       (tester) async {
     await startGame(tester);
@@ -83,7 +104,8 @@ void main() {
     expect(gameState.gameController.playedCards, isEmpty);
   });
 
-  testWidgets('truca tu no obliga a apostar con posicion floja', (tester) async {
+  testWidgets('truca tu ejecuta la apuesta legal aunque la mano sea floja',
+      (tester) async {
     await startGame(tester);
     final gameState = tester.state(find.byType(GameScreen)) as dynamic;
 
@@ -97,7 +119,7 @@ void main() {
     final betValue = gameState.evaluateCurrentBotBetForTesting();
     final snapshot =
         gameState.offlineRuntimeSnapshotForTesting() as Map<String, Object?>;
-    expect(betValue, isNull);
+    expect(betValue, 3);
     expect(snapshot['pendingOrders'], 0);
     expect(gameState.gameController.playedCards, isEmpty);
   });

@@ -11,6 +11,7 @@ class BotDecisionContext {
   final List<Player> players;
   final List<SpanishCard> hand;
   final Map<String, List<SpanishCard>> hands;
+  final Map<String, List<SpanishCard>> publiclyKnownCardsByPlayerId;
   final List<PlayedCard> playedCards;
   final int teamRoundWins;
   final int opponentRoundWins;
@@ -18,6 +19,7 @@ class BotDecisionContext {
   final bool teammateHasStrongSignal;
   final bool opponentHasStrongSignal;
   final bool forceWinIfPossible;
+  final bool prioritizeFirstTrick;
   final bool teammateStillToPlay;
   final bool opponentStillToPlay;
   final SignalContext signalContext;
@@ -33,6 +35,7 @@ class BotDecisionContext {
     required this.players,
     required this.hand,
     required this.hands,
+    this.publiclyKnownCardsByPlayerId = const {},
     required this.playedCards,
     required this.teamRoundWins,
     required this.opponentRoundWins,
@@ -40,6 +43,7 @@ class BotDecisionContext {
     required this.teammateHasStrongSignal,
     required this.opponentHasStrongSignal,
     required this.forceWinIfPossible,
+    this.prioritizeFirstTrick = false,
     required this.teammateStillToPlay,
     required this.opponentStillToPlay,
     this.signalContext = SignalContext.empty,

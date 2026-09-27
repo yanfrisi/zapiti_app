@@ -1,21 +1,18 @@
 import 'dart:math';
 
 import 'bot_al_ver_strategy.dart';
-import 'bot_bluff_strategy.dart';
-import 'bot_bet_strategy.dart';
+import 'bot_bet_value_evaluator.dart';
 import 'bot_decision_context.dart';
 import 'bot_policy.dart';
 import 'bot_memory_context.dart';
 import 'bot_table_read.dart';
-import 'bot_truco_raise_strategy.dart';
-import 'bot_truco_response_strategy.dart';
-import 'bot_truco_strategy.dart';
 import 'bot_ven_a_mi_strategy.dart';
 import 'bot_voy_a_ti_strategy.dart';
 import 'difficulty_profile.dart';
 import 'difficulty_strategy.dart';
 import 'monte_carlo_difficulty_config.dart';
 import 'played_card.dart';
+import 'legal_actions.dart';
 import 'player.dart';
 import 'signal_rules.dart';
 import 'spanish_card.dart';
@@ -24,7 +21,6 @@ import 'truco_rules.dart';
 import 'zapiti_deck.dart';
 import 'zapiti_game_controller.dart';
 import 'zapiti_players.dart';
-import 'zapiti_rules.dart';
 
 class AiSimulationConfig {
   final int matches;
@@ -34,6 +30,7 @@ class AiSimulationConfig {
   final int teamTwoDifficulty;
   final int maxHandsPerMatch;
   final bool rotateStartingPlayerPerMatch;
+  final void Function(int hand, int round, int turn)? onProgress;
 
   const AiSimulationConfig({
     this.matches = 100,
@@ -44,6 +41,7 @@ class AiSimulationConfig {
     int? teamTwoDifficulty,
     this.maxHandsPerMatch = 120,
     this.rotateStartingPlayerPerMatch = true,
+    this.onProgress,
   })  : teamOneDifficulty = teamOneDifficulty ?? difficulty,
         teamTwoDifficulty = teamTwoDifficulty ?? difficulty;
 }
@@ -60,12 +58,16 @@ class AiSimulationSummary {
   final AiSimulationConfig config;
   final int teamOneWins;
   final int teamTwoWins;
+  final int abortedMatches;
   final int totalHands;
   final int totalRounds;
   final int totalTrucoCalls;
   final int totalTrucoRaises;
   final int totalTrucoAccepts;
   final int totalTrucoPasses;
+  final Map<int, int> betCallsByValue;
+  final Map<int, int> handsByMaxBetValue;
+  final List<double> openingTrucoWinProbabilities;
   final int totalAlVerPlayed;
   final int totalAlVerConceded;
   final int totalSignalOpportunities;
@@ -82,12 +84,16 @@ class AiSimulationSummary {
     required this.config,
     required this.teamOneWins,
     required this.teamTwoWins,
+    required this.abortedMatches,
     required this.totalHands,
     required this.totalRounds,
     required this.totalTrucoCalls,
     required this.totalTrucoRaises,
     required this.totalTrucoAccepts,
     required this.totalTrucoPasses,
+    required this.betCallsByValue,
+    required this.handsByMaxBetValue,
+    required this.openingTrucoWinProbabilities,
     required this.totalAlVerPlayed,
     required this.totalAlVerConceded,
     required this.totalSignalOpportunities,
@@ -102,6 +108,7 @@ class AiSimulationSummary {
   });
 
   int get playedMatches => teamOneWins + teamTwoWins;
+  int get completedMatches => playedMatches;
   double get teamOneWinRate =>
       playedMatches == 0 ? 0 : teamOneWins / playedMatches;
   double get teamTwoWinRate =>
@@ -151,12 +158,16 @@ class AiSimulationSummary {
   ) {
     var teamOneWins = 0;
     var teamTwoWins = 0;
+    var abortedMatches = 0;
     var totalHands = 0;
     var totalRounds = 0;
     var totalTrucoCalls = 0;
     var totalTrucoRaises = 0;
     var totalTrucoAccepts = 0;
     var totalTrucoPasses = 0;
+    final betCallsByValue = <int, int>{};
+    final handsByMaxBetValue = <int, int>{};
+    final openingTrucoWinProbabilities = <double>[];
     var totalAlVerPlayed = 0;
     var totalAlVerConceded = 0;
     var totalSignalOpportunities = 0;
@@ -172,12 +183,28 @@ class AiSimulationSummary {
     for (final summary in summaries) {
       teamOneWins += summary.teamOneWins;
       teamTwoWins += summary.teamTwoWins;
+      abortedMatches += summary.abortedMatches;
       totalHands += summary.totalHands;
       totalRounds += summary.totalRounds;
       totalTrucoCalls += summary.totalTrucoCalls;
       totalTrucoRaises += summary.totalTrucoRaises;
       totalTrucoAccepts += summary.totalTrucoAccepts;
       totalTrucoPasses += summary.totalTrucoPasses;
+      for (final entry in summary.betCallsByValue.entries) {
+        betCallsByValue.update(
+          entry.key,
+          (count) => count + entry.value,
+          ifAbsent: () => entry.value,
+        );
+      }
+      for (final entry in summary.handsByMaxBetValue.entries) {
+        handsByMaxBetValue.update(
+          entry.key,
+          (count) => count + entry.value,
+          ifAbsent: () => entry.value,
+        );
+      }
+      openingTrucoWinProbabilities.addAll(summary.openingTrucoWinProbabilities);
       totalAlVerPlayed += summary.totalAlVerPlayed;
       totalAlVerConceded += summary.totalAlVerConceded;
       totalSignalOpportunities += summary.totalSignalOpportunities;
@@ -195,12 +222,17 @@ class AiSimulationSummary {
       config: config,
       teamOneWins: teamOneWins,
       teamTwoWins: teamTwoWins,
+      abortedMatches: abortedMatches,
       totalHands: totalHands,
       totalRounds: totalRounds,
       totalTrucoCalls: totalTrucoCalls,
       totalTrucoRaises: totalTrucoRaises,
       totalTrucoAccepts: totalTrucoAccepts,
       totalTrucoPasses: totalTrucoPasses,
+      betCallsByValue: Map.unmodifiable(betCallsByValue),
+      handsByMaxBetValue: Map.unmodifiable(handsByMaxBetValue),
+      openingTrucoWinProbabilities:
+          List.unmodifiable(openingTrucoWinProbabilities),
       totalAlVerPlayed: totalAlVerPlayed,
       totalAlVerConceded: totalAlVerConceded,
       totalSignalOpportunities: totalSignalOpportunities,
@@ -218,16 +250,21 @@ class AiSimulationSummary {
 
 class AiMatchSimulator {
   const AiMatchSimulator();
+  static const _betEvaluator = BotBetValueEvaluator();
 
   AiSimulationSummary run(AiSimulationConfig config) {
     var teamOneWins = 0;
     var teamTwoWins = 0;
+    var abortedMatches = 0;
     var totalHands = 0;
     var totalRounds = 0;
     var totalTrucoCalls = 0;
     var totalTrucoRaises = 0;
     var totalTrucoAccepts = 0;
     var totalTrucoPasses = 0;
+    final betCallsByValue = <int, int>{};
+    final handsByMaxBetValue = <int, int>{};
+    final openingTrucoWinProbabilities = <double>[];
     var totalAlVerPlayed = 0;
     var totalAlVerConceded = 0;
     var totalSignalOpportunities = 0;
@@ -252,6 +289,8 @@ class AiMatchSimulator {
         teamOneWins += 1;
       } else if (result.winningTeamId == TeamRules.teamTwo) {
         teamTwoWins += 1;
+      } else {
+        abortedMatches += 1;
       }
       totalHands += result.hands;
       totalRounds += result.rounds;
@@ -259,6 +298,21 @@ class AiMatchSimulator {
       totalTrucoRaises += result.trucoRaises;
       totalTrucoAccepts += result.trucoAccepts;
       totalTrucoPasses += result.trucoPasses;
+      for (final entry in result.betCallsByValue.entries) {
+        betCallsByValue.update(
+          entry.key,
+          (count) => count + entry.value,
+          ifAbsent: () => entry.value,
+        );
+      }
+      for (final entry in result.handsByMaxBetValue.entries) {
+        handsByMaxBetValue.update(
+          entry.key,
+          (count) => count + entry.value,
+          ifAbsent: () => entry.value,
+        );
+      }
+      openingTrucoWinProbabilities.addAll(result.openingTrucoWinProbabilities);
       totalAlVerPlayed += result.alVerPlayed;
       totalAlVerConceded += result.alVerConceded;
       totalSignalOpportunities += result.signalOpportunities;
@@ -276,12 +330,17 @@ class AiMatchSimulator {
       config: config,
       teamOneWins: teamOneWins,
       teamTwoWins: teamTwoWins,
+      abortedMatches: abortedMatches,
       totalHands: totalHands,
       totalRounds: totalRounds,
       totalTrucoCalls: totalTrucoCalls,
       totalTrucoRaises: totalTrucoRaises,
       totalTrucoAccepts: totalTrucoAccepts,
       totalTrucoPasses: totalTrucoPasses,
+      betCallsByValue: Map.unmodifiable(betCallsByValue),
+      handsByMaxBetValue: Map.unmodifiable(handsByMaxBetValue),
+      openingTrucoWinProbabilities:
+          List.unmodifiable(openingTrucoWinProbabilities),
       totalAlVerPlayed: totalAlVerPlayed,
       totalAlVerConceded: totalAlVerConceded,
       totalSignalOpportunities: totalSignalOpportunities,
@@ -319,6 +378,11 @@ class AiMatchSimulator {
     while (!controller.isGameFinished &&
         metrics.hands <= config.maxHandsPerMatch) {
       _playCurrentHand(controller, config, random, metrics);
+      metrics.handsByMaxBetValue.update(
+        metrics.currentHandMaxBetValue,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
       if (!controller.isGameFinished &&
           metrics.hands < config.maxHandsPerMatch) {
         _startNewSimulatedHand(controller, random, config, metrics);
@@ -336,6 +400,10 @@ class AiMatchSimulator {
       trucoRaises: metrics.trucoRaises,
       trucoAccepts: metrics.trucoAccepts,
       trucoPasses: metrics.trucoPasses,
+      betCallsByValue: Map.unmodifiable(metrics.betCallsByValue),
+      handsByMaxBetValue: Map.unmodifiable(metrics.handsByMaxBetValue),
+      openingTrucoWinProbabilities:
+          List.unmodifiable(metrics.openingTrucoWinProbabilities),
       alVerPlayed: metrics.alVerPlayed,
       alVerConceded: metrics.alVerConceded,
       signalOpportunities: metrics.signalOpportunities,
@@ -357,6 +425,14 @@ class AiMatchSimulator {
     var stagnantIterations = 0;
     String? previousSignature;
     while (!controller.handFinished && !controller.isGameFinished) {
+      if (metrics.turnsInHand >= 128) {
+        throw StateError(
+          'AI simulation exceeded 128 transitions in hand ${metrics.hands}; '
+          'round=${controller.roundHistory.length}, turn=${controller.turnIndex}, '
+          'pending=${controller.pendingTrucoValue}, played=${controller.playedCards.length}',
+        );
+      }
+      metrics.turnsInHand += 1;
       final signature = [
         controller.turnIndex,
         controller.leadIndex,
@@ -387,6 +463,11 @@ class AiMatchSimulator {
 
       if (controller.pendingTrucoValue != null) {
         _respondToTruco(controller, config, random, metrics);
+        config.onProgress?.call(
+          metrics.hands,
+          controller.roundHistory.length + 1,
+          controller.turnIndex,
+        );
         continue;
       }
 
@@ -398,6 +479,11 @@ class AiMatchSimulator {
         player,
         metrics,
       )) {
+        config.onProgress?.call(
+          metrics.hands,
+          controller.roundHistory.length + 1,
+          controller.turnIndex,
+        );
         continue;
       }
 
@@ -406,9 +492,15 @@ class AiMatchSimulator {
       watch.stop();
       metrics.decisionMicros.add(watch.elapsedMicroseconds);
       final roundCompleted = controller.playCard(player, card);
+      config.onProgress?.call(
+        metrics.hands,
+        controller.roundHistory.length + 1,
+        controller.turnIndex,
+      );
       if (roundCompleted) {
         controller.resolveRound();
         metrics.rounds += 1;
+        metrics.turnsInHand = 0;
         if (controller.isRoundAwaitingContinue) {
           controller.continueRound();
         }
@@ -469,76 +561,35 @@ class AiMatchSimulator {
     }
 
     final teamId = player.teamId;
-    final opponentTeamId = TeamRules.opponentOf(teamId);
-    final teamCards = _teamCards(controller, teamId);
-    final memory = BotMemoryContext.from(
-      bot: player,
-      playedCards: controller.playedCards,
-      roundHistory: controller.roundHistory,
-    );
-    final ownMaxStrength = hand
-        .map(ZapitiRules.strength)
-        .reduce((best, current) => current > best ? current : best);
-    final needsPoints =
-        controller.score[teamId]! < controller.score[opponentTeamId]! ||
-            memory.teamIsUnderRoundPressure;
-    final chosenValue = BotBetStrategy.chooseBetValue(
-      difficulty: _difficultyFor(config, teamId),
-      roll: random.nextDouble(),
-      nextValue: nextValue,
-      maxAllowedValue: controller.maxAllowedTrucoValueForTeam(teamId),
-      strengths: teamCards.map(ZapitiRules.strength),
-      teamScore: _teamHandScore(controller, teamId),
-      ownMaxStrength: ownMaxStrength,
-      handStrength: BotTrucoStrategy.evaluateHandStrength(teamCards),
-      cardsOnTable: controller.playedCards.length,
-      teamRoundWins: controller.roundWins[teamId]!,
-      opponentRoundWins: controller.roundWins[opponentTeamId]!,
-      teamHasStrongSignal: false,
-      opponentHasStrongSignal: false,
-      isCompanion: false,
-      needsPoints: needsPoints,
-      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
-      opponentsSpentPower: memory.opponentsSpentPower,
-      teamSpentPower: memory.teamSpentPower,
-      isWinningReparto:
-          controller.roundWins[teamId]! > controller.roundWins[opponentTeamId]!,
-      canCloseHand: controller.roundWins[teamId]! > 0,
-      mustSaveHand: controller.roundWins[opponentTeamId]! > 0,
-      sawOpponentStrongSignal: false,
-    );
-    final shouldBluff = chosenValue != null || nextValue != TrucoRules.firstTrucoValue
-        ? false
-        : BotBluffStrategy.shouldBluffCall(
-            difficulty: _difficultyFor(config, teamId),
-            roll: random.nextDouble(),
-            teamScore: _teamHandScore(controller, teamId),
-            ownMaxStrength: ownMaxStrength,
-            cardsOnTable: controller.playedCards.length,
-            teamRoundWins: controller.roundWins[teamId]!,
-            opponentRoundWins: controller.roundWins[opponentTeamId]!,
-            teamHasStrongSignal: false,
-            opponentHasStrongSignal: false,
-            needsPoints: needsPoints,
-            opponentsSpentPower: memory.opponentsSpentPower,
-            teamSpentPower: memory.teamSpentPower,
-            teamIsUnderRoundPressure: memory.teamIsUnderRoundPressure,
-            scoreGap:
-                controller.score[teamId]! - controller.score[opponentTeamId]!,
-          );
-
-    if (chosenValue == null && !shouldBluff) return false;
+    final action =
+        _chooseBetAction(controller, player, _difficultyFor(config, teamId));
+    if (action?.type != BetActionType.call) return false;
 
     controller.callTruco(
       player,
-      value: chosenValue ?? nextValue,
+      value: action!.value!,
       actorPlayerId: player.id,
     );
-    if ((chosenValue ?? nextValue) == TrucoRules.firstTrucoValue) {
+    if (action.value == TrucoRules.firstTrucoValue) {
       metrics.trucoCalls += 1;
+      final evaluation = _betEvaluator.evaluateHand(
+        ownHand: hand,
+        cardsOnTable: controller.playedCards.length,
+        teamRoundWins: controller.roundWins[teamId]!,
+        opponentRoundWins: controller.roundWins[TeamRules.opponentOf(teamId)]!,
+      );
+      metrics.openingTrucoWinProbabilities
+          .add(evaluation.winProbability);
     } else {
       metrics.trucoRaises += 1;
     }
+    metrics.betCallsByValue.update(
+      action.value!,
+      (count) => count + 1,
+      ifAbsent: () => 1,
+    );
+    metrics.currentHandMaxBetValue =
+        max(metrics.currentHandMaxBetValue, action.value!);
     return true;
   }
 
@@ -553,25 +604,26 @@ class AiMatchSimulator {
     if (teamId == null || pendingValue == null) return;
 
     final responder = _responderFor(controller, teamId);
-    final raiseValue = _chooseRaiseValue(
-      controller,
-      config,
-      random,
-      teamId,
-      responder,
-      pendingValue,
-    );
-    if (raiseValue != null) {
+    final action =
+        _chooseBetAction(controller, responder, _difficultyFor(config, teamId));
+    if (action?.type == BetActionType.call) {
       controller.raiseTruco(
         responder,
-        value: raiseValue,
+        value: action!.value!,
         actorPlayerId: responder.id,
       );
       metrics.trucoRaises += 1;
+      metrics.currentHandMaxBetValue =
+          max(metrics.currentHandMaxBetValue, action.value!);
+      metrics.betCallsByValue.update(
+        action.value!,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
       return;
     }
 
-    if (_shouldAcceptTruco(controller, config, random, teamId, pendingValue)) {
+    if (action?.type == BetActionType.accept) {
       controller.acceptTruco(teamId: teamId, actorPlayerId: responder.id);
       metrics.trucoAccepts += 1;
     } else {
@@ -580,109 +632,27 @@ class AiMatchSimulator {
     }
   }
 
-  int? _chooseRaiseValue(
+  BetAction? _chooseBetAction(
     ZapitiGameController controller,
-    AiSimulationConfig config,
-    Random random,
-    int teamId,
-    Player responder,
-    int pendingValue,
+    Player player,
+    int difficulty,
   ) {
-    final strengths = _teamCards(controller, teamId)
-        .map(ZapitiRules.strength)
-        .toList()
-      ..sort();
-    final opponentTeamId = TeamRules.opponentOf(teamId);
-    final memory = BotMemoryContext.from(
-      bot: responder,
-      playedCards: controller.playedCards,
-      roundHistory: controller.roundHistory,
-    );
-    final isWinningReparto =
-        controller.roundWins[teamId]! > controller.roundWins[opponentTeamId]!;
-    final raiseValue = BotTrucoRaiseStrategy.chooseRaiseValue(
-      difficulty: _difficultyFor(config, teamId),
-      pendingValue: pendingValue,
-      maxAllowedValue: controller.maxAllowedTrucoValueForTeam(teamId),
-      strengths: strengths,
-      teamScore: _teamHandScore(controller, teamId),
-      hasStrongSignal: false,
-      isWinningReparto: isWinningReparto,
-      sawOpponentStrongSignal: false,
-      canCloseHand: controller.roundWins[teamId]! > 0,
-      mustSaveHand: controller.roundWins[opponentTeamId]! > 0,
-      needsPoints:
-          controller.score[teamId]! < controller.score[opponentTeamId]! ||
-              memory.teamIsUnderRoundPressure,
-      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
-      roll: random.nextDouble(),
-    );
-    if (controller.raiseOptions.contains(raiseValue)) return raiseValue;
-
-    final bluffValue = BotBluffStrategy.bluffRaiseValue(
-      difficulty: _difficultyFor(config, teamId),
-      roll: random.nextDouble(),
-      pendingValue: pendingValue,
-      maxAllowedValue: controller.maxAllowedTrucoValueForTeam(teamId),
-      teamScore: _teamHandScore(controller, teamId),
-      hasStrongSignal: false,
-      sawOpponentStrongSignal: false,
-      needsPoints:
-          controller.score[teamId]! < controller.score[opponentTeamId]! ||
-              memory.teamIsUnderRoundPressure,
-      isWinningReparto: isWinningReparto,
-      opponentsSpentPower: memory.opponentsSpentPower,
-      teamSpentPower: memory.teamSpentPower,
-      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
-    );
-    return controller.raiseOptions.contains(bluffValue) ? bluffValue : null;
-  }
-
-  bool _shouldAcceptTruco(
-    ZapitiGameController controller,
-    AiSimulationConfig config,
-    Random random,
-    int teamId,
-    int pendingValue,
-  ) {
-    if (pendingValue > controller.maxAllowedTrucoValue) return false;
-    if (BotTableRead.currentRoundIsUnsavableForTeam(
-      teamId: teamId,
-      players: controller.players,
-      hands: controller.hands,
-      playedCards: controller.playedCards,
-    )) {
-      return false;
-    }
-
-    final profileDifficulty = _difficultyFor(config, teamId);
-    final profile = DifficultyProfiles.byLevel(profileDifficulty);
-    final opponentTeamId = TeamRules.opponentOf(teamId);
-    final responder = _responderFor(controller, teamId);
-    final memory = BotMemoryContext.from(
-      bot: responder,
-      playedCards: controller.playedCards,
-      roundHistory: controller.roundHistory,
-    );
-    return BotTrucoResponseStrategy.shouldAccept(
-      difficulty: profileDifficulty,
-      pendingValue: pendingValue,
-      maxAllowedValue: controller.maxAllowedTrucoValue,
-      teamScoreEstimate: _teamHandScore(controller, teamId),
-      handStrength: BotTrucoStrategy.evaluateHandStrength(
-        _teamCards(controller, teamId),
-      ),
+    final opponent = TeamRules.opponentOf(player.teamId);
+    final hand = _betEvaluator.evaluateHand(
+      ownHand: controller.hands[player.id] ?? const <SpanishCard>[],
       cardsOnTable: controller.playedCards.length,
-      canCloseHand: controller.roundWins[teamId]! > 0,
-      mustSaveHand: controller.roundWins[opponentTeamId]! > 0,
-      hasStrongSignal: false,
-      opponentHasStrongSignal: profile.readsOpponentSignals && false,
-      needsPoints:
-          controller.score[teamId]! < controller.score[opponentTeamId]! ||
-              memory.teamIsUnderRoundPressure,
-      scoreGap: controller.score[teamId]! - controller.score[opponentTeamId]!,
-      currentRoundUnsavable: false,
-      roll: random.nextDouble(),
+      teamRoundWins: controller.roundWins[player.teamId]!,
+      opponentRoundWins: controller.roundWins[opponent]!,
+    );
+    return _betEvaluator.chooseAction(
+      legalActions: controller.legalBetActionsForPlayer(player),
+      hand: hand,
+      teamScore: controller.score[player.teamId]!,
+      opponentScore: controller.score[opponent]!,
+      targetScore: controller.targetScore,
+      acceptedValue: controller.handValue,
+      pendingValue: controller.pendingTrucoValue ?? controller.handValue,
+      difficulty: difficulty,
     );
   }
 
@@ -786,6 +756,7 @@ class AiMatchSimulator {
           controller.players[i].id: deck.skip(i * 3).take(3).toList(),
       },
     );
+    metrics.currentHandMaxBetValue = 0;
     _trackSignals(controller, config, metrics);
   }
 
@@ -795,19 +766,6 @@ class AiMatchSimulator {
         .expand(
             (player) => controller.hands[player.id] ?? const <SpanishCard>[])
         .toList();
-  }
-
-  int _teamHandScore(ZapitiGameController controller, int teamId) {
-    final strengths = _teamCards(controller, teamId)
-        .map(ZapitiRules.strength)
-        .toList()
-      ..sort();
-    if (strengths.isEmpty) return 0;
-
-    final strongest = strengths.last;
-    final second = strengths.length > 1 ? strengths[strengths.length - 2] : 0;
-    final third = strengths.length > 2 ? strengths[strengths.length - 3] : 0;
-    return strongest + (second ~/ 2) + (third ~/ 3);
   }
 
   int _difficultyFor(AiSimulationConfig config, int teamId) {
@@ -930,6 +888,10 @@ class _SimulationMetrics {
   int trucoRaises = 0;
   int trucoAccepts = 0;
   int trucoPasses = 0;
+  final Map<int, int> betCallsByValue = {};
+  final Map<int, int> handsByMaxBetValue = {};
+  final List<double> openingTrucoWinProbabilities = [];
+  int currentHandMaxBetValue = 0;
   int alVerPlayed = 0;
   int alVerConceded = 0;
   int signalOpportunities = 0;
@@ -938,6 +900,7 @@ class _SimulationMetrics {
   int voyATiRequests = 0;
   int venAMiOrders = 0;
   int venAMiProtectedRounds = 0;
+  int turnsInHand = 0;
   final List<int> decisionMicros = [];
 }
 
@@ -951,6 +914,9 @@ class _SimulatedMatchResult {
   final int trucoRaises;
   final int trucoAccepts;
   final int trucoPasses;
+  final Map<int, int> betCallsByValue;
+  final Map<int, int> handsByMaxBetValue;
+  final List<double> openingTrucoWinProbabilities;
   final int alVerPlayed;
   final int alVerConceded;
   final int signalOpportunities;
@@ -971,6 +937,9 @@ class _SimulatedMatchResult {
     required this.trucoRaises,
     required this.trucoAccepts,
     required this.trucoPasses,
+    required this.betCallsByValue,
+    required this.handsByMaxBetValue,
+    required this.openingTrucoWinProbabilities,
     required this.alVerPlayed,
     required this.alVerConceded,
     required this.signalOpportunities,

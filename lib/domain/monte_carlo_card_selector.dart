@@ -4,8 +4,6 @@ import 'bot_strategy.dart';
 import 'bot_table_read.dart';
 import 'monte_carlo_difficulty_config.dart';
 import 'observable_game_state.dart';
-import 'played_card.dart';
-import 'round_rules.dart';
 import 'player.dart';
 import 'possible_deal_sampler.dart';
 import 'signal_context.dart';
@@ -14,7 +12,6 @@ import 'simulation_game_engine.dart';
 import 'simulation_game_state.dart';
 import 'simulation_state_factory.dart';
 import 'spanish_card.dart';
-import 'suit.dart';
 import 'team_rules.dart';
 import 'zapiti_rules.dart';
 
@@ -59,43 +56,6 @@ class MonteCarloCardSelector {
     }
     if (legalCards.length == 1 || config.simulationsPerMove <= 0) {
       return legalCards.first;
-    }
-
-    final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(
-      state.playedCards,
-    );
-    final bot = state.players.firstWhere((player) => player.id == botPlayerId);
-    if (currentWinningTeam == bot.teamId &&
-        state.playedCards.length == state.players.length - 1) {
-      final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
-      return sorted.first;
-    }
-
-    final preservationChoice = _knownThirdTrickPreservationChoice(
-      state: state,
-      bot: bot,
-      legalCards: legalCards,
-    );
-    if (preservationChoice != null) {
-      return preservationChoice;
-    }
-
-    final secondTrickLeadChoice = _secondTrickLeadPreservationChoice(
-      state: state,
-      bot: bot,
-      legalCards: legalCards,
-    );
-    if (secondTrickLeadChoice != null) {
-      return secondTrickLeadChoice;
-    }
-
-    final openingLeadChoice = _openingLeadPreservationChoice(
-      state: state,
-      bot: bot,
-      legalCards: legalCards,
-    );
-    if (openingLeadChoice != null) {
-      return openingLeadChoice;
     }
 
     final rolloutProfiles = _buildRolloutProfiles(
@@ -175,159 +135,24 @@ class MonteCarloCardSelector {
         .map((entry) => ScoredCard(entry.card, entry.meanScore))
         .toList()
       ..sort((a, b) => b.score.compareTo(a.score));
-    final orderAware = _orderAwareChoice(
-      botPlayerId: botPlayerId,
-      state: state,
-      scored: scored,
-    );
-    if (orderAware != null) return orderAware;
     final top = scored.take(config.topCandidateCount).toList();
     return top[random.nextInt(top.length)].card;
-  }
-
-  SpanishCard? _knownThirdTrickPreservationChoice({
-    required ObservableGameState state,
-    required Player bot,
-    required List<SpanishCard> legalCards,
-  }) {
-    final opponentTeamId = TeamRules.opponentOf(bot.teamId);
-    if ((state.roundWins[bot.teamId] ?? 0) <=
-        (state.roundWins[opponentTeamId] ?? 0)) {
-      return null;
-    }
-    if (state.playedCards.length != state.players.length - 1) {
-      return null;
-    }
-    if (legalCards.length <= 1) return null;
-    for (final player in state.players) {
-      if (player.id == bot.id) continue;
-      final known = state.publiclyKnownCardsByPlayerId[player.id];
-      final expected = state.cardsRemainingByPlayerId[player.id] ?? 0;
-      if (known == null || known.length != expected) {
-        return null;
-      }
-    }
-
-    final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
-    final weakest = sorted.first;
-    final result = RoundRules.resolveRound([
-      ...state.playedCards,
-      PlayedCard(player: bot, card: weakest),
-    ]);
-    if (result.winningTeamId == bot.teamId) {
-      return null;
-    }
-
-    SpanishCard? strongestRemaining;
-    int? strongestTeamId;
-    for (final player in state.players) {
-      final cards = player.id == bot.id
-          ? sorted.skip(1)
-          : (state.publiclyKnownCardsByPlayerId[player.id] ?? const <SpanishCard>[]);
-      for (final card in cards) {
-        if (strongestRemaining == null ||
-            ZapitiRules.strength(card) > ZapitiRules.strength(strongestRemaining)) {
-          strongestRemaining = card;
-          strongestTeamId = player.teamId;
-        }
-      }
-    }
-    if (strongestRemaining == null || strongestTeamId != bot.teamId) {
-      return null;
-    }
-    return weakest;
-  }
-
-  SpanishCard? _secondTrickLeadPreservationChoice({
-    required ObservableGameState state,
-    required Player bot,
-    required List<SpanishCard> legalCards,
-  }) {
-    if (state.playedCards.isNotEmpty || legalCards.length <= 1) return null;
-
-    final opponentTeamId = TeamRules.opponentOf(bot.teamId);
-    if ((state.roundWins[bot.teamId] ?? 0) <=
-        (state.roundWins[opponentTeamId] ?? 0)) {
-      return null;
-    }
-
-    const premiumTrump = SpanishCard(value: 4, suit: Suit.bastos);
-    if (!legalCards.contains(premiumTrump)) return null;
-
-    final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
-    return sorted.firstWhere(
-      (card) => card != premiumTrump,
-      orElse: () => premiumTrump,
-    );
-  }
-
-  SpanishCard? _openingLeadPreservationChoice({
-    required ObservableGameState state,
-    required Player bot,
-    required List<SpanishCard> legalCards,
-  }) {
-    if (state.playedCards.isNotEmpty || legalCards.length <= 1) return null;
-
-    final opponentTeamId = TeamRules.opponentOf(bot.teamId);
-    final teamRoundWins = state.roundWins[bot.teamId] ?? 0;
-    final opponentRoundWins = state.roundWins[opponentTeamId] ?? 0;
-    final signalBias = _observableSignalBiasForPlayer(state, bot);
-    final firstRoundWasTie = state.completedTricks.length == 1 &&
-        state.completedTricks.first.isTie;
-
-    // After a tie the next trick decides the hand, so playing the best card
-    // can be correct. Otherwise the leader should usually show a low card.
-    final mustPress = signalBias.mustWin ||
-        opponentRoundWins > teamRoundWins ||
-        firstRoundWasTie;
-    if (mustPress) return null;
-
-    final sorted = [...legalCards]..sort(BotStrategy.compareByStrength);
-    return sorted.first;
-  }
-
-  SpanishCard? _orderAwareChoice({
-    required String botPlayerId,
-    required ObservableGameState state,
-    required List<ScoredCard> scored,
-  }) {
-    if (scored.isEmpty) return null;
-    final bot = state.players.firstWhere((player) => player.id == botPlayerId);
-    final signalBias = _observableSignalBiasForPlayer(state, bot);
-    final bestScore = scored.first.score;
-    final tableStrength = BotTableRead.bestTableStrength(state.playedCards) ?? -1;
-
-    if (signalBias.mustWin) {
-      final winning = scored
-          .where((entry) => ZapitiRules.strength(entry.card) > tableStrength)
-          .toList()
-        ..sort((a, b) => BotStrategy.compareByStrength(a.card, b.card));
-      if (winning.isNotEmpty && winning.first.score >= bestScore - 60) {
-        return winning.first.card;
-      }
-    }
-
-    if (signalBias.conserveResources) {
-      final conservative = [...scored]
-        ..sort((a, b) => BotStrategy.compareByStrength(a.card, b.card));
-      if (conservative.first.score >= bestScore - 70) {
-        return conservative.first.card;
-      }
-    }
-
-    return null;
   }
 
   PossibleDealSampler _samplerForConfig(MonteCarloDifficultyConfig config) {
     if (!config.useActionInference &&
         !config.usePartnerModel &&
-        !config.useOpponentProfiles) {
+        !config.useOpponentProfiles &&
+        !config.useSignalInference &&
+        !config.useBetInference) {
       return sampler;
     }
     return InferenceBiasedPossibleDealSampler(
       useActionInference: config.useActionInference,
       usePartnerModel: config.usePartnerModel,
       useOpponentProfiles: config.useOpponentProfiles,
+      useSignalInference: config.useSignalInference,
+      useBetInference: config.useBetInference,
     );
   }
 
@@ -348,7 +173,8 @@ class MonteCarloCardSelector {
           observableState: state,
           possibleDeal: deal,
         );
-        final afterInitial = engine.playCard(simState, botPlayerId, card).nextState;
+        final afterInitial =
+            engine.playCard(simState, botPlayerId, card).nextState;
         final value = _evaluateState(
           state: afterInitial,
           botPlayerId: botPlayerId,
@@ -420,7 +246,8 @@ class MonteCarloCardSelector {
     final player = players.firstWhere((p) => p.id == playerId);
     final teamId = player.teamId;
     final opponentTeamId = TeamRules.opponentOf(teamId);
-    final currentWinningTeam = BotTableRead.currentWinningTeamOnTable(playedCards);
+    final currentWinningTeam =
+        BotTableRead.currentWinningTeamOnTable(playedCards);
     final teammateHasStrongSignal = state.signalContext
         .visibleToTeam(teamId)
         .teamHasObservedStrongCardSignal(teamId);
@@ -428,15 +255,15 @@ class MonteCarloCardSelector {
         .visibleToTeam(teamId)
         .teamHasObservedStrongCardSignal(opponentTeamId);
     final signalBias = _signalBiasForPlayer(state, player);
-    final preserveStrongCards =
-        currentWinningTeam == teamId ||
+    final preserveStrongCards = currentWinningTeam == teamId ||
         teammateHasStrongSignal ||
         signalBias.conserveResources ||
-        (state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) ||
+        (state.roundWins[teamId] ?? 0) >
+            (state.roundWins[opponentTeamId] ?? 0) ||
         profile.conservation >= 0.65;
-    final forceWinIfPossible =
-        (state.roundWins[opponentTeamId] ?? 0) > (state.roundWins[teamId] ?? 0) &&
-        (!teammateHasStrongSignal || profile.aggression >= 0.7) ||
+    final forceWinIfPossible = (state.roundWins[opponentTeamId] ?? 0) >
+                (state.roundWins[teamId] ?? 0) &&
+            (!teammateHasStrongSignal || profile.aggression >= 0.7) ||
         signalBias.mustWin;
 
     final baseline = BotStrategy.chooseCard(
@@ -507,8 +334,9 @@ class MonteCarloCardSelector {
       var conservation = 0.52;
       var cooperation = player.teamId == botTeamId ? 0.55 : 0.40;
 
-      final playedByPlayer =
-          state.playedCards.where((played) => played.player.id == player.id).toList();
+      final playedByPlayer = state.playedCards
+          .where((played) => played.player.id == player.id)
+          .toList();
       if (config.useActionInference && playedByPlayer.isNotEmpty) {
         final averageStrength = playedByPlayer
                 .map((entry) => ZapitiRules.strength(entry.card))
@@ -529,7 +357,8 @@ class MonteCarloCardSelector {
       }
 
       if (config.useOpponentProfiles && player.teamId != botTeamId) {
-        final seatIndex = state.players.indexWhere((entry) => entry.id == player.id);
+        final seatIndex =
+            state.players.indexWhere((entry) => entry.id == player.id);
         if (seatIndex.isEven) {
           aggression += 0.06;
         } else {
@@ -586,6 +415,17 @@ class MonteCarloCardSelector {
       mix(player.teamId);
       mix(state.cardsRemainingByPlayerId[player.id] ?? 0);
       mix(state.roundWins[player.teamId] ?? 0);
+    }
+    final knownPlayerIds = state.publiclyKnownCardsByPlayerId.keys.toList()
+      ..sort();
+    for (final playerId in knownPlayerIds) {
+      mix(playerId.hashCode);
+      final cards = [...state.publiclyKnownCardsByPlayerId[playerId]!]
+        ..sort(BotStrategy.compareByStrength);
+      for (final card in cards) {
+        mix(card.value);
+        mix(card.suit.index);
+      }
     }
     mix(state.trickIndex);
     for (final signal in state.signalContext.signals) {
@@ -696,7 +536,8 @@ class MonteCarloCardSelector {
       if (isLastToPlay) bonus += 10;
       if (teammateStillToPlay) bonus += 4;
       if (signalBias.conserveResources) bonus += 34 - cardStrength * 0.35;
-      if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+      if ((state.roundWins[teamId] ?? 0) >
+              (state.roundWins[opponentTeamId] ?? 0) &&
           state.completedTricks.isNotEmpty) {
         bonus += 24 - cardStrength * 0.28;
       }
@@ -710,11 +551,12 @@ class MonteCarloCardSelector {
       if (isLastToPlay) bonus += 8;
       if (teammateStillToPlay) bonus += 5;
       if (signalBias.mustWin && canBeatTable) {
-        bonus += 116 - cardStrength * 0.72;
+        bonus += 220 - cardStrength * 0.72;
       } else if (signalBias.conserveResources) {
         bonus += canBeatTable ? -cardStrength * 0.34 : 22;
       }
-      if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+      if ((state.roundWins[teamId] ?? 0) >
+              (state.roundWins[opponentTeamId] ?? 0) &&
           state.completedTricks.isNotEmpty &&
           isLastToPlay) {
         bonus += canBeatTable ? -cardStrength * 0.40 : 42 - cardStrength * 0.08;
@@ -726,13 +568,14 @@ class MonteCarloCardSelector {
     if (signalBias.conserveResources) {
       bonus += 22 - cardStrength * 0.24;
     }
-    if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+    if ((state.roundWins[teamId] ?? 0) >
+            (state.roundWins[opponentTeamId] ?? 0) &&
         state.completedTricks.isNotEmpty &&
         state.playedCards.isEmpty) {
       bonus += 18 - cardStrength * 0.20;
     }
     if (signalBias.mustWin && canBeatTable) {
-      bonus += 80 - cardStrength * 0.48;
+      bonus += 220 - cardStrength * 0.72;
     }
     if (teammateStillToPlay) {
       bonus += 10 - cardStrength * 0.08;
@@ -752,16 +595,19 @@ class MonteCarloCardSelector {
     final teamId = bot.teamId;
     final opponentTeamId = TeamRules.opponentOf(teamId);
     final cardStrength = ZapitiRules.strength(card);
-    final tableStrength = BotTableRead.bestTableStrength(state.playedCards) ?? -1;
+    final tableStrength =
+        BotTableRead.bestTableStrength(state.playedCards) ?? -1;
     final canBeat = cardStrength > tableStrength;
     final canTie = cardStrength == tableStrength;
 
     var bonus = 0.0;
-    if ((state.roundWins[opponentTeamId] ?? 0) > (state.roundWins[teamId] ?? 0) &&
+    if ((state.roundWins[opponentTeamId] ?? 0) >
+            (state.roundWins[teamId] ?? 0) &&
         canBeat) {
       bonus += 18;
     }
-    if ((state.roundWins[teamId] ?? 0) > (state.roundWins[opponentTeamId] ?? 0) &&
+    if ((state.roundWins[teamId] ?? 0) >
+            (state.roundWins[opponentTeamId] ?? 0) &&
         !canBeat &&
         !canTie) {
       bonus += 12;
@@ -795,7 +641,8 @@ class MonteCarloCardSelector {
         turnsUntilTeammate <= remainingTurnsAfterPlayer;
   }
 
-  bool _teammateStillToPlayObservable(ObservableGameState state, Player player) {
+  bool _teammateStillToPlayObservable(
+      ObservableGameState state, Player player) {
     final teammateIndex = state.players.indexWhere(
       (entry) => entry.teamId == player.teamId && entry.id != player.id,
     );
@@ -846,7 +693,8 @@ class MonteCarloCardSelector {
     return false;
   }
 
-  bool _opponentStillToPlayObservable(ObservableGameState state, Player player) {
+  bool _opponentStillToPlayObservable(
+      ObservableGameState state, Player player) {
     final playerIndex = state.players.indexWhere(
       (entry) => entry.id == player.id,
     );

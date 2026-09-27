@@ -120,7 +120,8 @@ void main() {
       expect(controller.betState.responsePending, isFalse);
     });
 
-    test('tras aceptar el mismo equipo no puede volver a subir enseguida', () {
+    test('BET-FLOW-006 aceptar no permite dos subidas consecutivas del equipo',
+        () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
@@ -269,7 +270,7 @@ void main() {
       );
     });
 
-    test('la escalera completa alterna equipos hasta ahorrisi', () {
+    test('BET-FLOW-003 contra-subidas directas alternan hasta Ahorrisi', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );
@@ -1315,8 +1316,7 @@ void main() {
       expect(controller.playedCards, isEmpty);
     });
 
-    test('al ver bloquea truco y subida para ambos equipos',
-        () {
+    test('al ver bloquea truco y subida para ambos equipos', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
       );

@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zapiti_app/domain/bot_truco_strategy.dart';
 
 void main() {
-  test('experto prioriza el truco tras una primera baza empatada con triunfo premium', () {
+  test('AI-005 el empate no fuerza Truco sin fuerza suficiente de mano', () {
     expect(
       BotTrucoStrategy.shouldCall(
         difficulty: 5,
@@ -10,13 +10,32 @@ void main() {
         ownMaxStrength: 100,
         handStrength: 0.55,
         cardsOnTable: 1,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        isCompanion: true,
+        needsPoints: false,
+      ),
+      isFalse,
+    );
+  });
+
+  test('AI-005 permite apostar tras empate si la mano completa es favorable', () {
+    expect(
+      BotTrucoStrategy.shouldCallWithRoll(
+        difficulty: 5,
+        roll: 0,
+        teamScore: 200,
+        ownMaxStrength: 100,
+        handStrength: 0.95,
+        cardsOnTable: 0,
         teamRoundWins: 1,
         opponentRoundWins: 1,
         teamHasStrongSignal: false,
         opponentHasStrongSignal: false,
         isCompanion: true,
         needsPoints: false,
-        firstRoundWasTie: true,
       ),
       isTrue,
     );

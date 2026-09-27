@@ -23,6 +23,19 @@ class ObservableGameState {
   final int handVersion;
   final int trickIndex;
 
+  List<PlayedCard> get allObservedPlayedCards {
+    final currentKeys = {
+      for (final played in playedCards) '${played.player.id}:${played.card}',
+    };
+    return [
+      ...completedTricks.expand((trick) => trick.playedCards).where(
+            (played) =>
+                !currentKeys.contains('${played.player.id}:${played.card}'),
+          ),
+      ...playedCards,
+    ];
+  }
+
   const ObservableGameState({
     required this.botPlayerId,
     required this.players,

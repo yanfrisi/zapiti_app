@@ -16,7 +16,8 @@ import 'package:zapiti_app/domain/team_rules.dart';
 void main() {
   const human = Player(id: 'p1', name: 'Human', teamId: TeamRules.teamOne);
   const rivalOne = Player(id: 'p2', name: 'Rival 1', teamId: TeamRules.teamTwo);
-  const companion = Player(id: 'p3', name: 'Companion', teamId: TeamRules.teamOne);
+  const companion =
+      Player(id: 'p3', name: 'Companion', teamId: TeamRules.teamOne);
   const rivalTwo = Player(id: 'p4', name: 'Rival 2', teamId: TeamRules.teamTwo);
   const players = [human, rivalOne, companion, rivalTwo];
   final selector = MonteCarloCardSelector();
@@ -25,6 +26,7 @@ void main() {
     required String botPlayerId,
     required List<SpanishCard> botHand,
     required List<PlayedCard> playedCards,
+    Map<String, List<SpanishCard>> publicCards = const {},
     SignalContext signalContext = SignalContext.empty,
   }) {
     return ObservableGameState(
@@ -38,9 +40,10 @@ void main() {
         'p3': 3,
         'p4': 3,
       },
-      publiclyKnownCardsByPlayerId: const {},
+      publiclyKnownCardsByPlayerId: publicCards,
       currentPlayerId: botPlayerId,
-      trickLeaderId: playedCards.isEmpty ? botPlayerId : playedCards.first.player.id,
+      trickLeaderId:
+          playedCards.isEmpty ? botPlayerId : playedCards.first.player.id,
       betState: const BetState(
         acceptedLevel: BetLevel.none,
         proposedLevel: null,
@@ -68,6 +71,22 @@ void main() {
         mediumWinner,
         maximum,
       ],
+      publicCards: const {
+        'p1': [
+          SpanishCard(value: 6, suit: Suit.oros),
+          SpanishCard(value: 5, suit: Suit.bastos),
+          SpanishCard(value: 4, suit: Suit.oros),
+        ],
+        'p2': [
+          SpanishCard(value: 10, suit: Suit.copas),
+          SpanishCard(value: 7, suit: Suit.espadas),
+        ],
+        'p4': [
+          SpanishCard(value: 6, suit: Suit.copas),
+          SpanishCard(value: 5, suit: Suit.espadas),
+          SpanishCard(value: 4, suit: Suit.espadas),
+        ],
+      },
       playedCards: const [
         PlayedCard(
           player: rivalOne,

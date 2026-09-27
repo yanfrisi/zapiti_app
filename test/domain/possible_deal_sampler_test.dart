@@ -89,4 +89,73 @@ void main() {
       isNot(contains(const SpanishCard(value: 3, suit: Suit.copas))),
     );
   });
+
+  test('coloca las cartas conocidas y no las duplica en otras manos', () {
+    const knownState = ObservableGameState(
+      botPlayerId: 'p1',
+      players: ZapitiPlayers.tableOrder,
+      botHand: [SpanishCard(value: 1, suit: Suit.espadas)],
+      playedCards: [
+        PlayedCard(
+          player: ZapitiPlayers.leftRival,
+          card: SpanishCard(value: 3, suit: Suit.copas),
+        ),
+      ],
+      cardsRemainingByPlayerId: {'p1': 1, 'p2': 2, 'p3': 2, 'p4': 2},
+      publiclyKnownCardsByPlayerId: {
+        'p2': [SpanishCard(value: 4, suit: Suit.bastos)],
+      },
+      currentPlayerId: 'p1',
+      trickLeaderId: 'p1',
+      betState: BetState(
+        acceptedLevel: BetLevel.none,
+        proposedLevel: null,
+        proposingTeam: null,
+        respondingTeam: null,
+        lastRaisingTeam: null,
+        responsePending: false,
+      ),
+      score: {1: 0, 2: 0},
+      roundWins: {1: 0, 2: 0},
+      visibleSignals: [],
+    );
+
+    final deal = sampler.sample(knownState, Random(11));
+    expect(deal.handsByPlayerId['p2'], contains(const SpanishCard(value: 4, suit: Suit.bastos)));
+    final cards = deal.handsByPlayerId.values.expand((hand) => hand).toList();
+    expect(cards.toSet(), hasLength(cards.length));
+  });
+
+  test('rechaza una carta conocida que ya se jugó', () {
+    const invalidState = ObservableGameState(
+      botPlayerId: 'p1',
+      players: ZapitiPlayers.tableOrder,
+      botHand: [SpanishCard(value: 1, suit: Suit.espadas)],
+      playedCards: [
+        PlayedCard(
+          player: ZapitiPlayers.leftRival,
+          card: SpanishCard(value: 3, suit: Suit.copas),
+        ),
+      ],
+      cardsRemainingByPlayerId: {'p1': 1, 'p2': 2, 'p3': 2, 'p4': 2},
+      publiclyKnownCardsByPlayerId: {
+        'p2': [SpanishCard(value: 3, suit: Suit.copas)],
+      },
+      currentPlayerId: 'p1',
+      trickLeaderId: 'p1',
+      betState: BetState(
+        acceptedLevel: BetLevel.none,
+        proposedLevel: null,
+        proposingTeam: null,
+        respondingTeam: null,
+        lastRaisingTeam: null,
+        responsePending: false,
+      ),
+      score: {1: 0, 2: 0},
+      roundWins: {1: 0, 2: 0},
+      visibleSignals: [],
+    );
+
+    expect(() => sampler.sample(invalidState, Random(12)), throwsStateError);
+  });
 }

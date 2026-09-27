@@ -75,6 +75,15 @@ class ControllerLegalActionProvider implements LegalActionProvider {
       )) {
         actions.add(const BetAction.pass());
       }
+      for (final value in controller.raiseOptionsForTeam(player.teamId)) {
+        if (controller.canCallTruco(
+          player,
+          value: value,
+          actorPlayerId: player.id,
+        )) {
+          actions.add(BetAction.call(value));
+        }
+      }
     }
 
     return List<BetAction>.unmodifiable(actions);

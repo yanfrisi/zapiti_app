@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:zapiti_app/domain/bet_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zapiti_app/domain/bot_decision_context.dart';
@@ -5,11 +7,14 @@ import 'package:zapiti_app/domain/bot_policy.dart';
 import 'package:zapiti_app/domain/monte_carlo_card_selector.dart';
 import 'package:zapiti_app/domain/monte_carlo_difficulty_config.dart';
 import 'package:zapiti_app/domain/observable_game_state.dart';
+import 'package:zapiti_app/domain/possible_deal_sampler.dart';
 import 'package:zapiti_app/domain/played_card.dart';
 import 'package:zapiti_app/domain/player.dart';
 import 'package:zapiti_app/domain/round_result.dart';
+import 'package:zapiti_app/domain/signal_context.dart';
 import 'package:zapiti_app/domain/spanish_card.dart';
 import 'package:zapiti_app/domain/suit.dart';
+import 'package:zapiti_app/domain/zapiti_rules.dart';
 
 void main() {
   group('BotPolicySelector', () {
@@ -24,13 +29,13 @@ void main() {
 
     test('mantiene presupuestos Monte Carlo razonables para la UI', () {
       expect(MonteCarloDifficultyConfigs.hard.simulationsPerMove,
-          lessThanOrEqualTo(80));
-      expect(MonteCarloDifficultyConfigs.hard.rolloutDepth,
-          lessThanOrEqualTo(3));
+          lessThanOrEqualTo(300));
+      expect(
+          MonteCarloDifficultyConfigs.hard.rolloutDepth, lessThanOrEqualTo(3));
       expect(MonteCarloDifficultyConfigs.expert.simulationsPerMove,
-          lessThanOrEqualTo(120));
+          lessThanOrEqualTo(750));
       expect(MonteCarloDifficultyConfigs.expert.rolloutDepth,
-          lessThanOrEqualTo(3));
+          lessThanOrEqualTo(4));
     });
   });
 
@@ -39,6 +44,55 @@ void main() {
     const rival = Player(id: 'rival', name: 'Rival', teamId: 1);
     const teammate = Player(id: 'mate', name: 'Mate', teamId: 2);
     const rearRival = Player(id: 'rear', name: 'Rear', teamId: 1);
+
+    test(
+        'AI-006 transfiere cartas conocidas a Monte Carlo sin revelar otras manos',
+        () {
+      const knownCard = SpanishCard(value: 4, suit: Suit.bastos);
+      final sampler = _RecordingSampler();
+      const botHand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 12, suit: Suit.oros),
+      ];
+      final policy = MonteCarloBotPolicy(
+        selector: MonteCarloCardSelector(sampler: sampler),
+      );
+
+      policy.chooseCard(
+        const BotDecisionContext(
+          difficulty: 1,
+          bot: bot,
+          players: [bot, rival, teammate, rearRival],
+          hand: botHand,
+          hands: {
+            'bot': botHand,
+            'rival': [SpanishCard(value: 3, suit: Suit.copas)],
+            'mate': [knownCard],
+            'rear': [SpanishCard(value: 5, suit: Suit.oros)],
+          },
+          publiclyKnownCardsByPlayerId: {
+            'mate': [knownCard],
+          },
+          playedCards: [],
+          teamRoundWins: 0,
+          opponentRoundWins: 0,
+          preserveStrongCards: false,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: true,
+          opponentStillToPlay: true,
+        ),
+      );
+
+      expect(sampler.observedState, isNotNull);
+      expect(sampler.observedState!.publiclyKnownCardsByPlayerId['mate'],
+          [knownCard]);
+      expect(sampler.observedState!.publiclyKnownCardsByPlayerId,
+          isNot(contains('rival')));
+      expect(sampler.observedState!.publiclyKnownCardsByPlayerId,
+          isNot(contains('rear')));
+    });
     const hand = [
       SpanishCard(value: 2, suit: Suit.copas),
       SpanishCard(value: 12, suit: Suit.oros),
@@ -161,6 +215,67 @@ void main() {
       expect(card, const SpanishCard(value: 12, suit: Suit.oros));
     });
 
+    test('AI-003 conserva la mata con el companero claramente ganador', () {
+      const botHand = [
+        SpanishCard(value: 7, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      final card = MonteCarloBotPolicy().chooseCard(
+        const BotDecisionContext(
+          difficulty: 5,
+          bot: bot,
+          players: players,
+          hand: botHand,
+          hands: {
+            'bot': botHand,
+            'rival': [
+              SpanishCard(value: 3, suit: Suit.espadas),
+              SpanishCard(value: 5, suit: Suit.oros),
+            ],
+            'rear': [
+              SpanishCard(value: 5, suit: Suit.espadas),
+              SpanishCard(value: 6, suit: Suit.copas),
+            ],
+          },
+          publiclyKnownCardsByPlayerId: {
+            'rival': [
+              SpanishCard(value: 3, suit: Suit.espadas),
+              SpanishCard(value: 5, suit: Suit.oros),
+            ],
+            'rear': [
+              SpanishCard(value: 5, suit: Suit.espadas),
+              SpanishCard(value: 6, suit: Suit.copas),
+            ],
+          },
+          playedCards: [
+            PlayedCard(
+              player: rival,
+              card: SpanishCard(value: 1, suit: Suit.oros),
+            ),
+            PlayedCard(
+              player: teammate,
+              card: SpanishCard(value: 4, suit: Suit.bastos),
+            ),
+            PlayedCard(
+              player: rearRival,
+              card: SpanishCard(value: 3, suit: Suit.copas),
+            ),
+          ],
+          teamRoundWins: 0,
+          opponentRoundWins: 0,
+          preserveStrongCards: false,
+          teammateHasStrongSignal: false,
+          opponentHasStrongSignal: false,
+          forceWinIfPossible: false,
+          teammateStillToPlay: false,
+          opponentStillToPlay: false,
+        ),
+      );
+
+      expect(ZapitiRules.strength(card), lessThan(98));
+    });
+
     test('Monte Carlo descarta la baja si no puede ganar la baza', () {
       final card = MonteCarloBotPolicy().chooseCard(
         const BotDecisionContext(
@@ -254,40 +369,228 @@ void main() {
       expect(teamOneHand, contains(card));
     });
 
-    test('nivel 5 guarda el 4 de bastos al salir en la segunda baza', () {
+    test(
+        'TESTER-A Hard y Expert conservan el 4 tras ganar primera con alternativa suficiente',
+        () {
       const botHand = [
         SpanishCard(value: 4, suit: Suit.bastos),
         SpanishCard(value: 6, suit: Suit.oros),
         SpanishCard(value: 12, suit: Suit.copas),
       ];
-      final card = MonteCarloBotPolicy().chooseCard(
-        const BotDecisionContext(
-          difficulty: 5,
+      for (final difficulty in [4, 5]) {
+        final card = MonteCarloBotPolicy().chooseCard(
+          BotDecisionContext(
+            difficulty: difficulty,
+            bot: bot,
+            players: const [bot, rival, teammate, rearRival],
+            hand: botHand,
+            hands: const {
+              'bot': botHand,
+              'rival': [
+                SpanishCard(value: 3, suit: Suit.espadas),
+                SpanishCard(value: 5, suit: Suit.oros),
+              ],
+              'mate': [SpanishCard(value: 7, suit: Suit.copas)],
+              'rear': [SpanishCard(value: 2, suit: Suit.espadas)],
+            },
+            playedCards: const [],
+            teamRoundWins: 1,
+            opponentRoundWins: 0,
+            preserveStrongCards: true,
+            teammateHasStrongSignal: false,
+            opponentHasStrongSignal: false,
+            forceWinIfPossible: false,
+            teammateStillToPlay: true,
+            opponentStillToPlay: true,
+          ),
+        );
+
+        expect(card, const SpanishCard(value: 6, suit: Suit.oros),
+            reason: 'difficulty=$difficulty');
+      }
+    });
+
+    test('TESTER-B recuerda la primera empatada al empezar la segunda', () {
+      const botHand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.oros),
+      ];
+      const tie = RoundResult(
+        winner: null,
+        playedCards: [
+          PlayedCard(
+            player: rival,
+            card: SpanishCard(value: 3, suit: Suit.espadas),
+          ),
+          PlayedCard(
+            player: bot,
+            card: SpanishCard(value: 12, suit: Suit.copas),
+          ),
+          PlayedCard(
+            player: rearRival,
+            card: SpanishCard(value: 4, suit: Suit.copas),
+          ),
+          PlayedCard(
+            player: teammate,
+            card: SpanishCard(value: 3, suit: Suit.copas),
+          ),
+        ],
+      );
+      const hands = {
+        'bot': botHand,
+        'rival': [SpanishCard(value: 5, suit: Suit.bastos)],
+        'mate': [SpanishCard(value: 7, suit: Suit.oros)],
+        'rear': [SpanishCard(value: 6, suit: Suit.copas)],
+      };
+      const priorBlindSignal = SignalContext(
+        signals: [
+          StrategicSignal(
+            type: StrategicSignalType.cardSignal,
+            issuerPlayerId: 'bot',
+            teamId: 2,
+            handVersion: 0,
+            trickIndex: 0,
+            label: 'Mala',
+          ),
+        ],
+      );
+
+      for (final difficulty in [4, 5]) {
+        BotDecisionContext context({required bool tiedFirstTrick}) {
+          final firstTrick = RoundResult(
+            winner: tiedFirstTrick
+                ? null
+                : const PlayedCard(
+                    player: teammate,
+                    card: SpanishCard(value: 3, suit: Suit.copas),
+                  ),
+            playedCards: tie.playedCards,
+          );
+          return BotDecisionContext(
+            difficulty: difficulty,
+            bot: bot,
+            players: const [rival, teammate, bot, rearRival],
+            hand: botHand,
+            hands: hands,
+            playedCards: const [],
+            teamRoundWins: tiedFirstTrick ? 0 : 1,
+            opponentRoundWins: 0,
+            preserveStrongCards: true,
+            teammateHasStrongSignal: false,
+            opponentHasStrongSignal: false,
+            forceWinIfPossible: false,
+            teammateStillToPlay: true,
+            opponentStillToPlay: true,
+            signalContext: priorBlindSignal,
+            trickIndex: 1,
+            roundHistory: [firstTrick],
+          );
+        }
+
+        final tiedSelector = _RecordingMonteCarloCardSelector();
+        final policy = MonteCarloBotPolicy(
+          selector: tiedSelector,
+        );
+        final tiedDecision = policy.chooseCard(
+          context(tiedFirstTrick: true),
+        );
+        final freshSelector = _RecordingMonteCarloCardSelector();
+        final freshHandDecision = MonteCarloBotPolicy(
+          selector: freshSelector,
+        ).chooseCard(
+          context(tiedFirstTrick: false),
+        );
+
+        expect(tie.isTie, isTrue);
+        expect(tiedSelector.observedState?.completedTricks, hasLength(1));
+        expect(
+            tiedSelector.observedState?.completedTricks.single.isTie, isTrue);
+        expect(tiedSelector.observedState?.trickIndex, 1);
+        expect(
+          tiedSelector.observedState?.signalContext.signals.single.label,
+          'Mala',
+        );
+        expect(tiedDecision, isIn(botHand), reason: 'difficulty=$difficulty');
+        expect(freshHandDecision, isIn(botHand),
+            reason: 'difficulty=$difficulty');
+        expect(
+            freshSelector.observedState?.completedTricks.single.isTie, isFalse);
+        expect(freshSelector.observedState?.trickIndex, 1);
+        expect(
+          freshSelector.observedState?.signalContext.signals.single.label,
+          'Mala',
+        );
+      }
+    });
+
+    test('TESTER-C conserva la mata con pareja ganadora y la usa ante amenaza',
+        () {
+      const botHand = [
+        SpanishCard(value: 4, suit: Suit.bastos),
+        SpanishCard(value: 6, suit: Suit.oros),
+        SpanishCard(value: 12, suit: Suit.copas),
+      ];
+
+      BotDecisionContext context({
+        required int difficulty,
+        required bool dangerousRival,
+      }) {
+        final rearHand = dangerousRival
+            ? const [SpanishCard(value: 7, suit: Suit.copas)]
+            : const [SpanishCard(value: 2, suit: Suit.copas)];
+        return BotDecisionContext(
+          difficulty: difficulty,
           bot: bot,
-          players: [bot, rival, teammate, rearRival],
+          players: const [rival, teammate, bot, rearRival],
           hand: botHand,
           hands: {
             'bot': botHand,
-            'rival': [
-              SpanishCard(value: 3, suit: Suit.espadas),
-              SpanishCard(value: 5, suit: Suit.oros),
-            ],
-            'mate': [SpanishCard(value: 7, suit: Suit.copas)],
-            'rear': [SpanishCard(value: 2, suit: Suit.espadas)],
+            'rival': const [],
+            'mate': const [],
+            'rear': rearHand,
           },
-          playedCards: [],
-          teamRoundWins: 1,
+          publiclyKnownCardsByPlayerId: {
+            'rival': const [],
+            'mate': const [],
+            'rear': rearHand,
+          },
+          playedCards: const [
+            PlayedCard(
+              player: rival,
+              card: SpanishCard(value: 1, suit: Suit.oros),
+            ),
+            PlayedCard(
+              player: teammate,
+              card: SpanishCard(value: 3, suit: Suit.espadas),
+            ),
+          ],
+          teamRoundWins: 0,
           opponentRoundWins: 0,
           preserveStrongCards: true,
           teammateHasStrongSignal: false,
           opponentHasStrongSignal: false,
           forceWinIfPossible: false,
-          teammateStillToPlay: true,
+          teammateStillToPlay: false,
           opponentStillToPlay: true,
-        ),
-      );
+        );
+      }
 
-      expect(card, const SpanishCard(value: 6, suit: Suit.oros));
+      for (final difficulty in [4, 5]) {
+        final policy = MonteCarloBotPolicy();
+        final safeCard = policy.chooseCard(context(
+          difficulty: difficulty,
+          dangerousRival: false,
+        ));
+        final defensiveCard = policy.chooseCard(context(
+          difficulty: difficulty,
+          dangerousRival: true,
+        ));
+
+        expect(safeCard, isNot(const SpanishCard(value: 4, suit: Suit.bastos)),
+            reason: 'difficulty=$difficulty');
+        expect(defensiveCard, const SpanishCard(value: 4, suit: Suit.bastos),
+            reason: 'difficulty=$difficulty');
+      }
     });
 
     test('nivel 5 sale bajo para dar vision a la pareja', () {
@@ -348,7 +651,7 @@ void main() {
             player: bot,
             card: winner.id == bot.id
                 ? card
-                : const SpanishCard(value: 12, suit: Suit.oros),
+                : const SpanishCard(value: 10, suit: Suit.espadas),
           ),
           const PlayedCard(
             player: rival,
@@ -381,7 +684,8 @@ void main() {
         botHand: botHand,
         playedCards: playedCards,
         cardsRemainingByPlayerId: {
-          for (final player in players) player.id: knownHands[player.id]!.length,
+          for (final player in players)
+            player.id: knownHands[player.id]!.length,
         },
         publiclyKnownCardsByPlayerId: {
           for (final entry in knownHands.entries)
@@ -404,7 +708,9 @@ void main() {
       );
     }
 
-    test('normal conserva una carta extrema en segunda si su equipo gano la primera', () {
+    test(
+        'normal conserva una carta extrema en segunda si su equipo gano la primera',
+        () {
       const botHand = [
         SpanishCard(value: 4, suit: Suit.bastos),
         SpanishCard(value: 12, suit: Suit.oros),
@@ -515,7 +821,7 @@ void main() {
           roundHistory: [
             firstTrickWonBy(
               teammate,
-              const SpanishCard(value: 2, suit: Suit.copas),
+              const SpanishCard(value: 2, suit: Suit.bastos),
             ),
           ],
         ),
@@ -524,7 +830,7 @@ void main() {
       expect(card, const SpanishCard(value: 1, suit: Suit.espadas));
     });
 
-    test('cambiar solo el ganador de primera baza altera la evaluacion de segunda', () {
+    test('AI-004 la historia de primera cambia la decision de segunda', () {
       const botHand = [
         SpanishCard(value: 4, suit: Suit.bastos),
         SpanishCard(value: 12, suit: Suit.oros),
@@ -556,7 +862,8 @@ void main() {
         ],
       };
 
-      final chosenWhenWinning = const RolloutBotPolicy(rolloutCount: 24).chooseCard(
+      final chosenWhenWinning =
+          const RolloutBotPolicy(rolloutCount: 24).chooseCard(
         BotDecisionContext(
           difficulty: 3,
           bot: bot,
@@ -575,13 +882,14 @@ void main() {
           roundHistory: [
             firstTrickWonBy(
               teammate,
-              const SpanishCard(value: 2, suit: Suit.copas),
+              const SpanishCard(value: 2, suit: Suit.bastos),
             ),
           ],
         ),
       );
 
-      final chosenWhenLosing = const RolloutBotPolicy(rolloutCount: 24).chooseCard(
+      final chosenWhenLosing =
+          const RolloutBotPolicy(rolloutCount: 24).chooseCard(
         BotDecisionContext(
           difficulty: 3,
           bot: bot,
@@ -652,7 +960,7 @@ void main() {
           roundHistory: [
             firstTrickWonBy(
               teammate,
-              const SpanishCard(value: 2, suit: Suit.copas),
+              const SpanishCard(value: 2, suit: Suit.bastos),
             ),
           ],
           roundWins: const {1: 0, 2: 1},
@@ -663,7 +971,8 @@ void main() {
       expect(card, const SpanishCard(value: 12, suit: Suit.oros));
     });
 
-    test('hard distingue segunda baza segun quien gano la primera', () {
+    test('AI-002 hard usa fuerza cuando perder segunda pone la mano en riesgo',
+        () {
       const botHand = [
         SpanishCard(value: 4, suit: Suit.bastos),
         SpanishCard(value: 12, suit: Suit.oros),
@@ -705,7 +1014,7 @@ void main() {
           roundHistory: [
             firstTrickWonBy(
               teammate,
-              const SpanishCard(value: 2, suit: Suit.copas),
+              const SpanishCard(value: 2, suit: Suit.bastos),
             ),
           ],
           roundWins: const {1: 0, 2: 1},
@@ -733,7 +1042,9 @@ void main() {
       expect(forcing, const SpanishCard(value: 4, suit: Suit.bastos));
     });
 
-    test('easy sigue siendo legal; normal y hard conservan con la historia correcta', () {
+    test(
+        'easy sigue siendo legal; normal y hard conservan con la historia correcta',
+        () {
       const botHand = [
         SpanishCard(value: 4, suit: Suit.bastos),
         SpanishCard(value: 12, suit: Suit.oros),
@@ -767,7 +1078,7 @@ void main() {
       final roundHistory = [
         firstTrickWonBy(
           teammate,
-          const SpanishCard(value: 2, suit: Suit.copas),
+          const SpanishCard(value: 2, suit: Suit.bastos),
         ),
       ];
 
@@ -826,4 +1137,30 @@ void main() {
       expect(hard, const SpanishCard(value: 12, suit: Suit.oros));
     });
   });
+}
+
+class _RecordingMonteCarloCardSelector extends MonteCarloCardSelector {
+  ObservableGameState? observedState;
+
+  @override
+  SpanishCard selectCard({
+    required String botPlayerId,
+    required ObservableGameState state,
+    required MonteCarloDifficultyConfig config,
+  }) {
+    observedState = state;
+    return state.botHand.first;
+  }
+}
+
+class _RecordingSampler implements PossibleDealSampler {
+  final UniformPossibleDealSampler _delegate =
+      const UniformPossibleDealSampler();
+  ObservableGameState? observedState;
+
+  @override
+  PossibleDeal sample(ObservableGameState state, Random random) {
+    observedState = state;
+    return _delegate.sample(state, random);
+  }
 }

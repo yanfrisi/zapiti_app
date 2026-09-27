@@ -159,10 +159,55 @@ extension _GameScreenPlayLogic on _GameScreenState {
     }
 
     final signal = SignalRules.signalForHand(_hands[bot.id] ?? const []);
+    _logGameplay('signal', 'signal_request', fields: {
+      'playerId': bot.id,
+      'source': 'automatic',
+    });
+    _logGameplay('signal', 'signal_computed', fields: {
+      'playerId': bot.id,
+      'hasSignal': signal != null,
+    });
     if (signal == null) return;
+    await _presentBotSignal(
+      bot: bot,
+      signal: signal,
+      version: version,
+      isRivalBot: isRivalBot,
+      awaitReveal: awaitReveal,
+      source: 'automatic',
+    );
+  }
 
+  Future<void> _presentBotSignal({
+    required Player bot,
+    required String signal,
+    required int version,
+    required bool isRivalBot,
+    required bool awaitReveal,
+    required String source,
+    String? privateFeedback,
+    String? requestId,
+  }) async {
+    final shownAt = Stopwatch()..start();
+    await _botVisualDelay(_GameScreenState._botSignalDelay);
+    if (!mounted ||
+        _handFinished ||
+        _isGameFinished ||
+        version != _handVersion) {
+      return;
+    }
+    if (source == 'automatic' &&
+        bot.id == _companionPlayer.id &&
+        _isRequestingCompanionSignal) {
+      return;
+    }
+
+    final visualGeneration = ++_botSignalVisualGeneration;
     _updateState(() {
       _playersSignaledThisHand.add(bot.id);
+      if (source == 'automatic') {
+        _automaticBotSignalsThisHand.add(bot.id);
+      }
       _playerMessages[bot.id] = 'SENAL: $signal';
       _recordStrategicSignal(
         type: StrategicSignalType.cardSignal,
@@ -174,33 +219,48 @@ extension _GameScreenPlayLogic on _GameScreenState {
       );
       _teamSignalsByTeam[bot.teamId] = signal;
       _knownSignalsByTeam[bot.teamId] = signal;
-    });
-
-    final revealDuration = isRivalBot
-        ? Duration(
-            milliseconds: difficultyProfile.rivalSignalRevealMilliseconds,
-          )
-        : _GameScreenState._teammateBotSignalRevealDuration;
-    if (!awaitReveal) {
-      _playerMessageTimers.remove(bot.id)?.cancel();
-      _playerMessageTimers[bot.id] = Timer(revealDuration, () {
-        if (!mounted || version != _handVersion) return;
-        _updateState(() {
-          if (_playerMessages[bot.id] == 'SENAL: $signal') {
-            _playerMessages.remove(bot.id);
-          }
-          _playerMessageTimers.remove(bot.id);
-        });
-      });
-      return;
-    }
-    await Future<void>.delayed(revealDuration);
-    if (!mounted || version != _handVersion) return;
-    _updateState(() {
-      if (_playerMessages[bot.id] == 'SENAL: $signal') {
-        _playerMessages.remove(bot.id);
+      if (source == 'requested') {
+        _maybeLetOpponentsSeeSignal(bot.teamId, signal);
+      }
+      if (privateFeedback != null) {
+        _setCompanionPrivateSignalStatus(
+          privateFeedback,
+          requestId: requestId,
+        );
+        _isRequestingCompanionSignal = false;
       }
     });
+    shownAt.stop();
+    _logGameplay('signal', 'signal_shown', fields: {
+      'playerId': bot.id,
+      'source': source,
+      'signalType': signal,
+      'shownDurationMs':
+          _GameScreenState._botSignalVisibleDuration.inMilliseconds,
+      'durationMs': shownAt.elapsedMilliseconds,
+      'hasSignal': true,
+    });
+
+    Future<void> restoreAvatar() async {
+      await _botVisualDelay(_GameScreenState._botSignalVisibleDuration);
+      if (!mounted ||
+          version != _handVersion ||
+          visualGeneration != _botSignalVisualGeneration) {
+        return;
+      }
+      _updateState(() {
+        if (_playerMessages[bot.id] == 'SENAL: $signal') {
+          _playerMessages.remove(bot.id);
+        }
+        if (requestId != null &&
+            _companionPrivateSignalRequestId == requestId) {
+          _setCompanionPrivateSignalStatus(null);
+        }
+      });
+    }
+
+    final restoration = restoreAvatar();
+    if (awaitReveal) await restoration;
   }
 
   bool _playCard(Player player, SpanishCard card) {
@@ -266,7 +326,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     }
   }
 
-  Future<void> _advanceBots() async {
+  Future<void> _advanceBots({String? skipBetForPlayerId}) async {
     if (_game.alVerState == AlVerState.awaitingDecision) {
       return;
     }
@@ -320,11 +380,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
           });
         }
 
-        await _maybeShowBotSignal(
-          bot,
-          version,
-          awaitReveal: !hasCompanionOrderWindow,
-        );
+        if (hasCompanionOrderWindow) {
+          unawaited(_maybeShowBotSignal(
+            bot,
+            version,
+            awaitReveal: false,
+          ));
+        } else {
+          await _maybeShowBotSignal(bot, version);
+        }
         if (!mounted || version != _handVersion || _handFinished) return;
 
         _updateState(() {
@@ -359,24 +423,36 @@ extension _GameScreenPlayLogic on _GameScreenState {
         }
         if (!mounted || version != _handVersion || _handFinished) return;
 
-        final betWatch = Stopwatch()..start();
-        final betValue = _botBetValue(bot);
-        betWatch.stop();
-        _logGameplay('bot', 'bet_selector_end', fields: {
-          'runId': runId,
-          'playerId': bot.id,
-          'durationMs': betWatch.elapsedMilliseconds,
-          'value': betValue,
-        });
+        final skipsBetAfterAcceptedResponse = bot.id == skipBetForPlayerId;
+        if (skipsBetAfterAcceptedResponse) skipBetForPlayerId = null;
+        int? betValue;
+        if (skipsBetAfterAcceptedResponse) {
+          _logGameplay('bot', 'bet_selector_skipped', fields: {
+            'runId': runId,
+            'playerId': bot.id,
+            'reason': 'accepted_response_continues_to_card',
+          });
+        } else {
+          final betWatch = Stopwatch()..start();
+          betValue = _botBetValue(bot);
+          betWatch.stop();
+          _logGameplay('bot', 'bet_selector_end', fields: {
+            'runId': runId,
+            'playerId': bot.id,
+            'durationMs': betWatch.elapsedMilliseconds,
+            'value': betValue,
+          });
+        }
         if (betValue != null) {
+          final callValue = betValue;
           _updateState(() {
             _callTruco(
               bot,
-              value: betValue,
+              value: callValue,
               actorPlayerId: bot.id,
             );
           });
-          _sendMultiplayerTrucoCallIfNeeded(bot, betValue);
+          _sendMultiplayerTrucoCallIfNeeded(bot, callValue);
 
           // Once the bot has already decided to sing truco, keep only a short
           // beat before showing the human-response overlay.
@@ -400,7 +476,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
           if (_isWaitingHumanTrucoResponse) {
             _openIncomingTrucoOverlay(
               caller: bot,
-              value: betValue,
+              value: callValue,
               source: 'bot_turn',
             );
           }
@@ -493,6 +569,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final teamSignal = _teamSignalsByTeam[bot.teamId];
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
+    var forceWinFromOrder = shouldObeyVoyATi;
     final shouldPlayHighest = _forceHighestRequestedPlayerIds.contains(bot.id);
     final shouldPlayLowest = _forceLowestRequestedPlayerIds.contains(bot.id);
     final signaledCard = SignalRules.exactCardForSignal(teamSignal);
@@ -504,6 +581,30 @@ extension _GameScreenPlayLogic on _GameScreenState {
           signal.handVersion == _handVersion &&
           signal.trickIndex == _roundHistory.length,
     );
+    final legalCards = _game.legalCardsForPlayer(bot);
+    if (hasVoyATiOrder || shouldObeyVoyATi) {
+      _forceWinRequestedPlayerIds.remove(bot.id);
+      final bestTableStrength = _playedCards.isEmpty
+          ? -1
+          : _playedCards
+              .map((played) => ZapitiRules.strength(played.card))
+              .reduce((a, b) => a > b ? a : b);
+      final winningCards = legalCards
+          .where((card) => ZapitiRules.strength(card) > bestTableStrength)
+          .toList();
+      if (winningCards.isNotEmpty) {
+        _forceHighestRequestedPlayerIds.remove(bot.id);
+        _forceLowestRequestedPlayerIds.remove(bot.id);
+        return BotVoyATiStrategy.chooseCard(
+          bot: bot,
+          hand: winningCards,
+          playedCards: _playedCards,
+          players: _players,
+          hands: _hands,
+        );
+      }
+      forceWinFromOrder = false;
+    }
     if (shouldPlayLowest) {
       _forceWinRequestedPlayerIds.remove(bot.id);
       _forceHighestRequestedPlayerIds.remove(bot.id);
@@ -531,24 +632,11 @@ extension _GameScreenPlayLogic on _GameScreenState {
       final legalCards = _game.legalCardsForPlayer(bot);
       return ([...legalCards]..sort(BotStrategy.compareByStrength)).last;
     }
-    if (hasVoyATiOrder &&
-        signaledCard != null &&
-        hand.contains(signaledCard)) {
+    if (hasVoyATiOrder && signaledCard != null && hand.contains(signaledCard)) {
       _forceWinRequestedPlayerIds.remove(bot.id);
       _forceHighestRequestedPlayerIds.remove(bot.id);
       _forceLowestRequestedPlayerIds.remove(bot.id);
       return signaledCard;
-    }
-    if (shouldObeyVoyATi && _shouldIgnoreAggressiveCompanionCommand(bot)) {
-      _forceWinRequestedPlayerIds.remove(bot.id);
-      return BotVenAMiStrategy.chooseCard(
-        bot: bot,
-        hand: hand,
-        playedCards: _playedCards,
-        players: _players,
-        hands: _hands,
-        legalCards: _game.legalCardsForPlayer(bot),
-      );
     }
     final memory = BotMemoryContext.from(
       bot: bot,
@@ -556,62 +644,46 @@ extension _GameScreenPlayLogic on _GameScreenState {
       roundHistory: _roundHistory,
     );
     final difficulty = _botDifficultyFor(bot);
-    final policy = BotPolicySelector.forDifficulty(difficulty);
-    final strategicCard = policy.chooseCard(
-      BotDecisionContext(
-        difficulty: difficulty,
-        bot: bot,
-        players: _players,
-        hand: hand,
-        hands: _hands,
-        playedCards: _playedCards,
-        teamRoundWins: _roundWins[bot.teamId]!,
-        opponentRoundWins: _roundWins[TeamRules.opponentOf(bot.teamId)]!,
-        preserveStrongCards: bot.teamId == _humanPlayer.teamId ||
-            _isStrongSignal(teamSignal) ||
-            memory.teammateWonLastRound ||
-            memory.opponentsSpentPower,
-        teammateHasStrongSignal: _isStrongSignal(teamSignal),
-        opponentHasStrongSignal:
-            _isStrongSignal(opponentSignal) && !memory.tableIsDrained,
-        forceWinIfPossible: shouldObeyVoyATi ||
-            shouldPlayHighest ||
-            _shouldBotForceWin(bot, memory: memory),
-        teammateStillToPlay:
-            _teammateStillToPlay(bot) && !memory.opponentsWonAnyRound,
-        opponentStillToPlay: _opponentStillToPlay(bot),
-        signalContext: _signalContextFor(bot),
-        handVersion: _handVersion,
-        trickIndex: _roundHistory.length,
-        betState: _betState,
-        score: _score,
-        roundHistory: _roundHistory,
-      ),
+    final prioritizeFirstTrick =
+        bot.teamId != _humanPlayer.teamId && _roundHistory.isEmpty;
+    final decisionContext = BotDecisionContext(
+      difficulty: difficulty,
+      bot: bot,
+      players: _players,
+      hand: hand,
+      hands: _hands,
+      playedCards: _playedCards,
+      teamRoundWins: _roundWins[bot.teamId]!,
+      opponentRoundWins: _roundWins[TeamRules.opponentOf(bot.teamId)]!,
+      preserveStrongCards: bot.teamId == _humanPlayer.teamId ||
+          _isStrongSignal(teamSignal) ||
+          memory.teammateWonLastRound ||
+          memory.opponentsSpentPower,
+      teammateHasStrongSignal: _isStrongSignal(teamSignal),
+      opponentHasStrongSignal:
+          _isStrongSignal(opponentSignal) && !memory.tableIsDrained,
+      forceWinIfPossible: prioritizeFirstTrick ||
+          forceWinFromOrder ||
+          shouldPlayHighest ||
+          _shouldBotForceWin(bot, memory: memory),
+      prioritizeFirstTrick: prioritizeFirstTrick,
+      teammateStillToPlay:
+          _teammateStillToPlay(bot) && !memory.opponentsWonAnyRound,
+      opponentStillToPlay: _opponentStillToPlay(bot),
+      signalContext: _signalContextFor(bot),
+      handVersion: _handVersion,
+      trickIndex: _roundHistory.length,
+      betState: _betState,
+      score: _score,
+      roundHistory: _roundHistory,
     );
+    final strategicCard = BotPolicySelector.chooseCard(decisionContext);
     _forceWinRequestedPlayerIds.remove(bot.id);
     _forceHighestRequestedPlayerIds.remove(bot.id);
     _forceLowestRequestedPlayerIds.remove(bot.id);
-    return _maybeApplyDifficultyCardMistake(bot, hand, strategicCard);
-  }
-
-  bool _shouldIgnoreAggressiveCompanionCommand(Player bot) {
-    if (_playedCards.length != _players.length - 1) {
-      return false;
-    }
-    final winningTeam = BotTableRead.currentWinningTeamOnTable(_playedCards);
-    if (winningTeam != bot.teamId) {
-      return false;
-    }
-    final bestStrength = BotTableRead.bestTableStrength(_playedCards);
-    if (bestStrength == null) {
-      return false;
-    }
-    return _playedCards.any(
-      (playedCard) =>
-          playedCard.player.teamId == bot.teamId &&
-          playedCard.player.id != bot.id &&
-          ZapitiRules.strength(playedCard.card) == bestStrength,
-    );
+    return prioritizeFirstTrick
+        ? strategicCard
+        : _maybeApplyDifficultyCardMistake(bot, hand, strategicCard);
   }
 
   int _botDifficultyFor(Player bot) {
@@ -643,18 +715,42 @@ extension _GameScreenPlayLogic on _GameScreenState {
   }
 
   void _beginCompanionBotOrderWindow(Player bot) {
-    final orderReceived = Completer<void>();
+    _clearCompanionBotOrderWindow();
+    final orderReceived = Completer<bool>();
     _updateState(() {
       _companionBotOrderWindowPlayerId = bot.id;
       _companionBotOrderWindowCompleter = orderReceived;
-      _companionBotOrderWindowFuture = orderReceived.future.then((_) => true);
+      _companionBotOrderWindowFuture = orderReceived.future;
     });
+    _companionBotOrderWindowTimer = Timer(
+      _GameScreenState._companionOrderWindowDuration,
+      () {
+        if (identical(_companionBotOrderWindowCompleter, orderReceived) &&
+            !orderReceived.isCompleted) {
+          orderReceived.complete(false);
+        }
+      },
+    );
+  }
+
+  void _clearCompanionBotOrderWindow() {
+    _companionBotOrderWindowTimer?.cancel();
+    _companionBotOrderWindowTimer = null;
+    final completer = _companionBotOrderWindowCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(false);
+    }
+    _companionBotOrderWindowPlayerId = null;
+    _companionBotOrderWindowCompleter = null;
+    _companionBotOrderWindowFuture = null;
   }
 
   Future<bool> _finishCompanionBotOrderWindow(Player bot, int version) async {
     final completer = _companionBotOrderWindowCompleter;
     final windowFuture = _companionBotOrderWindowFuture;
     final wasOrderReceived = await (windowFuture ?? Future.value(false));
+    _companionBotOrderWindowTimer?.cancel();
+    _companionBotOrderWindowTimer = null;
 
     if (!mounted || version != _handVersion) return false;
     _updateState(() {
@@ -668,12 +764,12 @@ extension _GameScreenPlayLogic on _GameScreenState {
     return wasOrderReceived;
   }
 
-
   void _notifyCompanionBotOrderRegistered(String playerId) {
     if (_companionBotOrderWindowPlayerId != playerId) return;
     final completer = _companionBotOrderWindowCompleter;
     if (completer == null || completer.isCompleted) return;
-    completer.complete();
+    _companionBotOrderWindowTimer?.cancel();
+    completer.complete(true);
   }
 
   bool _maybeCompanionBotRequestsHumanVoyATi(Player bot) {
@@ -779,8 +875,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final repartoIsExpensive =
         _handValue >= 4 || (_pendingTrucoValue ?? 0) >= 5;
     final teamIsBehind = _roundWins[botTeam]! < _roundWins[otherTeam]!;
-    final canCloseHand =
-        _playedCards.isNotEmpty && _roundWins[botTeam]! > 0;
+    final canCloseHand = _playedCards.isNotEmpty && _roundWins[botTeam]! > 0;
     final mustSaveHand = _roundWins[otherTeam]! > 0;
     return repartoIsExpensive ||
         teamIsBehind ||
@@ -1320,7 +1415,7 @@ extension _GameScreenPlayLogic on _GameScreenState {
               'companionSignal',
               params: {'signal': _localizedSignalName(label)},
             ),
-            clearAfter: _GameScreenState._companionSignalFeedbackDuration,
+            clearAfter: _GameScreenState._botSignalVisibleDuration,
           );
           _status = context.tr(
             'signalReceivedFrom',

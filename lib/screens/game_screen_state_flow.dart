@@ -408,13 +408,12 @@ extension _GameScreenStateFlow on _GameScreenState {
     _forceLowestRequestedPlayerIds.clear();
     _forceBetEvaluationRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
+    _automaticBotSignalsThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
     _isAutoPlaying = false;
-    _companionBotOrderWindowPlayerId = null;
-    _companionBotOrderWindowCompleter = null;
-    _companionBotOrderWindowFuture = null;
+    _clearCompanionBotOrderWindow();
     _advanceBotsInFlight = false;
     _advanceBotsActiveRunId = 0;
     _advanceBotsInFlightHandVersion = null;
@@ -476,13 +475,12 @@ extension _GameScreenStateFlow on _GameScreenState {
     _forceLowestRequestedPlayerIds.clear();
     _forceBetEvaluationRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
+    _automaticBotSignalsThisHand.clear();
     _aiTeamsConsideredTrucoThisHand.clear();
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
     _isAutoPlaying = false;
-    _companionBotOrderWindowPlayerId = null;
-    _companionBotOrderWindowCompleter = null;
-    _companionBotOrderWindowFuture = null;
+    _clearCompanionBotOrderWindow();
     _advanceBotsInFlight = false;
     _advanceBotsActiveRunId = 0;
     _advanceBotsInFlightHandVersion = null;
@@ -776,7 +774,18 @@ extension _GameScreenStateFlow on _GameScreenState {
 
   Future<void> _botDelay(int milliseconds) {
     final adjusted = (milliseconds * _botSpeed.delayFactor).round();
-    return Future<void>.delayed(Duration(milliseconds: adjusted));
+    final completer = Completer<void>();
+    late final Timer timer;
+    timer = Timer(Duration(milliseconds: adjusted), () {
+      _botDelayTimers.remove(timer);
+      if (!completer.isCompleted) completer.complete();
+    });
+    _botDelayTimers[timer] = completer;
+    return completer.future;
+  }
+
+  Future<void> _botVisualDelay(Duration duration) {
+    return _botDelay((duration.inMilliseconds / _botSpeed.delayFactor).round());
   }
 
   void _newHand() {
@@ -947,6 +956,11 @@ extension _GameScreenStateFlow on _GameScreenState {
       timer.cancel();
     }
     _playerMessageTimers.clear();
+    for (final entry in _botDelayTimers.entries.toList()) {
+      entry.key.cancel();
+      if (!entry.value.isCompleted) entry.value.complete();
+    }
+    _botDelayTimers.clear();
     _companionPrivateSignalTimer?.cancel();
     _companionPrivateSignalTimer = null;
     _turnCountdownTimer?.cancel();
@@ -957,6 +971,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _opponentSignalsSeenByTeam.clear();
     _activeStrategicSignals.clear();
     _playersSignaledThisHand.clear();
+    _automaticBotSignalsThisHand.clear();
     _forceWinRequestedPlayerIds.clear();
     _forceHighestRequestedPlayerIds.clear();
     _forceLowestRequestedPlayerIds.clear();
@@ -967,9 +982,7 @@ extension _GameScreenStateFlow on _GameScreenState {
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _isAutoPlaying = false;
-    _companionBotOrderWindowPlayerId = null;
-    _companionBotOrderWindowCompleter = null;
-    _companionBotOrderWindowFuture = null;
+    _clearCompanionBotOrderWindow();
     _advanceBotsInFlight = false;
     _advanceBotsActiveRunId = 0;
     _advanceBotsInFlightHandVersion = null;
@@ -1040,14 +1053,13 @@ extension _GameScreenStateFlow on _GameScreenState {
     _forceLowestRequestedPlayerIds.clear();
     _forceBetEvaluationRequestedPlayerIds.clear();
     _playersSignaledThisHand.clear();
+    _automaticBotSignalsThisHand.clear();
     _companionPrivateSignalStatus = null;
     _companionPrivateSignalRequestId = null;
     _isWaitingHumanTrucoResponse = false;
     _isRequestingCompanionSignal = false;
     _isAutoPlaying = false;
-    _companionBotOrderWindowPlayerId = null;
-    _companionBotOrderWindowCompleter = null;
-    _companionBotOrderWindowFuture = null;
+    _clearCompanionBotOrderWindow();
     _advanceBotsInFlight = false;
     _advanceBotsActiveRunId = 0;
     _advanceBotsInFlightHandVersion = null;

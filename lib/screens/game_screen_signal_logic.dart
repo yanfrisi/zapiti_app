@@ -56,9 +56,14 @@ extension _GameScreenSignalLogic on _GameScreenState {
       return;
     }
 
+    final responseWatch = Stopwatch()..start();
     final version = _handVersion;
     final companion = _companionPlayer;
+    _logGameplay('signal', 'signal_request', fields: {'source': 'requested'});
     final signal = SignalRules.signalForHand(_hands[companion.id] ?? const []);
+    _logGameplay('signal', 'signal_computed', fields: {
+      'hasSignal': signal != null,
+    });
     if (_isGuidedTutorialMatch) {
       final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
       if (scenario.expectedAction != _TutorialScenarioAction.requestSignal) {
@@ -72,22 +77,26 @@ extension _GameScreenSignalLogic on _GameScreenState {
       _setCompanionPrivateSignalStatus(context.tr('companionLooking'));
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
-    if (version != _handVersion || _handFinished || _isGameFinished) {
-      _updateState(() {
-        _isRequestingCompanionSignal = false;
-      });
-      return;
-    }
-
     if (signal == null) {
+      await _botVisualDelay(_GameScreenState._botSignalDelay);
+      if (!mounted) return;
+      if (version != _handVersion || _handFinished || _isGameFinished) {
+        _updateState(() {
+          _isRequestingCompanionSignal = false;
+        });
+        return;
+      }
       _updateState(() {
         _setCompanionPrivateSignalStatus(
           context.tr('companionNoSignal'),
           clearAfter: _companionNoSignalStatusDuration,
         );
         _isRequestingCompanionSignal = false;
+      });
+      responseWatch.stop();
+      _logGameplay('signal', 'signal_shown', fields: {
+        'durationMs': responseWatch.elapsedMilliseconds,
+        'hasSignal': false,
       });
       return;
     }
@@ -97,29 +106,16 @@ extension _GameScreenSignalLogic on _GameScreenState {
       params: {'signal': _localizedSignalName(signal)},
     );
     final requestId = 'local-signal-${++_localSignalRequestSequence}';
-    _updateState(() {
-      _playersSignaledThisHand.add(companion.id);
-      _playerMessages[companion.id] = '$_signalMessagePrefix$signal';
-      _recordStrategicSignal(
-        type: StrategicSignalType.cardSignal,
-        issuer: companion,
-        label: signal,
-      );
-      _setCompanionPrivateSignalStatus(
-        companionSignalStatus,
-        clearAfter: _GameScreenState._companionSignalFeedbackDuration,
-        requestId: requestId,
-        onClear: () {
-          if (_playerMessages[companion.id] == '$_signalMessagePrefix$signal') {
-            _playerMessages.remove(companion.id);
-          }
-        },
-      );
-      _teamSignalsByTeam[companion.teamId] = signal;
-      _knownSignalsByTeam[companion.teamId] = signal;
-      _maybeLetOpponentsSeeSignal(companion.teamId, signal);
-      _isRequestingCompanionSignal = false;
-    });
+    await _presentBotSignal(
+      bot: companion,
+      signal: signal,
+      version: version,
+      isRivalBot: false,
+      awaitReveal: false,
+      source: 'requested',
+      privateFeedback: companionSignalStatus,
+      requestId: requestId,
+    );
     if (_isGuidedTutorialMatch) {
       final scenario = _guidedTutorialScenarios[_guidedTutorialScenarioIndex];
       final correct =
