@@ -138,8 +138,7 @@ class ZapitiGameController {
       : TeamRules.opponentOf(trucoCallerTeamId!);
   int? nextTrucoValueForPlayer(Player player) {
     if (handFinished || isGameFinished) return null;
-    if (alVerState == AlVerState.awaitingDecision) return null;
-    if (alVerState != AlVerState.none) return null;
+    if (!_canBetDuringAlVer(player.teamId)) return null;
     if (trucoState == TrucoNegotiationState.awaitingResponse) {
       if (respondingTrucoTeamId != player.teamId || pendingTrucoValue == null) {
         return null;
@@ -446,11 +445,7 @@ class ZapitiGameController {
     }
     final nominalPoints =
         TrucoRules.passPoints(currentAcceptedValue: handValue);
-    final points = TrucoRules.awardedPointsForTeam(
-      teamScore: score[callerTeamId]!,
-      targetScore: targetScore,
-      nominalValue: nominalPoints,
-    );
+    final points = _awardedTrucoPoints(callerTeamId, nominalPoints);
     trucoState = TrucoNegotiationState.rejectedHandFinished;
     _finishHandForTeam(
       callerTeamId,
@@ -466,7 +461,7 @@ class ZapitiGameController {
   }) {
     if (!_isAuthorizedTrucoActor(actorPlayerId ?? player.id)) return false;
     if (handFinished || isGameFinished) return false;
-    if (alVerState != AlVerState.none) return false;
+    if (!_canBetDuringAlVer(player.teamId)) return false;
     if (value > maxAllowedTrucoValueForTeam(player.teamId)) return false;
 
     if (trucoState == TrucoNegotiationState.awaitingResponse) {
@@ -724,13 +719,38 @@ class ZapitiGameController {
     );
   }
 
-  int _awardedHandPoints() {
-    if (alVerState == AlVerState.playing && alVerTeamIds.isNotEmpty) {
+  bool _canBetDuringAlVer(int teamId) {
+    if (alVerState == AlVerState.none) return true;
+    if (alVerState != AlVerState.playing || alVerTeamIds.length != 1) {
+      return false;
+    }
+    final alVerTeamId = alVerTeamIds.single;
+    return teamId != alVerTeamId && !_alVerForcesPlay(alVerTeamIds);
+  }
+
+  int _awardedTrucoPoints(int teamId, int nominalValue) {
+    final points = TrucoRules.awardedPointsForTeam(
+      teamScore: score[teamId]!,
+      targetScore: targetScore,
+      nominalValue: nominalValue,
+    );
+    if (alVerState == AlVerState.playing &&
+        alVerTeamIds.isNotEmpty &&
+        points < AlVerRules.playPoints) {
       return AlVerRules.playPoints;
     }
+    return points;
+  }
+
+  int _awardedHandPoints() {
     final progress = HandRules.resolve(roundHistory);
     if (progress.winningTeamId == null) {
-      return handValue;
+      return alVerState == AlVerState.playing && alVerTeamIds.isNotEmpty
+          ? AlVerRules.playPoints
+          : handValue;
+    }
+    if (alVerState == AlVerState.playing && alVerTeamIds.isNotEmpty) {
+      return _awardedTrucoPoints(progress.winningTeamId!, handValue);
     }
     return TrucoRules.awardedPointsForTeam(
       teamScore: score[progress.winningTeamId]!,

@@ -1732,6 +1732,29 @@ void main() {
     expect(gameState.canHumanCallTrucoForTesting, isFalse);
   });
 
+  testWidgets('permite cantar Truco contra el rival tras jugar al Ver',
+      (tester) async {
+    await startGame(tester);
+
+    final gameState = tester.state(find.byType(GameScreen)) as dynamic;
+    gameState.setState(() {
+      gameState.gameController.score[TeamRules.teamOne] = 24;
+      gameState.gameController.score[TeamRules.teamTwo] = 29;
+      gameState.gameController.startNewHand();
+      gameState.gameController.turnIndex = 0;
+      gameState.gameController.chooseAlVerDecision(
+        teamId: TeamRules.teamTwo,
+        play: true,
+      );
+      gameState.gameController.turnIndex = 0;
+    });
+    await tester.pump();
+
+    expect(gameState.canHumanCallTrucoForTesting, isTrue);
+    gameState.callGuidedTutorialTrucoForTesting();
+    expect(gameState.gameController.pendingTrucoValue, 3);
+  });
+
   testWidgets('ven a mi hace que el bot conserve el Zapiti en segunda baza',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);

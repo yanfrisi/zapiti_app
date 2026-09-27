@@ -1316,13 +1316,19 @@ void main() {
       expect(controller.playedCards, isEmpty);
     });
 
-    test('al ver bloquea truco y subida para ambos equipos', () {
+    test('al ver permite truco al rival tras decidir jugar', () {
       final controller = ZapitiGameController(
         players: ZapitiPlayers.tableOrder,
+        targetScore: 40,
       );
-      controller.score[TeamRules.teamOne] = 29;
+      controller.score[TeamRules.teamOne] = 24;
+      controller.score[TeamRules.teamTwo] = 29;
       controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
-      controller.chooseAlVerDecision(teamId: TeamRules.teamOne, play: true);
+
+      expect(controller.alVerState, AlVerState.awaitingDecision);
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 3), isFalse);
+      controller.chooseAlVerDecision(teamId: TeamRules.teamTwo, play: true);
+      controller.turnIndex = 0;
 
       expect(
         controller.canCallTruco(
@@ -1330,24 +1336,49 @@ void main() {
           value: 3,
           actorPlayerId: ZapitiPlayers.human.id,
         ),
-        isFalse,
+        isTrue,
       );
+      expect(
+        controller.legalBetActionsForPlayer(ZapitiPlayers.human),
+        contains(const BetAction.call(3)),
+      );
+      controller.callTruco(
+        ZapitiPlayers.human,
+        value: 3,
+        actorPlayerId: ZapitiPlayers.human.id,
+      );
+      expect(
+          controller.canAcceptTruco(
+            teamId: TeamRules.teamTwo,
+            actorPlayerId: ZapitiPlayers.rightRival.id,
+          ),
+          isTrue);
+      controller.acceptTruco(
+        teamId: TeamRules.teamTwo,
+        actorPlayerId: ZapitiPlayers.rightRival.id,
+      );
+      _finishTwoRounds(controller);
+
+      expect(controller.score[TeamRules.teamOne], 27);
+      expect(controller.handFinished, isTrue);
+    });
+
+    test('Al Ver forzado 29-28 sigue sin permitir cantar Truco', () {
+      final controller = ZapitiGameController(
+        players: ZapitiPlayers.tableOrder,
+      );
+      controller.score[TeamRules.teamOne] = 29;
+      controller.score[TeamRules.teamTwo] = 28;
+      controller.startNewHand(fixedHands: _teamOneWinsTwoRoundsHands());
+
+      expect(controller.alVerState, AlVerState.playing);
+      expect(controller.canCallTruco(ZapitiPlayers.human, value: 3), isFalse);
+      controller.turnIndex = 1;
       expect(
         controller.canCallTruco(
           ZapitiPlayers.rightRival,
           value: 3,
           actorPlayerId: ZapitiPlayers.rightRival.id,
-        ),
-        isFalse,
-      );
-
-      expect(controller.raiseOptionsForTeam(TeamRules.teamOne), isEmpty);
-      expect(controller.raiseOptionsForTeam(TeamRules.teamTwo), isEmpty);
-      expect(
-        controller.canCallTruco(
-          ZapitiPlayers.human,
-          value: 6,
-          actorPlayerId: ZapitiPlayers.human.id,
         ),
         isFalse,
       );
