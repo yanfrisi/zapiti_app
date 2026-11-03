@@ -94,5 +94,64 @@ void main() {
       expect(raiseValue, 6);
       expect(tooHigh, isNull);
     });
+
+    test('experto no farolea de salida si no hay presion ni lectura', () {
+      final shouldBluff = BotBluffStrategy.shouldBluffCall(
+        difficulty: 5,
+        roll: 0,
+        teamScore: 96,
+        ownMaxStrength: 70,
+        cardsOnTable: 0,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        needsPoints: false,
+        opponentsSpentPower: false,
+        teamSpentPower: false,
+        scoreGap: 0,
+      );
+
+      expect(shouldBluff, isFalse);
+    });
+
+    test('experto puede farolear si va por detras y el rival ya gasto fuerza', () {
+      final shouldBluff = BotBluffStrategy.shouldBluffCall(
+        difficulty: 5,
+        roll: 0.01,
+        teamScore: 88,
+        ownMaxStrength: 72,
+        cardsOnTable: 1,
+        teamRoundWins: 0,
+        opponentRoundWins: 0,
+        teamHasStrongSignal: false,
+        opponentHasStrongSignal: false,
+        needsPoints: true,
+        opponentsSpentPower: true,
+        teamSpentPower: false,
+        scoreGap: -8,
+      );
+
+      expect(shouldBluff, isTrue);
+    });
+
+    test('experto no re-sube de farol caro sin contexto favorable', () {
+      final raiseValue = BotBluffStrategy.bluffRaiseValue(
+        difficulty: 5,
+        roll: 0,
+        pendingValue: 6,
+        maxAllowedValue: 9,
+        teamScore: 92,
+        hasStrongSignal: false,
+        sawOpponentStrongSignal: false,
+        needsPoints: true,
+        isWinningReparto: false,
+        opponentsSpentPower: false,
+        teamSpentPower: false,
+        scoreGap: -4,
+      );
+
+      expect(raiseValue, isNull);
+    });
   });
 }

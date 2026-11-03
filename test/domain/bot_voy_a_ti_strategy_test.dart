@@ -66,6 +66,102 @@ void main() {
       expect(chosen, const SpanishCard(value: 2, suit: Suit.copas));
     });
 
+    test('en la mesa de los tres cincos gana con la menor carta suficiente',
+        () {
+      const hand = [
+        SpanishCard(value: 4, suit: Suit.copas),
+        SpanishCard(value: 6, suit: Suit.copas),
+        SpanishCard(value: 3, suit: Suit.oros),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 5, suit: Suit.espadas),
+        ),
+        PlayedCard(
+          player: human,
+          card: SpanishCard(value: 5, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: rivalLeft,
+          card: SpanishCard(value: 5, suit: Suit.copas),
+        ),
+      ];
+
+      final chosen = BotVoyATiStrategy.chooseCard(
+        bot: companion,
+        hand: hand,
+        playedCards: playedCards,
+        players: players,
+        hands: const {'p3': hand},
+      );
+
+      expect(chosen, const SpanishCard(value: 6, suit: Suit.copas));
+    });
+
+    test('sube de carta si la ganadora barata deja demasiado riesgo pendiente',
+        () {
+      const hand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 4, suit: Suit.bastos),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 1, suit: Suit.copas),
+        ),
+      ];
+      const rivalLeftHand = [
+        SpanishCard(value: 3, suit: Suit.espadas),
+      ];
+
+      final chosen = BotVoyATiStrategy.chooseCard(
+        bot: companion,
+        hand: hand,
+        playedCards: playedCards,
+        players: players,
+        hands: const {
+          'p3': hand,
+          'p4': rivalLeftHand,
+        },
+      );
+
+      expect(chosen, const SpanishCard(value: 4, suit: Suit.bastos));
+    });
+
+    test('si el companero ya gana la baza y el bot cierra turno, no lo supera',
+        () {
+      const hand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 2, suit: Suit.copas),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: human,
+          card: SpanishCard(value: 4, suit: Suit.bastos),
+        ),
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 1, suit: Suit.oros),
+        ),
+        PlayedCard(
+          player: rivalLeft,
+          card: SpanishCard(value: 3, suit: Suit.espadas),
+        ),
+      ];
+
+      final chosen = BotVoyATiStrategy.chooseCard(
+        bot: companion,
+        hand: hand,
+        playedCards: playedCards,
+        players: players,
+        hands: const {'p3': hand},
+      );
+
+      expect(chosen, const SpanishCard(value: 12, suit: Suit.oros));
+    });
+
     test('pide voy a ti al humano si el companero va antes y conviene', () {
       const botHand = [
         SpanishCard(value: 12, suit: Suit.oros),
@@ -74,6 +170,10 @@ void main() {
       const humanHand = [
         SpanishCard(value: 2, suit: Suit.copas),
         SpanishCard(value: 11, suit: Suit.espadas),
+      ];
+      const rivalLeftHand = [
+        SpanishCard(value: 12, suit: Suit.copas),
+        SpanishCard(value: 10, suit: Suit.espadas),
       ];
       const playedCards = [
         PlayedCard(
@@ -88,7 +188,9 @@ void main() {
         players: companionBeforeHumanPlayers,
         hands: const {
           'p1': humanHand,
+          'p2': [],
           'p3': botHand,
+          'p4': rivalLeftHand,
         },
         playedCards: playedCards,
         teamRoundWins: 0,
@@ -159,6 +261,47 @@ void main() {
         hands: const {
           'p1': humanHand,
           'p3': botHand,
+        },
+        playedCards: playedCards,
+        teamRoundWins: 0,
+        opponentRoundWins: 1,
+        handValue: 3,
+        difficulty: 5,
+        roll: 0,
+      );
+
+      expect(shouldAsk, isFalse);
+    });
+
+    test('no pide voy a ti si el humano ganaria con mucho riesgo oculto', () {
+      const botHand = [
+        SpanishCard(value: 12, suit: Suit.oros),
+        SpanishCard(value: 4, suit: Suit.bastos),
+      ];
+      const humanHand = [
+        SpanishCard(value: 2, suit: Suit.copas),
+        SpanishCard(value: 11, suit: Suit.espadas),
+      ];
+      const rivalLeftHand = [
+        SpanishCard(value: 1, suit: Suit.espadas),
+        SpanishCard(value: 5, suit: Suit.espadas),
+      ];
+      const playedCards = [
+        PlayedCard(
+          player: rivalRight,
+          card: SpanishCard(value: 1, suit: Suit.bastos),
+        ),
+      ];
+
+      final shouldAsk = BotVoyATiStrategy.shouldAskTeammateToWin(
+        bot: companion,
+        teammate: human,
+        players: companionBeforeHumanPlayers,
+        hands: const {
+          'p1': humanHand,
+          'p2': [],
+          'p3': botHand,
+          'p4': rivalLeftHand,
         },
         playedCards: playedCards,
         teamRoundWins: 0,

@@ -29,3 +29,21 @@ android/key.properties
 # OS
 .DS_Store
 Thumbs.db
+obfuscation-symbols/0.3.0+4/app.android-arm.symbols
+obfuscation-symbols/0.3.0+4/app.android-arm64.symbols
+obfuscation-symbols/0.3.0+4/app.android-x64.symbols
+obfuscation-symbols/0.3.3+7/app.android-arm.symbols
+obfuscation-symbols/0.3.3+7/app.android-arm64.symbols
+obfuscation-symbols/0.3.3+7/app.android-x64.symbols
+obfuscation-symbols/0.3.3+8/app.android-arm.symbols
+obfuscation-symbols/0.3.3+8/app.android-arm64.symbols
+obfuscation-symbols/0.3.3+8/app.android-x64.symbols
+obfuscation-symbols/0.3.5+9/app.android-x64.symbols
+obfuscation-symbols/0.3.5+9/app.android-arm.symbols
+obfuscation-symbols/0.3.5+9/app.android-arm64.symbols
+obfuscation-symbols/0.4.0+10/app.android-arm.symbols
+obfuscation-symbols/0.4.0+10/app.android-arm64.symbols
+obfuscation-symbols/0.4.0+10/app.android-x64.symbols
+obfuscation-symbols/0.4.1+11/app.android-arm.symbols
+obfuscation-symbols/0.4.1+11/app.android-arm64.symbols
+obfuscation-symbols/0.4.1+11/app.android-x64.symbols

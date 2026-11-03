@@ -2,6 +2,7 @@ import '../domain/spanish_card.dart';
 import '../domain/player.dart';
 import 'zapiti_game_socket.dart';
 import 'zapiti_multiplayer_protocol.dart';
+import 'zapiti_logger.dart';
 
 class MultiplayerSessionStore {
   MultiplayerSessionStore._();
@@ -10,6 +11,14 @@ class MultiplayerSessionStore {
 
   GameSocket? socket;
   MultiplayerRoomSnapshot? roomSnapshot;
+  String? reconnectRoomId;
+  String? reconnectUsername;
+  String? reconnectPlayerName;
+  String? reconnectTeamName;
+  String? reconnectPassword;
+  String? reconnectSessionToken;
+  String? reconnectPairId;
+  String? reconnectCharacterId;
   String? localGamePlayerId;
   List<Player> players = const [];
   List<String> controlledPlayerIds = const [];
@@ -19,6 +28,53 @@ class MultiplayerSessionStore {
   int? botDifficulty;
   bool allowPassHand = false;
   bool matchStarted = false;
+
+  String? get activeRoomId => roomSnapshot?.roomId ?? reconnectRoomId;
+
+  bool get canReconnectMatch {
+    return activeRoomId?.isNotEmpty == true &&
+        localGamePlayerId?.isNotEmpty == true &&
+        reconnectUsername?.isNotEmpty == true &&
+        reconnectPlayerName?.isNotEmpty == true &&
+        reconnectTeamName?.isNotEmpty == true &&
+        ((reconnectSessionToken?.isNotEmpty == true) ||
+            (reconnectPassword?.isNotEmpty == true));
+  }
+
+  void rememberReconnectCredentials({
+    required String roomId,
+    required String playerId,
+    required String username,
+    required String playerName,
+    required String teamName,
+    String? password,
+    String? sessionToken,
+    String? pairId,
+    String? characterId,
+  }) {
+    reconnectRoomId = roomId.trim().isEmpty ? null : roomId.trim();
+    localGamePlayerId = playerId.trim().isEmpty ? null : playerId.trim();
+    reconnectUsername = username.trim().isEmpty ? null : username.trim();
+    reconnectPlayerName = playerName.trim().isEmpty ? null : playerName.trim();
+    reconnectTeamName = teamName.trim().isEmpty ? null : teamName.trim();
+    reconnectPassword = password?.trim().isEmpty == true ? null : password;
+    reconnectSessionToken =
+        sessionToken?.trim().isEmpty == true ? null : sessionToken;
+    reconnectPairId = pairId?.trim().isEmpty == true ? null : pairId;
+    reconnectCharacterId =
+        characterId?.trim().isEmpty == true ? null : characterId;
+  }
+
+  void clearReconnectCredentials() {
+    reconnectRoomId = null;
+    reconnectUsername = null;
+    reconnectPlayerName = null;
+    reconnectTeamName = null;
+    reconnectPassword = null;
+    reconnectSessionToken = null;
+    reconnectPairId = null;
+    reconnectCharacterId = null;
+  }
 
   void clearMatchData() {
     localGamePlayerId = null;
@@ -32,10 +88,35 @@ class MultiplayerSessionStore {
     matchStarted = false;
   }
 
-  void clearAll() {
-    socket?.close();
+  void clearAll({bool closeSocket = true}) {
+    ZapitiLogger.info('session_store', 'clear_all_begin', fields: {
+      'activeRoomId': activeRoomId,
+      'localGamePlayerId': localGamePlayerId,
+      'matchStarted': matchStarted,
+      'players': players.map((player) => player.id).toList(),
+      'controlledPlayerIds': controlledPlayerIds,
+      'hasSocket': socket != null,
+      'socketConnected': socket?.isConnected,
+      'roomSnapshotPhase': roomSnapshot?.phase,
+    });
+    if (closeSocket) {
+      socket?.onMessage = null;
+      socket?.onError = null;
+      socket?.onDone = null;
+      socket?.close();
+    }
     socket = null;
     roomSnapshot = null;
+    clearReconnectCredentials();
     clearMatchData();
+    ZapitiLogger.info('session_store', 'clear_all_done', fields: {
+      'activeRoomId': activeRoomId,
+      'localGamePlayerId': localGamePlayerId,
+      'matchStarted': matchStarted,
+      'players': players.map((player) => player.id).toList(),
+      'controlledPlayerIds': controlledPlayerIds,
+      'hasSocket': socket != null,
+      'roomSnapshotPhase': roomSnapshot?.phase,
+    });
   }
 }

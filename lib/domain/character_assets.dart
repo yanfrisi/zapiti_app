@@ -10,14 +10,25 @@ class CharacterAssets {
     'p4': 'Jugador 4',
   };
 
+  static String safeCharacterId(String? characterId, {String fallback = 'p1'}) {
+    if (characterId != null && characterIds.contains(characterId)) {
+      return characterId;
+    }
+    return characterIds.contains(fallback) ? fallback : characterIds.first;
+  }
+
   static Map<String, String> assignmentForHuman({
     required String humanPlayerId,
     required List<String> playerIds,
     required String humanCharacterId,
   }) {
-    final safeHumanCharacterId = characterIds.contains(humanCharacterId)
-        ? humanCharacterId
-        : characterIds.first;
+    if (playerIds.isEmpty) {
+      return const {};
+    }
+    final safeHumanCharacterId = safeCharacterId(humanCharacterId);
+    final effectiveHumanPlayerId = playerIds.contains(humanPlayerId)
+        ? humanPlayerId
+        : playerIds.first;
     final remainingCharacters = characterIds
         .where((characterId) => characterId != safeHumanCharacterId)
         .toList();
@@ -25,7 +36,7 @@ class CharacterAssets {
 
     return {
       for (final playerId in playerIds)
-        playerId: playerId == humanPlayerId
+        playerId: playerId == effectiveHumanPlayerId
             ? safeHumanCharacterId
             : remainingCharacters[nextCharacterIndex++],
     };
@@ -44,23 +55,27 @@ class CharacterAssets {
 
   /// Imagen neutral frontal para el jugador indicado (`p1`, `p2`, `p3`, `p4`).
   static String neutral(String playerId) {
-    return 'assets/characters/$playerId/front/neutral.png';
+    final safeId = safeCharacterId(playerId);
+    return 'assets/characters/$safeId/front/neutral.png';
   }
 
   static String selection(String playerId) {
-    return 'assets/characters/$playerId/front/selection.png';
+    final safeId = safeCharacterId(playerId);
+    return 'assets/characters/$safeId/front/selection.png';
   }
 
   /// Imagen frontal de seña, o neutral si la seña no está mapeada.
   static String frontForSignal(String playerId, String? signal) {
+    final safeId = safeCharacterId(playerId);
     final file = signal == null ? null : _signalFiles[signal];
     return file == null
-        ? neutral(playerId)
-        : 'assets/characters/$playerId/front/$file';
+        ? neutral(safeId)
+        : 'assets/characters/$safeId/front/$file';
   }
 
   /// Imagen lateral de apoyo para rivales sentados a izquierda/derecha.
   static String side(String playerId, {required bool left}) {
-    return 'assets/characters/$playerId/${left ? 'left' : 'right'}/neutral.png';
+    final safeId = safeCharacterId(playerId);
+    return 'assets/characters/$safeId/${left ? 'left' : 'right'}/neutral.png';
   }
 }
