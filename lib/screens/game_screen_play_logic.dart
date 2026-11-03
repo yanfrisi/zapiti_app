@@ -239,12 +239,19 @@ extension _GameScreenPlayLogic on _GameScreenState {
     final opponentSignal = _opponentSignalsSeenByTeam[bot.teamId];
     final shouldObeyVoyATi = _forceWinRequestedPlayerIds.contains(bot.id);
     final shouldPlayHighest = _forceHighestRequestedPlayerIds.contains(bot.id);
-    if (shouldPlayHighest) {
+    final orderedCard = BotOrderPolicy.chooseOrderedCard(
+      bot: bot,
+      hand: hand,
+      playedCards: _playedCards,
+      players: _players,
+      hands: _hands,
+      mataRequested: shouldPlayHighest,
+      voyATiRequested: shouldObeyVoyATi,
+    );
+    if (orderedCard != null) {
       _forceHighestRequestedPlayerIds.remove(bot.id);
-      final sorted = [...hand]..sort(
-          (a, b) => ZapitiRules.strength(a).compareTo(ZapitiRules.strength(b)),
-        );
-      return sorted.last;
+      _forceWinRequestedPlayerIds.remove(bot.id);
+      return orderedCard;
     }
     final memory = BotMemoryContext.from(
       bot: bot,
@@ -270,16 +277,6 @@ extension _GameScreenPlayLogic on _GameScreenState {
           _teammateStillToPlay(bot) && !memory.opponentsWonAnyRound,
       opponentStillToPlay: _opponentStillToPlay(bot),
     );
-    _forceWinRequestedPlayerIds.remove(bot.id);
-    if (shouldObeyVoyATi) {
-      return BotVoyATiStrategy.chooseCard(
-        bot: bot,
-        hand: hand,
-        playedCards: _playedCards,
-        players: _players,
-        hands: _hands,
-      );
-    }
     return _maybeApplyDifficultyCardMistake(bot, hand, strategicCard);
   }
 
