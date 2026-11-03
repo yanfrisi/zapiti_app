@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/bot_order_policy.dart';
+import '../domain/bot_voy_a_ti_strategy.dart';
 import '../domain/bot_strategy.dart';
 import '../domain/bot_al_ver_strategy.dart';
 import '../domain/bot_bluff_strategy.dart';
