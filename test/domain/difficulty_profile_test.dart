@@ -33,5 +33,15 @@ void main() {
       expect(DifficultyProfiles.byLevel(3).readsOpponentSignals, isTrue);
       expect(DifficultyProfiles.byLevel(5).allowsPerfectCardPlay, isTrue);
     });
+
+    test('acelera y elimina senas rivales en experto', () {
+      expect(DifficultyProfiles.byLevel(1).rivalsGiveSignals, isTrue);
+      expect(
+        DifficultyProfiles.byLevel(1).rivalSignalRevealMilliseconds,
+        greaterThan(DifficultyProfiles.byLevel(4).rivalSignalRevealMilliseconds),
+      );
+      expect(DifficultyProfiles.byLevel(5).rivalsGiveSignals, isFalse);
+      expect(DifficultyProfiles.byLevel(5).rivalSignalRevealMilliseconds, 0);
+    });
   });
 }

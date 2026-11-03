@@ -36,11 +36,13 @@ String _difficultyTrucoPlay(BuildContext context, int level) {
 class _CharacterSelectionScreen extends StatelessWidget {
   final String selectedCharacterId;
   final ValueChanged<String> onSelected;
+  final VoidCallback onBack;
   final VoidCallback onStart;
 
   const _CharacterSelectionScreen({
     required this.selectedCharacterId,
     required this.onSelected,
+    required this.onBack,
     required this.onStart,
   });
 
@@ -81,6 +83,14 @@ class _CharacterSelectionScreen extends StatelessWidget {
                 primary: true,
               ),
             );
+            final backButton = FractionallySizedBox(
+              widthFactor: orientation == Orientation.portrait ? 1 : 0.86,
+              child: ZapitiActionButton(
+                label: context.tr('back'),
+                icon: Icons.arrow_back,
+                onPressed: onBack,
+              ),
+            );
 
             if (orientation == Orientation.portrait) {
               return Padding(
@@ -100,7 +110,16 @@ class _CharacterSelectionScreen extends StatelessWidget {
                     SizedBox(height: gap),
                     Expanded(flex: 40, child: grid),
                     SizedBox(height: gap),
-                    Flexible(flex: 10, child: Center(child: button)),
+                    Flexible(
+                      flex: 16,
+                      child: Column(
+                        children: [
+                          Expanded(child: Center(child: button)),
+                          SizedBox(height: gap * 0.5),
+                          Expanded(child: Center(child: backButton)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -127,7 +146,16 @@ class _CharacterSelectionScreen extends StatelessWidget {
                         SizedBox(height: gap),
                         Expanded(flex: 68, child: grid),
                         SizedBox(height: gap),
-                        Flexible(flex: 14, child: Center(child: button)),
+                        Flexible(
+                          flex: 22,
+                          child: Column(
+                            children: [
+                              Expanded(child: Center(child: button)),
+                              SizedBox(height: gap * 0.5),
+                              Expanded(child: Center(child: backButton)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -515,11 +543,13 @@ class _CharacterChoice extends StatelessWidget {
 class _DifficultySelectionScreen extends StatelessWidget {
   final int selectedDifficulty;
   final ValueChanged<int> onSelected;
+  final VoidCallback onBack;
   final VoidCallback onStart;
 
   const _DifficultySelectionScreen({
     required this.selectedDifficulty,
     required this.onSelected,
+    required this.onBack,
     required this.onStart,
   });
 
@@ -557,6 +587,14 @@ class _DifficultySelectionScreen extends StatelessWidget {
                 primary: true,
               ),
             );
+            final backButton = FractionallySizedBox(
+              widthFactor: orientation == Orientation.portrait ? 1 : 0.72,
+              child: ZapitiActionButton(
+                label: context.tr('back'),
+                icon: Icons.arrow_back,
+                onPressed: onBack,
+              ),
+            );
 
             if (orientation == Orientation.portrait) {
               return Padding(
@@ -570,9 +608,18 @@ class _DifficultySelectionScreen extends StatelessWidget {
                       child: _SelectedDifficultySummary(profile: profile),
                     ),
                     SizedBox(height: gap),
-                    Expanded(flex: 48, child: choices),
+                    Expanded(flex: 40, child: choices),
                     SizedBox(height: gap),
-                    Flexible(flex: 12, child: Center(child: button)),
+                    Flexible(
+                      flex: 20,
+                      child: Column(
+                        children: [
+                          Expanded(child: Center(child: button)),
+                          SizedBox(height: gap * 0.5),
+                          Expanded(child: Center(child: backButton)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -589,11 +636,20 @@ class _DifficultySelectionScreen extends StatelessWidget {
                         Flexible(flex: 28, child: title),
                         SizedBox(height: gap),
                         Expanded(
-                          flex: 58,
+                          flex: 46,
                           child: _SelectedDifficultySummary(profile: profile),
                         ),
                         SizedBox(height: gap),
-                        Flexible(flex: 14, child: Center(child: button)),
+                        Flexible(
+                          flex: 26,
+                          child: Column(
+                            children: [
+                              Expanded(child: Center(child: button)),
+                              SizedBox(height: gap * 0.5),
+                              Expanded(child: Center(child: backButton)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
