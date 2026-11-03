@@ -13,7 +13,6 @@ import '../domain/bot_bluff_strategy.dart';
 import '../domain/bot_table_read.dart';
 import '../domain/bot_truco_raise_strategy.dart';
 import '../domain/bot_truco_strategy.dart';
-import '../domain/bot_voy_a_ti_strategy.dart';
 import '../domain/bot_memory_context.dart';
 import '../domain/character_assets.dart';
 import '../domain/debug_deals.dart';
