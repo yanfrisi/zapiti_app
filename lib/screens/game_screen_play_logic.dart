@@ -595,13 +595,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
       if (winningCards.isNotEmpty) {
         _forceHighestRequestedPlayerIds.remove(bot.id);
         _forceLowestRequestedPlayerIds.remove(bot.id);
-        return BotVoyATiStrategy.chooseCard(
+        return BotOrderPolicy.chooseOrderedCard(
           bot: bot,
           hand: winningCards,
           playedCards: _playedCards,
           players: _players,
           hands: _hands,
-        );
+          mataRequested: false,
+          voyATiRequested: true,
+        )!;
       }
       forceWinFromOrder = false;
     }
@@ -629,8 +631,15 @@ extension _GameScreenPlayLogic on _GameScreenState {
       _forceWinRequestedPlayerIds.remove(bot.id);
       _forceHighestRequestedPlayerIds.remove(bot.id);
       _forceLowestRequestedPlayerIds.remove(bot.id);
-      final legalCards = _game.legalCardsForPlayer(bot);
-      return ([...legalCards]..sort(BotStrategy.compareByStrength)).last;
+      return BotOrderPolicy.chooseOrderedCard(
+        bot: bot,
+        hand: legalCards,
+        playedCards: _playedCards,
+        players: _players,
+        hands: _hands,
+        mataRequested: true,
+        voyATiRequested: false,
+      )!;
     }
     if (hasVoyATiOrder && signaledCard != null && hand.contains(signaledCard)) {
       _forceWinRequestedPlayerIds.remove(bot.id);
